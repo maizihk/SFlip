@@ -1,7 +1,7 @@
 # SFlip
 
-[![macOS CI](https://github.com/maizihk/DisplaySwitch/actions/workflows/macos.yml/badge.svg)](https://github.com/maizihk/DisplaySwitch/actions/workflows/macos.yml)
-[![Windows CI](https://github.com/maizihk/DisplaySwitch/actions/workflows/windows.yml/badge.svg)](https://github.com/maizihk/DisplaySwitch/actions/workflows/windows.yml)
+[![macOS CI](https://github.com/maizihk/SFlip/actions/workflows/macos.yml/badge.svg)](https://github.com/maizihk/SFlip/actions/workflows/macos.yml)
+[![Windows CI](https://github.com/maizihk/SFlip/actions/workflows/windows.yml/badge.svg)](https://github.com/maizihk/SFlip/actions/workflows/windows.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 SFlip 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多台电脑共用显示器的场景。它通过 DDC/CI 调节亮度、对比度和音量，并在 USB 设备离开或用户手动选择目标时切换显示器输入源。
@@ -10,20 +10,20 @@ SFlip 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多台电�
 
 ## 下载与安装
 
-[查看最新发布](https://github.com/maizihk/DisplaySwitch/releases/latest) · [硬件兼容性](COMPATIBILITY.md)
+[查看最新发布](https://github.com/maizihk/SFlip/releases/latest) · [硬件兼容性](COMPATIBILITY.md)
 
-产品对外名称现统一为 **SFlip**；仓库地址、内部工程和兼容标识保留原名。现有发布附件仍使用旧名。
+产品和 GitHub 仓库名称均为 **SFlip**。内部工程、兼容标识及现有 v2.2.0 发布附件保留旧名，避免影响已有配置和下载。
 
 当前发布为 **v2.2.0（build 20）测试包**。macOS 使用 ad-hoc 签名且未经公证；Windows 包未签名。
 
-> **发布包与主线的区别**：`main` 已合入 [#82](https://github.com/maizihk/DisplaySwitch/pull/82) 的协同和连续调节修复，现有 v2.2.0 下载包尚未包含这些修复。需要这些修复时，请按下方“源码构建”说明构建当前主线；发布包所含变更以对应 Release 说明为准。
+> **发布包与主线的区别**：`main` 已合入 [#82](https://github.com/maizihk/SFlip/pull/82) 的协同和连续调节修复，现有 v2.2.0 下载包尚未包含这些修复。需要这些修复时，请按下方“源码构建”说明构建当前主线；发布包所含变更以对应 Release 说明为准。
 
 | 平台 | 运行要求 | v2.2.0 下载 |
 | --- | --- | --- |
-| macOS | Apple Silicon，macOS 12 或更高版本 | [macOS arm64 ZIP](https://github.com/maizihk/DisplaySwitch/releases/download/v2.2.0/DisplaySwitcher-v2.2.0-macOS-arm64-unsigned.zip) |
-| Windows | x64，Windows 10 1809 或更高版本；Windows App Runtime 2.4 x64 | [Windows x64 ZIP](https://github.com/maizihk/DisplaySwitch/releases/download/v2.2.0/DisplaySwitcher-v2.2.0-Windows-x64-unsigned-framework-dependent.zip) |
+| macOS | Apple Silicon，macOS 12 或更高版本 | [macOS arm64 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.2.0/DisplaySwitcher-v2.2.0-macOS-arm64-unsigned.zip) |
+| Windows | x64，Windows 10 1809 或更高版本；Windows App Runtime 2.4 x64 | [Windows x64 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.2.0/DisplaySwitcher-v2.2.0-Windows-x64-unsigned-framework-dependent.zip) |
 
-文件校验值见 [SHA256SUMS.txt](https://github.com/maizihk/DisplaySwitch/releases/download/v2.2.0/SHA256SUMS.txt)。Intel Mac 当前不支持原生 DDC；Windows 版不依赖 .NET。
+文件校验值见 [SHA256SUMS.txt](https://github.com/maizihk/SFlip/releases/download/v2.2.0/SHA256SUMS.txt)。Intel Mac 当前不支持原生 DDC；Windows 版不依赖 .NET。
 
 - **macOS DMG（当前主线构建）**：双击打开 DMG，将 `SFlip.app` 拖到旁边的 `Applications` 文件夹。复制后推出磁盘映像，从“应用程序”启动。替换旧版前先退出旧应用，不要直接从 DMG 运行。
 - **macOS ZIP（现有 v2.2.0 发布包）**：解压后将 `DisplaySwitcher.app` 放到固定的 `/Applications` 目录，再启动应用。
@@ -93,8 +93,8 @@ USB 切换与手动协同是独立路径。USB 离开时立即执行本机输入
 以下是当前主线的构建要求，与上面的应用运行要求不同。先获取源码并进入仓库根目录：
 
 ```bash
-git clone https://github.com/maizihk/DisplaySwitch.git
-cd DisplaySwitch
+git clone https://github.com/maizihk/SFlip.git
+cd SFlip
 ```
 
 ### macOS
@@ -116,7 +116,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./macOS/scripts/bu
 
 DMG 打包还需要 Python 3（含 venv/pip）。首次构建会下载固定版本的 dmgbuild 及其依赖，隔离安装到 `macOS/.build/dmg-tools`；后续构建复用该环境。背景由 AppKit 生成，布局配置随源码维护，无需 Finder 自动化权限。
 
-输出位于 `macOS/outputs/`：`SFlip.app`、拖拽安装包 `SFlip-macOS-<arch>-unsigned.dmg` 和原有 ZIP。DMG 包含应用、指向 `/Applications` 的快捷方式和安装说明；构建脚本会校验映像、挂载后的应用及复制后的签名。DMG 是未公证测试包，现有 v2.2.0 Release 仍只提供 ZIP。脚本默认使用 ad-hoc 签名；如需稳定保留本机权限记录，可指定钥匙串中的 Apple Development 身份：
+输出位于 `macOS/outputs/`：`SFlip.app`、拖拽安装包 `SFlip-macOS-<arch>-unsigned.dmg` 和 `SFlip-macOS-<arch>.zip`。DMG 包含应用、指向 `/Applications` 的快捷方式和安装说明；构建脚本会校验映像、挂载后的应用及复制后的签名。DMG 是未公证测试包，现有 v2.2.0 Release 仍只提供 ZIP。脚本默认使用 ad-hoc 签名；如需稳定保留本机权限记录，可指定钥匙串中的 Apple Development 身份：
 
 ```bash
 DISPLAYSWITCH_CODESIGN_IDENTITY="<identity SHA-1 or exact name>" \
