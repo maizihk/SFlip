@@ -30,13 +30,18 @@ function Assert([bool]$Condition, [string]$Message) {
 }
 function Invoke-Setup([string]$Exe, [bool]$Success) {
     $log = Join-Path $work ('setup-' + [guid]::NewGuid() + '.log')
-    $process = Start-Process $Exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"", "/LOG=`"$log`"") -PassThru
-    if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'Installer exceeded test timeout.' }
+    Write-Host "Testing $([IO.Path]::GetFileName($Exe)); expected success=$Success"
+    # Inno uninstall hands off to a temporary child process. Wait for the entire tree.
+    $process = Start-Process $Exe -Wait -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"", "/LOG=`"$log`"") -PassThru
     if (($process.ExitCode -eq 0) -ne $Success) {
         Get-Content $log -ErrorAction SilentlyContinue | Select-Object -Last 30 | Write-Host
         throw "Unexpected installer exit code: $($process.ExitCode)"
     }
     $script:checks++
+    if ($Success -and [IO.Path]::GetFileName($Exe) -eq 'SFlip-Setup-x64-unsigned.exe') {
+        $script:uninstaller = (Get-ItemPropertyValue $uninstallKey 'UninstallString').Trim('"')
+        Assert (Test-Path -LiteralPath $script:uninstaller) 'Registered uninstaller does not exist.'
+    }
     Assert ((Get-Content $config -Raw) -ceq $sentinel) 'User configuration was changed.'
 }
 try {
@@ -57,7 +62,7 @@ class MockRuntime {
     & $iscc "/DDistDir=$(Join-Path $windows 'dist')" "/DRuntimeInstaller=$mock" "/DOutputDir=$work" (Join-Path $PSScriptRoot 'SFlip.iss')
     if ($LASTEXITCODE -ne 0) { throw 'Test installer compilation failed.' }
     $setup = Join-Path $work 'SFlip-Setup-x64-unsigned.exe'
-    $uninstaller = Join-Path $installed 'unins000.exe'
+    $uninstaller = $null
     $env:SFLIP_TEST_RUNTIME_FAILURE = '1'
     Invoke-Setup $setup $false
     Assert (-not (Test-Path (Join-Path $installed 'SFlip.exe'))) 'Runtime failure copied application files.'

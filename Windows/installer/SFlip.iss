@@ -8,7 +8,7 @@
 #ifndef OutputDir
   #error OutputDir is required
 #endif
-#define AppVersion GetFileVersion(DistDir + "\runtime\DisplaySwitcher.Windows.exe")
+#define AppVersion GetVersionNumbersString(DistDir + "\runtime\DisplaySwitcher.Windows.exe")
 
 [Setup]
 AppId={{AE3D56F2-6790-4E14-AC64-F109C402D06B}

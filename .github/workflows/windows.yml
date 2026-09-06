@@ -78,6 +78,7 @@ jobs:
         run: ./Windows/build-installer.ps1
 
       - name: Test installer lifecycle with simulated runtime
+        timeout-minutes: 5
         shell: pwsh
         run: ./Windows/installer/test-installer.ps1
 
