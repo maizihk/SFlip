@@ -2226,6 +2226,26 @@ namespace
         config.displays[0].volumeValue = 25;
         config.displays[1].volumeValue = 65;
 
+        MediaKeyRouter completedRouter;
+        auto completedConfig = config;
+        auto pending = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        for (auto const& write : pending.writes)
+            completedRouter.OnWriteCompleted(write.code, write.targetDisplayIds, write.value);
+        completedConfig.displays[0].volumeValue = 80;
+        auto afterSlider = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        Check(afterSlider.writes.size() == 2 && afterSlider.writes[0].value == 85,
+            L"W-034: 已完成媒体写入不覆盖后续滑杆值，80 加音量得到 85");
+        auto newer = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        completedRouter.OnWriteCompleted(afterSlider.writes[0].code,
+            afterSlider.writes[0].targetDisplayIds, afterSlider.writes[0].value);
+        auto afterOlderCompletion = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        Check(newer.writes[0].value == 90 && afterOlderCompletion.writes[0].value == 95,
+            L"W-034: 较旧成功回调保留更新的待写步进");
+
         MediaKeyRouter router;
         auto relative = router.Plan(config, DisplayTopologyTrust::LocalPhysicalAuthoritative,
             MediaKeyAction::BrightnessUp, 1);

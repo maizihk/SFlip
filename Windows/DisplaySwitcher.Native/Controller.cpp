@@ -883,13 +883,29 @@ namespace DisplaySwitcher::Native
             if (!AllowsSideEffects(generation) || !actionPlan.topologyTrusted) continue;
             auto backend = ddcBackends_.Lookup(NativeDdcBackendKey);
             auto trust = backend ? backend->TopologyTrust() : DisplayTopologyTrust::IncompleteOrUnavailable;
-            auto actionConfig = std::make_shared<AppConfig const>(std::move(actionPlan.config));
             for (auto const& event : events)
             {
                 if (event.second != generation || !AllowsSideEffects(generation)) continue;
                 MediaKeyPlan mediaPlan;
+                std::shared_ptr<AppConfig const> actionConfig;
                 {
                     std::scoped_lock lock(mediaKeyMutex_);
+                    if (!AllowsSideEffects(generation)) continue;
+                    // Topology belongs to this action; values must include the latest
+                    // completed write before the router releases its pending projection.
+                    auto latest = Config();
+                    auto currentAction = actionPlan.config;
+                    for (auto& display : currentAction.displays)
+                    {
+                        auto index = FindDisplayById(latest.displays, display.id);
+                        if (!index) continue;
+                        auto const& saved = latest.displays[*index];
+                        display.brightnessValue = saved.brightnessValue;
+                        display.brightnessMax = saved.brightnessMax;
+                        display.volumeValue = saved.volumeValue;
+                        display.volumeMax = saved.volumeMax;
+                    }
+                    actionConfig = std::make_shared<AppConfig const>(std::move(currentAction));
                     mediaPlan = mediaKeyRouter_.Plan(*actionConfig, trust, event.first,
                         configurationGeneration_.load(), 5);
                 }
@@ -959,7 +975,13 @@ namespace DisplaySwitcher::Native
                 return;
             }
             if (!AllowsSideEffects(request->generation)) continue;
-            { std::scoped_lock lock(configMutex_); config_ = std::move(config); }
+            {
+                std::scoped_lock mediaLock(mediaKeyMutex_);
+                if (!AllowsSideEffects(request->generation)) continue;
+                { std::scoped_lock lock(configMutex_); config_ = std::move(config); }
+                mediaKeyRouter_.OnWriteCompleted(request->code,
+                    request->mediaKeyTargetDisplayIds, request->value);
+            }
             Enqueue([weak, generation = request->generation]
             {
                 if (auto current = weak.lock(); current && current->AllowsSideEffects(generation))

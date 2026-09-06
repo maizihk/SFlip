@@ -1,5 +1,14 @@
 # macOS 交接记录
 
+## 当前任务：DS-007 / DS-031 审核修复（2026-09-06）
+
+- 分支：`codex/macos-windows-audit-fixes`；基线：`8179ea2`（2.2.0）。本次用户授权双端修复，各端只改平台实现和测试；协议、contracts、schema 与版本不变。
+- 根因：离线目标错误进入立即切屏分支；旧代次 DDC 完成回调错误删除新代次活动标记；HUD 固定行为模型无生产消费者。
+- 修复：离线手动事件取消并提示、迟到确认零 DDC；旧代次回调直接退出；删除无效模型及对应固定值测试。
+- 本机自动验证：完整 272 项 XCTest 全过；`./macOS/scripts/build-app.sh` 成功；`codesign --verify --deep --strict macOS/outputs/DisplaySwitcher.app` 通过，默认 ad-hoc 签名。
+- 新回归覆盖离线与迟到确认、重新在线后 600 ms 兜底、取消后新写入与旧回调交错并保持 latest-wins。
+- 待实机：离线提示、连续调节期间重新检测显示器；未执行真实 USB、DDC、唤醒或输入源切换。最终双端 CI 结果以本次 PR checks 为准。
+
 ## 当前状态：DS-031 原生媒体键关联 DDC 与 HDMI/DP 音量接管
 
 - 日期：2026-09-04

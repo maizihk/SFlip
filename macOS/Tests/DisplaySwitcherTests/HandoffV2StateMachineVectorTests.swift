@@ -89,6 +89,37 @@ final class HandoffV2StateMachineVectorTests: XCTestCase {
         XCTAssertEqual(sink.inputCalls, 0)
     }
 
+    func testOfflineManualTargetNeverSwitchesEvenAfterLateReadyAndTimeout() {
+        let clock = V2VectorClock()
+        let scheduler = V2VectorScheduler(clock: clock)
+        let sink = V2VectorSink()
+        let machine = HandoffV2StateMachine(
+            localEndpointID: "11111111-1111-4111-8111-111111111111",
+            sink: sink, scheduler: scheduler, eventIDSource: V2VectorEventIDs()
+        )
+        let peer = "22222222-2222-4222-8222-222222222222"
+        let event = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        machine.configure(localEndpointID: "11111111-1111-4111-8111-111111111111",
+                          coordinationEnabled: true,
+                          enabledTargets: [.init(endpointID: peer, capability: .v2, reachable: false)])
+        XCTAssertFalse(machine.handleManualSelect(endpointID: peer, eventID: event))
+        machine.handleTargetReady(endpointID: peer, eventID: event, authenticated: true, wakeSucceeded: true)
+        scheduler.run(until: 5_000, includingBoundary: true)
+        XCTAssertEqual(machine.snapshot().state, .cancelled)
+        XCTAssertNil(machine.snapshot().activeEventID)
+        XCTAssertEqual(sink.networkSends, 1)
+        XCTAssertEqual(sink.switchCalls, 0)
+        XCTAssertEqual(sink.wakeCalls, 0)
+
+        machine.setTargetReachable(true, endpointID: peer)
+        XCTAssertTrue(machine.handleManualSelect(endpointID: peer,
+            eventID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"))
+        scheduler.run(until: 5_599, includingBoundary: true)
+        XCTAssertEqual(sink.switchCalls, 0)
+        scheduler.run(until: 5_600, includingBoundary: true)
+        XCTAssertEqual(sink.switchCalls, 1)
+    }
+
     private func apply(_ input: V2VectorInput, to machine: HandoffV2StateMachine) throws {
         switch input.kind {
         case "statusProbe":

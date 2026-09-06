@@ -617,6 +617,30 @@ final class DS007Tests: XCTestCase {
         XCTAssertEqual(executor.cancelCount, 1)
     }
 
+    func testCancelledGenerationCannotClearActiveWriteInNewGeneration() {
+        let executor = ControlledWriteExecutor()
+        let coordinator = DDCLatestWinsCoordinator(executor: executor)
+        var published: [Int] = []
+        coordinator.onCompletion = { request, _ in published.append(request.value) }
+        let old = request(command: .volume, value: 10)
+        coordinator.submit(old)
+        coordinator.cancelAll()
+        coordinator.setOperationsAllowed(true)
+        coordinator.submit(request(command: .volume, value: 20))
+
+        executor.completeNext(success: true)
+        XCTAssertTrue(coordinator.isBusy(old.key))
+        XCTAssertTrue(published.isEmpty)
+        coordinator.submit(request(command: .volume, value: 30))
+        coordinator.submit(request(command: .volume, value: 40))
+        XCTAssertEqual(executor.started.map(\.value), [10, 20])
+        executor.completeNext(success: true)
+        XCTAssertEqual(executor.started.map(\.value), [10, 20, 40])
+        executor.completeNext(success: true)
+        XCTAssertEqual(published, [20, 40])
+        XCTAssertFalse(coordinator.isBusy(old.key))
+    }
+
     func testDS009DifferentDisplaysRemainFailureIsolated() {
         let executor = ControlledWriteExecutor()
         let coordinator = DDCLatestWinsCoordinator(executor: executor)

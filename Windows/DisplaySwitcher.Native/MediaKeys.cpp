@@ -177,6 +177,17 @@ namespace DisplaySwitcher::Native
         return plan;
     }
 
+    void MediaKeyRouter::OnWriteCompleted(DdcVcpCode code,
+        std::vector<std::wstring> const& targetDisplayIds, int value)
+    {
+        for (auto const& displayId : targetDisplayIds)
+        {
+            auto found = pendingValues_.find({ CanonicalId(displayId), code });
+            if (found != pendingValues_.end() && found->second == value)
+                pendingValues_.erase(found);
+        }
+    }
+
     void MediaKeyRouter::OnWriteFailed(DdcVcpCode code,
         std::vector<std::wstring> const& targetDisplayIds)
     {

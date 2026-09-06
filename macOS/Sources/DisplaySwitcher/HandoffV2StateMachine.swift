@@ -171,14 +171,16 @@ final class HandoffV2StateMachine {
         enabledTargets[index].reachable = reachable
     }
 
-    func handleManualSelect(endpointID: String, eventID: String) {
+    @discardableResult
+    func handleManualSelect(endpointID: String, eventID: String) -> Bool {
         guard coordinationEnabled,
-              let target = target(endpointID), target.capability == .v2 else { return }
+              let target = target(endpointID), target.capability == .v2 else { return false }
         clearInternalEvent(finalState: .idle)
         activeEventID = eventID.lowercased()
         activeIntent = .manual
         lock(endpointID)
         beginDirectedRequest(target: target, eventID: eventID, intent: .manual)
+        return target.reachable
     }
 
     func handleWakeDisplay(endpointID: String, eventID: String, authenticated: Bool) {
@@ -316,7 +318,7 @@ final class HandoffV2StateMachine {
         state = .awaitingReady
         send(type: .handoverRequest, eventID: eventID, endpointID: target.endpointID, intent: intent)
         guard target.reachable else {
-            requestSwitchIfNeeded(eventID: eventID, endpointID: target.endpointID)
+            clearEvent(reason: nil, finalState: .cancelled)
             return
         }
         for attempt in 1..<Self.retryCount {

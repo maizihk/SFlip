@@ -70,6 +70,7 @@ namespace DisplaySwitcher::Native
         MediaKeyPlan Plan(AppConfig const& config, DisplayTopologyTrust topologyTrust,
             MediaKeyAction action, uint64_t configurationGeneration, int step = 5);
         void OnWriteFailed(DdcVcpCode code, std::vector<std::wstring> const& targetDisplayIds);
+        void OnWriteCompleted(DdcVcpCode code, std::vector<std::wstring> const& targetDisplayIds, int value);
         void ResetPending() noexcept;
 
     private:

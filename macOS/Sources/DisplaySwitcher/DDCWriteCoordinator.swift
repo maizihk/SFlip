@@ -98,7 +98,6 @@ final class DDCLatestWinsCoordinator {
     private func startNext(displayID: String, generation token: UInt64) {
         lock.lock()
         guard allowed, token == generation else {
-            activeDisplays.remove(displayID)
             lock.unlock()
             return
         }

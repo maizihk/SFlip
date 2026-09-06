@@ -1081,15 +1081,6 @@ final class MediaKeyDDCTests: XCTestCase {
         XCTAssertFalse(session.isVisible)
     }
 
-    func testHUDWindowBehaviorNeverTakesFocusOrMouseAndSupportsAllSpaces() {
-        let behavior = DDCVolumeHUDWindowBehavior()
-        XCTAssertTrue(behavior.isNonactivating)
-        XCTAssertTrue(behavior.ignoresMouseEvents)
-        XCTAssertTrue(behavior.joinsAllSpaces)
-        XCTAssertTrue(behavior.supportsFullScreen)
-        XCTAssertTrue(behavior.reusesOneWindow)
-    }
-
     private func event(_ action: MediaKeyAction, repeatEvent: Bool = false) -> NormalizedMediaKeyEvent {
         NormalizedMediaKeyEvent(action: action, isRepeat: repeatEvent)
     }

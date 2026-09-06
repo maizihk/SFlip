@@ -562,7 +562,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         if profile.peerProtocolVersion == 2,
            let endpointID = profile.peerEndpointID.flatMap(V2Crypto.normalizedUUID),
            v2RoutingTable.route(for: endpointID)?.profileID == profile.id {
-            handoffV2StateMachine.handleManualSelect(endpointID: endpointID, eventID: nextEventID())
+            if !handoffV2StateMachine.handleManualSelect(endpointID: endpointID, eventID: nextEventID()) {
+                showError(title: "对端不可用，未执行切换", error: NSError(
+                    domain: "DisplaySwitcher.Collaboration", code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "请检查对端连接后重试。"]
+                ))
+            }
             return
         }
         showError(
