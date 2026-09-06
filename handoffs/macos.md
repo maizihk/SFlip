@@ -1,5 +1,12 @@
 # macOS 交接记录
 
+## 当前任务：M-102 SFlip 对外命名统一（2026-09-06）
+
+- 分支：`codex/macos-dmg-packaging`，在 PR #84 已完成的 DMG 基础上继续，改名前基线 `0285071`。用户明确授权双端对外名称统一；协议、schema 和版本不变。
+- macOS 元数据、权限/诊断提示、App/DMG/ZIP 和 CI 附件统一为 SFlip；保留 Bundle ID、配置、实例锁和协议认证字符串。272 项 XCTest、Release、DMG 及签名检查通过。
+- README 保留旧 Release 下载链接，补充旧名升级与登录启动重新确认步骤；未更名 GitHub 仓库或历史记录。
+- 待实机：旧版升级、权限复用、快捷方式和登录启动；未安装/启动应用或执行硬件流程。
+
 ## 当前任务：M-102 DMG 分发打包（2026-09-06）
 
 - 分支：`codex/macos-dmg-packaging`；基线：`945b005`，包含 PR #82 修复及 #83 首次使用文档。

@@ -1,6 +1,6 @@
-# Contributing to DisplaySwitch
+# Contributing to SFlip
 
-Thank you for helping improve DisplaySwitch. Small, focused changes with reproducible validation are easiest to review.
+Thank you for helping improve SFlip. Small, focused changes with reproducible validation are easiest to review.
 
 ## Before editing
 

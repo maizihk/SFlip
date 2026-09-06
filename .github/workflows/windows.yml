@@ -46,7 +46,7 @@ jobs:
         shell: pwsh
         run: |
           $requiredFiles = @(
-            "Windows/dist/DisplaySwitch.exe",
+            "Windows/dist/SFlip.exe",
             "Windows/dist/runtime/DisplaySwitcher.Windows.exe",
             "Windows/dist/runtime/DisplaySwitcher.Windows.pri",
             "Windows/dist/runtime/DisplaySwitcher.Native.winmd",
@@ -76,7 +76,7 @@ jobs:
       - name: Upload Windows x64 unsigned framework-dependent artifact
         uses: actions/upload-artifact@v6
         with:
-          name: DisplaySwitcher-Windows-x64-unsigned-framework-dependent
+          name: SFlip-Windows-x64-unsigned-framework-dependent
           path: Windows/dist/
           if-no-files-found: error
           retention-days: 7

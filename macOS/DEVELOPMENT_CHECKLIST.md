@@ -8,7 +8,7 @@
 - 原生 Swift/AppKit 菜单栏 App，正式工程为 `macOS/DisplaySwitcher.xcodeproj`。
 - Bundle Identifier：`local.maizi.DisplaySwitcher`；最低支持 macOS 12。
 - 正式构建脚本：`macOS/scripts/build-app.sh`。
-- 构建产物：`macOS/outputs/DisplaySwitcher.app` 和当前架构 ZIP。
+- 构建产物：`macOS/outputs/SFlip.app` 和当前架构 SFlip DMG/ZIP。
 - 当前版本：2.2.0（build 20）。
 - 本机配置为 `schemaVersion = 5`；v4 保留非 USB 设置并迁移到新格式，独立 USB 功能默认关闭且不猜测旧绑定或输入源。
 - 双端网络运行时只接受协议 v2；v1、缺失版本、类型错误和未知版本均在入口安全拒绝。
@@ -143,6 +143,9 @@
 - [ ] 在另一台干净 Mac 上验证下载、解压、移动到 `/Applications` 和首次启动。
 
 ### M-102 发布自动化
+
+- [x] 对外名称统一为 SFlip，包含 App 元数据、权限提示、DMG、ZIP 和 CI 附件；内部工程、Bundle ID、配置及协议标识保留。
+- [ ] 改名后的旧版升级、权限复用与登录启动仍待实机验证。
 
 - [x] 构建脚本和 macOS CI 同时生成 DMG 与 ZIP；DMG 包含应用、Applications 快捷方式及安装说明，自动验证映像完整性、挂载内容和复制后签名。
 - [x] DMG 使用 Retina 背景、固定双图标布局、拖拽箭头和安装提示；本机 Finder 验证布局，并为开启路径栏/状态栏预留空间。

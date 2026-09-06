@@ -23,7 +23,7 @@ func text(_ value: String, y: CGFloat, height: CGFloat, font: NSFont, ink: NSCol
 }
 NSGradient(starting: color(0.97, 0.98, 1), ending: color(0.91, 0.94, 0.98))!
     .draw(in: NSRect(origin: .zero, size: size), angle: -70)
-text("DisplaySwitch", y: 40, height: 44, font: .systemFont(ofSize: 32, weight: .semibold),
+text("SFlip", y: 40, height: 44, font: .systemFont(ofSize: 32, weight: .semibold),
      ink: color(0.13, 0.19, 0.28))
 text("拖入应用程序，即可完成安装", y: 92, height: 28, font: .systemFont(ofSize: 16),
      ink: color(0.38, 0.44, 0.53))
@@ -49,7 +49,7 @@ arrow.line(to: NSPoint(x: 378, y: arrowY - 11))
 arrow.stroke()
 text("安装后推出此磁盘映像，从“应用程序”打开", y: 364, height: 24,
      font: .systemFont(ofSize: 13), ink: color(0.38, 0.44, 0.53))
-text("替换旧版前，请先退出 DisplaySwitch", y: 393, height: 20,
+text("替换旧版前，请先退出 SFlip", y: 393, height: 20,
      font: .systemFont(ofSize: 11), ink: color(0.48, 0.54, 0.62))
 NSGraphicsContext.restoreGraphicsState()
 try bitmap.tiffRepresentation!.write(to: URL(fileURLWithPath: CommandLine.arguments[1]))

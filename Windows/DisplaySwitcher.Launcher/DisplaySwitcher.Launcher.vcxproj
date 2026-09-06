@@ -8,7 +8,7 @@
     <ProjectGuid>{BF747B2C-4EAA-45A9-A412-9E8B43AA71EA}</ProjectGuid>
     <ProjectName>DisplaySwitcher.Launcher</ProjectName>
     <RootNamespace>DisplaySwitcher.Launcher</RootNamespace>
-    <TargetName>DisplaySwitch</TargetName>
+    <TargetName>SFlip</TargetName>
     <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
   </PropertyGroup>

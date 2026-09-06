@@ -212,7 +212,7 @@ final class PublicPresentationModelsTests: XCTestCase {
 
     func testC023AboutPageUsesOnlyPublicMetadataAndHasNoRuntimeSideEffectDependencies() {
         let metadata = RecordingAboutMetadata(values: [
-            "CFBundleName": "DisplaySwitcher",
+            "CFBundleName": "SFlip",
             "CFBundleShortVersionString": "2.2.0",
             "CFBundleVersion": "20",
             "Peer.Host": "private-peer-value",
@@ -235,7 +235,7 @@ final class PublicPresentationModelsTests: XCTestCase {
         XCTAssertEqual(Set(metadata.requestedKeys), [
             "CFBundleName", "CFBundleShortVersionString", "CFBundleVersion"
         ])
-        XCTAssertEqual(content.productName, "DisplaySwitcher")
+        XCTAssertEqual(content.productName, "SFlip")
         XCTAssertEqual(content.versionText, "版本 2.2.0 (20)")
         XCTAssertEqual(content.platformText, "macOS · simulated-arch · 协议 v2")
         for privateValue in metadata.values.values where privateValue.hasPrefix("private-") {
@@ -965,7 +965,7 @@ final class PublicPresentationModelsTests: XCTestCase {
 
         let report = DiagnosticReport.make(
             metadata: RecordingAboutMetadata(values: [
-                "CFBundleName": "DisplaySwitcher",
+                "CFBundleName": "SFlip",
                 "CFBundleShortVersionString": "2.2.0",
                 "CFBundleVersion": "20"
             ]),
@@ -1002,7 +1002,7 @@ final class PublicPresentationModelsTests: XCTestCase {
 
         let disabledReport = DiagnosticReport.make(
             metadata: RecordingAboutMetadata(values: [
-                "CFBundleName": "DisplaySwitcher",
+                "CFBundleName": "SFlip",
                 "CFBundleShortVersionString": "2.2.0",
                 "CFBundleVersion": "20"
             ]),

@@ -77,7 +77,7 @@
 		A2000000000000000000000C /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		A2000000000000000000000D /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		A2000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A2000000000000000000000F /* DisplaySwitcher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DisplaySwitcher.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000000000000000000000F /* SFlip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFlip.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000010 /* DisplaySwitcherTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DisplaySwitcherTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000012 /* build-app.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "build-app.sh"; sourceTree = "<group>"; };
 		A20000000000000000000013 /* DDCController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDCController.swift; sourceTree = "<group>"; };
@@ -237,7 +237,7 @@
 		A70000000000000000000007 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A2000000000000000000000F /* DisplaySwitcher.app */,
+				A2000000000000000000000F /* SFlip.app */,
 				A20000000000000000000010 /* DisplaySwitcherTests.xctest */,
 			);
 			name = Products;
@@ -258,7 +258,7 @@
 			dependencies = ();
 			name = DisplaySwitcher;
 			productName = DisplaySwitcher;
-			productReference = A2000000000000000000000F /* DisplaySwitcher.app */;
+			productReference = A2000000000000000000000F /* SFlip.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A50000000000000000000002 /* DisplaySwitcherTests */ = {
@@ -368,7 +368,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = local.maizi.DisplaySwitcher;
-				PRODUCT_NAME = DisplaySwitcher;
+				PRODUCT_NAME = SFlip;
+				PRODUCT_MODULE_NAME = DisplaySwitcher;
 				SWIFT_OBJC_BRIDGING_HEADER = Sources/DisplaySwitcher/NativeDDCBridge.h;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -388,7 +389,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = local.maizi.DisplaySwitcher;
-				PRODUCT_NAME = DisplaySwitcher;
+				PRODUCT_NAME = SFlip;
+				PRODUCT_MODULE_NAME = DisplaySwitcher;
 				SWIFT_OBJC_BRIDGING_HEADER = Sources/DisplaySwitcher/NativeDDCBridge.h;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";

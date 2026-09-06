@@ -3,7 +3,7 @@ import os
 
 format = "UDZO"
 filesystem = "HFS+"
-files = [os.path.join(defines["contents"], "DisplaySwitcher.app"),
+files = [os.path.join(defines["contents"], "SFlip.app"),
          os.path.join(defines["contents"], "安装说明.txt")]
 symlinks = {"Applications": "/Applications"}
 hide = ["安装说明.txt"]
@@ -20,4 +20,4 @@ arrange_by = None
 icon_size = 96
 text_size = 13
 label_pos = "bottom"
-icon_locations = {"DisplaySwitcher.app": (188, 236), "Applications": (532, 236)}
+icon_locations = {"SFlip.app": (188, 236), "Applications": (532, 236)}

@@ -779,7 +779,7 @@ final class PeerInspectionDiagnosticStore {
     func exportText() -> String {
         guard recordingEnabled() else {
             return [
-                "DisplaySwitcher collaboration inspection diagnostic",
+                "SFlip collaboration inspection diagnostic",
                 "Detailed diagnostic recording is disabled."
             ].joined(separator: "\n")
         }
@@ -787,7 +787,7 @@ final class PeerInspectionDiagnosticStore {
         let snapshot = lines
         lock.unlock()
         return ([
-            "DisplaySwitcher collaboration inspection diagnostic",
+            "SFlip collaboration inspection diagnostic",
             "Session-only anonymized data; no IP, pairing code, auth tag, endpoint ID, or hardware identifier."
         ] + snapshot).joined(separator: "\n")
     }

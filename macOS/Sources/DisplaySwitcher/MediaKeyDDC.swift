@@ -1846,7 +1846,7 @@ struct MediaKeyShortcutPresentation: Equatable {
         case .permissionRequired:
             return Self(
                 title: "媒体快捷键关联需要输入监控权限",
-                detail: "未授权时仅停用快捷键关联，其他功能不受影响。请在“系统设置 > 隐私与安全性 > 输入监控”中允许 DisplaySwitcher。",
+                detail: "未授权时仅停用快捷键关联，其他功能不受影响。请在“系统设置 > 隐私与安全性 > 输入监控”中允许 SFlip。",
                 actionTitle: "申请权限",
                 action: .requestInputMonitoring
             )
@@ -1892,7 +1892,7 @@ struct MediaKeyVolumeTakeoverPresentation: Equatable {
             return Self(
                 enabled: true,
                 title: "音量接管需要辅助功能权限",
-                detail: "未授权时保持被动监听，不吞按键；仅当输出符合 HDMI/DP 条件时仍额外执行 DDC。可在系统设置中允许 DisplaySwitcher。",
+                detail: "未授权时保持被动监听，不吞按键；仅当输出符合 HDMI/DP 条件时仍额外执行 DDC。可在系统设置中允许 SFlip。",
                 actionTitle: "申请辅助功能权限",
                 action: .requestAccessibility
             )

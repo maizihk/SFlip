@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="DisplaySwitcher"
+APP_NAME="SFlip"
 OUTPUT_DIR="$PROJECT_DIR/outputs"
 APP_DIR="$OUTPUT_DIR/$APP_NAME.app"
 DERIVED_DATA="$PROJECT_DIR/.build/xcode"
