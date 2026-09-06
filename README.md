@@ -110,6 +110,8 @@ xcrun --sdk macosx --show-sdk-version
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./macOS/scripts/build-app.sh
 ```
 
+DMG 打包还需要 Python 3（含 venv/pip）。首次构建会下载固定版本的 dmgbuild 及其依赖，隔离安装到 `macOS/.build/dmg-tools`；后续构建复用该环境。背景由 AppKit 生成，布局配置随源码维护，无需 Finder 自动化权限。
+
 输出位于 `macOS/outputs/`：`DisplaySwitcher.app`、拖拽安装包 `DisplaySwitcher-macOS-<arch>-unsigned.dmg` 和原有 ZIP。DMG 包含应用、指向 `/Applications` 的快捷方式和安装说明；构建脚本会校验映像、挂载后的应用及复制后的签名。DMG 是未公证测试包，现有 v2.2.0 Release 仍只提供 ZIP。脚本默认使用 ad-hoc 签名；如需稳定保留本机权限记录，可指定钥匙串中的 Apple Development 身份：
 
 ```bash
