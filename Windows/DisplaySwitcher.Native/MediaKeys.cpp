@@ -71,7 +71,7 @@ namespace DisplaySwitcher::Native
         return found == pendingValues_.end() ? std::nullopt : std::optional<int>{ found->second };
     }
 
-    void MediaKeyRouter::SetPending(std::vector<std::wstring> const& displayIds, DdcVcpCode code, int value)
+    void MediaKeyRouter::OnWriteSubmitted(std::vector<std::wstring> const& displayIds, DdcVcpCode code, int value)
     {
         for (auto const& displayId : displayIds) pendingValues_[{ CanonicalId(displayId), code }] = value;
     }
@@ -166,7 +166,7 @@ namespace DisplaySwitcher::Native
                 if (!invalidRestore) target = commonRestore;
             }
             if (!target || *target == current) continue;
-            SetPending(control.targetDisplayIds, code, *target);
+            OnWriteSubmitted(control.targetDisplayIds, code, *target);
             plan.writes.push_back({ control.displayId, code, *target, control.linked,
                 control.targetDisplayIds });
         }
@@ -177,15 +177,20 @@ namespace DisplaySwitcher::Native
         return plan;
     }
 
-    void MediaKeyRouter::OnWriteFailed(DdcVcpCode code,
-        std::vector<std::wstring> const& targetDisplayIds)
+    void MediaKeyRouter::OnWriteFinished(DdcVcpCode code,
+        std::vector<std::wstring> const& targetDisplayIds, int value)
     {
         for (auto const& displayId : targetDisplayIds)
-            pendingValues_.erase({ CanonicalId(displayId), code });
+        {
+            auto found = pendingValues_.find({ CanonicalId(displayId), code });
+            if (found != pendingValues_.end() && found->second == value)
+                pendingValues_.erase(found);
+        }
     }
 
-    void MediaKeyRouter::ResetPending() noexcept
+    void MediaKeyRouter::ResetPending(uint64_t configurationGeneration) noexcept
     {
+        configurationGeneration_ = configurationGeneration;
         pendingValues_.clear();
         muteRestoreValues_.clear();
     }

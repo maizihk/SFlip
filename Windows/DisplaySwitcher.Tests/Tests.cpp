@@ -2226,6 +2226,46 @@ namespace
         config.displays[0].volumeValue = 25;
         config.displays[1].volumeValue = 65;
 
+        MediaKeyRouter completedRouter;
+        auto completedConfig = config;
+        auto pending = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        for (auto const& write : pending.writes)
+            completedRouter.OnWriteFinished(write.code, write.targetDisplayIds, write.value);
+        completedConfig.displays[0].volumeValue = 80;
+        auto afterSlider = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        Check(afterSlider.writes.size() == 2 && afterSlider.writes[0].value == 85,
+            L"W-034: 已完成媒体写入不覆盖后续滑杆值，80 加音量得到 85");
+        auto newer = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        completedRouter.OnWriteFinished(afterSlider.writes[0].code,
+            afterSlider.writes[0].targetDisplayIds, afterSlider.writes[0].value);
+        auto afterOlderCompletion = completedRouter.Plan(completedConfig,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        Check(newer.writes[0].value == 90 && afterOlderCompletion.writes[0].value == 95,
+            L"W-034: 较旧成功回调保留更新的待写步进");
+
+        MediaKeyRouter supersededRouter;
+        supersededRouter.ResetPending(1);
+        supersededRouter.OnWriteSubmitted({ config.displays[0].id }, DdcVcpCode::Volume, 50);
+        auto superseded = supersededRouter.Plan(config,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        Check(superseded.writes[0].value == 55,
+            L"W-034: 会话内首次媒体键也保留先前滑杆的待写投影");
+        auto const& replaced = superseded.writes[0];
+        supersededRouter.OnWriteSubmitted(replaced.targetDisplayIds, replaced.code, 80);
+        supersededRouter.OnWriteFinished(replaced.code, replaced.targetDisplayIds, replaced.value);
+        auto afterReplacement = supersededRouter.Plan(config,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        Check(afterReplacement.writes[0].value == 85,
+            L"W-034: 滑杆覆盖未完成媒体写入后，旧失败不清除滑杆投影，下一步为 85");
+        supersededRouter.OnWriteFinished(replaced.code, replaced.targetDisplayIds, 80);
+        auto afterSliderCompletion = supersededRouter.Plan(config,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative, MediaKeyAction::VolumeUp, 1);
+        Check(afterSliderCompletion.writes[0].value == 90,
+            L"W-034: 滑杆旧完成保留后续媒体键投影");
+
         MediaKeyRouter router;
         auto relative = router.Plan(config, DisplayTopologyTrust::LocalPhysicalAuthoritative,
             MediaKeyAction::BrightnessUp, 1);
@@ -2238,8 +2278,8 @@ namespace
         Check(repeated.writes.size() == 2 && repeated.writes[0].value == 40
             && repeated.writes[1].value == 80,
             L"W-034: 按住产生的重复事件从 generation 内待提交值继续步进，供 latest-wins 合并");
-        router.OnWriteFailed(DdcVcpCode::Brightness,
-            { config.displays[0].id, config.displays[1].id });
+        for (auto const& write : repeated.writes)
+            router.OnWriteFinished(write.code, write.targetDisplayIds, write.value);
         auto afterFailure = router.Plan(config, DisplayTopologyTrust::LocalPhysicalAuthoritative,
             MediaKeyAction::BrightnessUp, 1);
         Check(afterFailure.writes.size() == 2 && afterFailure.writes[0].value == 35

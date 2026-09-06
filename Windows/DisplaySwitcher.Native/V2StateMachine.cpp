@@ -89,6 +89,7 @@ namespace DisplaySwitcher::Native
         if (Seen(L"handover_request", endpointId, eventId)) return { { V2Action::Kind::IgnoreMessage, {}, eventId, {}, L"duplicate" } };
         if (!FindTarget(endpointId)) return { { V2Action::Kind::IgnoreMessage, {}, eventId, endpointId, L"endpoint_changed" } };
         if (intent != L"manual") return { { V2Action::Kind::IgnoreMessage, {}, eventId, endpointId, L"invalid_intent" } };
+        CancelTimers();
         activeEventId_ = eventId; lockedTargetEndpointId_ = endpointId; incomingIntent_ = intent;
         state_ = V2CoordinatorState::AwaitingReady;
         return { { V2Action::Kind::RequestWake, {}, eventId } };

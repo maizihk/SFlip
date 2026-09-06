@@ -1129,14 +1129,6 @@ enum DDCVolumeHUDPlacement {
     }
 }
 
-struct DDCVolumeHUDWindowBehavior: Equatable {
-    let isNonactivating = true
-    let ignoresMouseEvents = true
-    let joinsAllSpaces = true
-    let supportsFullScreen = true
-    let reusesOneWindow = true
-}
-
 struct DDCVolumeHUDSessionModel: Equatable {
     struct Update: Equatable {
         let revision: UInt64

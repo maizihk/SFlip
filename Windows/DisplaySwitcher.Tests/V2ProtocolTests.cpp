@@ -250,6 +250,26 @@ int RunV2ProtocolVectorTests()
         if (wake != static_cast<int>(hardware.GetNamedNumber(L"wake")) || switches != static_cast<int>(hardware.GetNamedNumber(L"switchDisplay")) ||
             hardware.GetNamedNumber(L"inputActions") != 0) fail(id, L"hardware call count differs");
     }
+    {
+        auto const peer = L"22222222-2222-4222-8222-222222222222";
+        auto const incoming = L"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        V2StateMachine machine({ L"11111111-1111-4111-8111-111111111111", true,
+            V2CoordinatorState::Idle, {}, {}, { { peer, 2, true } } });
+        machine.OnManualSelect(0, peer, L"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+        auto received = machine.OnHandoverRequest(100, peer, incoming, true, L"manual");
+        if (received.size() != 1 || received[0].kind != V2Action::Kind::RequestWake)
+            fail(L"overlapping_requests", L"incoming event must request wake");
+        for (auto now : { 150, 300, 450, 600, 1000 })
+            if (!machine.Advance(now).empty())
+                fail(L"overlapping_requests", L"old outgoing timers affected incoming event");
+        auto ready = machine.OnWakeCompleted(1001, incoming, true);
+        if (ready.size() != 1 || ready[0].type != L"target_ready"
+            || machine.Snapshot().state != V2CoordinatorState::AwaitingCommit)
+            fail(L"overlapping_requests", L"delayed wake must complete the incoming event");
+        machine.OnCommitted(1002, peer, incoming, true, true);
+        if (machine.Snapshot().state != V2CoordinatorState::Completed)
+            fail(L"overlapping_requests", L"incoming event must still complete");
+    }
     if (!failures) std::wcout << L"DS-005 passed 1 normalization vector, 4 authentication vectors, " << messageCount
         << L" message vectors and " << stateCount << L" state-machine vectors\n";
     return failures;

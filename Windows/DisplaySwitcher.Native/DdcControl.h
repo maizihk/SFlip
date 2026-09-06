@@ -210,7 +210,7 @@ namespace DisplaySwitcher::Native
         uint64_t generation{};
         std::shared_ptr<AppConfig const> actionConfig;
         std::optional<bool> linkAllDisplays;
-        std::vector<std::wstring> mediaKeyTargetDisplayIds;
+        std::vector<std::wstring> projectedTargetDisplayIds;
     };
 
     class DdcWriteQueue final
