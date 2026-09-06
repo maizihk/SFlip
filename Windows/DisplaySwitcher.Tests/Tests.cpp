@@ -2859,7 +2859,7 @@ namespace
         DiagnosticSnapshot snapshot;
         snapshot.about = { L"SFlip", L"2.2.0 (20)", L"Windows x64", L"UDP 协议 v2",
             L"https://example.invalid/project", L"https://example.invalid/license",
-            L"https://example.invalid/notices", L"测试构建", true };
+            L"https://example.invalid/notices", true };
         snapshot.schemaVersion = CurrentAppConfigSchemaVersion;
         snapshot.safeMode = true;
         snapshot.detailedRecordingEnabled = true;
