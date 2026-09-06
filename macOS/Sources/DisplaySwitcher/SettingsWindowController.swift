@@ -982,21 +982,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         links.alignment = .centerY
         links.spacing = 18
 
-        let buildNotice = NSTextField(wrappingLabelWithString: content.buildNotice)
-        buildNotice.font = .systemFont(ofSize: 11)
-        buildNotice.textColor = .secondaryLabelColor
-        buildNotice.alignment = .center
-        buildNotice.maximumNumberOfLines = 2
-        buildNotice.preferredMaxLayoutWidth = 520
-
         let stack = NSStackView(views: [
             iconView,
             nameLabel,
             introduction,
             versionLabel,
             platformLabel,
-            links,
-            buildNotice
+            links
         ])
         stack.orientation = .vertical
         stack.alignment = .centerX
@@ -1004,7 +996,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         stack.setCustomSpacing(18, after: iconView)
         stack.setCustomSpacing(6, after: nameLabel)
         stack.setCustomSpacing(16, after: platformLabel)
-        stack.setCustomSpacing(14, after: links)
         stack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stack)
 
@@ -1012,7 +1003,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             iconView.widthAnchor.constraint(equalToConstant: 112),
             iconView.heightAnchor.constraint(equalToConstant: 112),
             introduction.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
-            buildNotice.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
             stack.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 42)
         ])

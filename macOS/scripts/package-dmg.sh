@@ -48,7 +48,7 @@ cat > "$CONTENTS/安装说明.txt" <<'INSTRUCTIONS'
    改名升级后如已启用登录启动，请在新应用中关闭再开启一次。
 
 请勿直接从磁盘映像运行应用。
-这是未经公证的测试包。DMG 不会自动安装、申请权限或改变系统设置。
+DMG 不会自动安装、申请权限或改变系统设置。
 INSTRUCTIONS
 /usr/bin/xcrun swift "$PROJECT_DIR/scripts/dmg/render-background.swift" "$WORK_DIR/background.tiff"
 "$TOOLS_DIR/bin/dmgbuild" -s "$PROJECT_DIR/scripts/dmg/settings.py" \

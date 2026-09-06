@@ -606,9 +606,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         auto notices = HyperlinkButton(); notices.Content(box_value(L"Windows 第三方说明")); notices.NavigateUri(Windows::Foundation::Uri(info.thirdPartyNoticesUrl));
         auto aboutLinks = StackPanel(); aboutLinks.Orientation(Orientation::Horizontal); aboutLinks.HorizontalAlignment(HorizontalAlignment::Center);
         aboutLinks.Children().Append(project); aboutLinks.Children().Append(license); aboutLinks.Children().Append(notices);
-        auto buildNotice = TextBlock(); buildNotice.Text(info.buildNotice); buildNotice.TextWrapping(TextWrapping::Wrap);
-        buildNotice.TextAlignment(TextAlignment::Center); buildNotice.Opacity(0.72);
-        aboutTab.Content(CreatePage({ CreateSection({}, { aboutIcon, aboutName, aboutDetails, aboutLinks, buildNotice }) }));
+        aboutTab.Content(CreatePage({ CreateSection({}, { aboutIcon, aboutName, aboutDetails, aboutLinks }) }));
 
         tabs_.TabItems().Append(commonTab); tabs_.TabItems().Append(usbTab);
         tabs_.TabItems().Append(peerTab); tabs_.TabItems().Append(displayTab);

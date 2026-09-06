@@ -60,14 +60,14 @@ jobs:
         run: |
           test -d macOS/outputs/SFlip.app
           test -f "macOS/outputs/SFlip-macOS-$(uname -m).zip"
-          test -f "macOS/outputs/SFlip-macOS-$(uname -m)-unsigned.dmg"
+          test -f "macOS/outputs/SFlip-macOS-$(uname -m).dmg"
           codesign --verify --deep --strict macOS/outputs/SFlip.app
 
-      - name: Upload unsigned test package
+      - name: Upload package
         uses: actions/upload-artifact@v6
         with:
-          name: SFlip-macOS-${{ runner.arch }}-unsigned
+          name: SFlip-macOS-${{ runner.arch }}
           path: |
             macOS/outputs/SFlip-macOS-*.zip
-            macOS/outputs/SFlip-macOS-*-unsigned.dmg
+            macOS/outputs/SFlip-macOS-*.dmg
           if-no-files-found: error

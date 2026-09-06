@@ -98,9 +98,9 @@ jobs:
             $relative = [IO.Path]::GetRelativePath((Resolve-Path "Windows/dist"), $_.FullName)
             "{0} ({1} bytes)" -f $relative, $_.Length
           }
-          "Verified Windows x64 unsigned framework-dependent artifact: {0:N2} MiB" -f ($bytes / 1MB)
+          "Verified Windows x64 framework-dependent artifact: {0:N2} MiB" -f ($bytes / 1MB)
 
-      - name: Build unsigned installer without runtime packages
+      - name: Build installer without runtime packages
         shell: pwsh
         run: ./Windows/build-installer.ps1
 
@@ -109,20 +109,20 @@ jobs:
         shell: pwsh
         run: ./Windows/installer/test-installer.ps1
 
-      - name: Upload Windows x64 unsigned installer
+      - name: Upload Windows x64 installer
         uses: actions/upload-artifact@v6
         with:
-          name: SFlip-Windows-x64-unsigned-installer
+          name: SFlip-Windows-x64-installer
           path: |
-            Windows/outputs/SFlip-Setup-x64-unsigned.exe
-            Windows/outputs/SFlip-Setup-x64-unsigned.sha256
+            Windows/outputs/SFlip-Setup-x64.exe
+            Windows/outputs/SFlip-Setup-x64.sha256
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload Windows x64 unsigned framework-dependent artifact
+      - name: Upload Windows x64 framework-dependent artifact
         uses: actions/upload-artifact@v6
         with:
-          name: SFlip-Windows-x64-unsigned-framework-dependent
+          name: SFlip-Windows-x64-framework-dependent
           path: Windows/dist/
           if-no-files-found: error
           retention-days: 7

@@ -57,8 +57,6 @@ Observed project acceptance covers one Apple Silicon setup with built-in HDMI, d
 | GUI validation | Visible layout and interaction on the tested OS, scale, and theme | Other DPI/theme/OS combinations or hardware behavior |
 | Hardware validation | The named operation worked on the tested complete connection path | Other ports, cables, docks, displays, OS releases, or VCP codes |
 
-Current macOS ZIPs are locally/ad-hoc signed test builds. Current Windows packages are unsigned framework-dependent test builds. Neither is a notarized or commercially signed release.
-
 ## Safe compatibility test order
 
 1. Record the app version, OS version, architecture, display count, and connection-path category.

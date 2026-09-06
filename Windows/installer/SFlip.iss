@@ -20,7 +20,7 @@
 AppId={{AE3D56F2-6790-4E14-AC64-F109C402D06B}
 AppName=SFlip
 AppVersion={#AppVersion}
-AppVerName=SFlip {#AppVersion} ({cm:UnsignedBuild})
+AppVerName=SFlip {#AppVersion}
 AppPublisher=maizihk
 AppPublisherURL=https://github.com/maizihk/SFlip
 AppSupportURL=https://github.com/maizihk/SFlip/issues
@@ -33,7 +33,7 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.17763
 OutputDir={#OutputDir}
-OutputBaseFilename=SFlip-Setup-x64-unsigned
+OutputBaseFilename=SFlip-Setup-x64
 SetupIconFile=..\DisplaySwitcher.Native\AppIcon.ico
 UninstallDisplayIcon={app}\SFlip.exe
 LicenseFile=..\..\LICENSE
@@ -55,8 +55,6 @@ Name: en; MessagesFile: "compiler:Default.isl"; InfoBeforeFile: "install-info.tx
 Name: zh_CN; MessagesFile: "compiler:Languages\ChineseSimplified.isl"; InfoBeforeFile: "install-info.zh-CN.txt"
 
 [CustomMessages]
-en.UnsignedBuild=unsigned test build
-zh_CN.UnsignedBuild=未签名测试版
 en.DesktopShortcut=Create a desktop shortcut
 zh_CN.DesktopShortcut=创建桌面快捷方式
 en.NewerInstalled=A newer SFlip version is installed. Use the same or a newer installer.

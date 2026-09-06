@@ -1,4 +1,4 @@
-SFlip - unsigned test build
+SFlip
 
 Installs SFlip for the current Windows user and creates a Start menu shortcut.
 

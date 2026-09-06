@@ -39,11 +39,13 @@ function Invoke-Setup([string]$Exe, [bool]$Success, [string]$Language = 'zh_CN')
     }
     $script:checks++
     $script:lastLog = Get-Content $log -Raw
-    if ($Success -and [IO.Path]::GetFileName($Exe) -eq 'SFlip-Setup-x64-unsigned.exe') {
+    if ($Success -and [IO.Path]::GetFileName($Exe) -eq 'SFlip-Setup-x64.exe') {
         $script:uninstaller = (Get-ItemPropertyValue $uninstallKey 'UninstallString').Trim('"')
         Assert (Test-Path -LiteralPath $script:uninstaller) 'Registered uninstaller does not exist.'
         $displayName = Get-ItemPropertyValue $uninstallKey 'DisplayName'
-        Assert ($displayName.Contains($(if ($Language -eq 'zh_CN') { '未签名测试版' } else { 'unsigned test build' }))) 'Installer product name was not localized.'
+        $version = (Get-Item (Join-Path $installed 'runtime\DisplaySwitcher.Windows.exe')).VersionInfo
+        $expectedName = 'SFlip {0}.{1}.{2}.{3}' -f $version.FileMajorPart, $version.FileMinorPart, $version.FileBuildPart, $version.FilePrivatePart
+        Assert ($displayName -eq $expectedName) 'Installed product name/version differs from the application.'
     }
     Assert ((Get-Content $config -Raw) -ceq $sentinel) 'User configuration was changed.'
 }
@@ -86,7 +88,7 @@ cl /nologo /LD /MT /EHsc /Fo"$work\MockBootstrap.obj" /Fe"$mock" "$source" /link
     if ($LASTEXITCODE -ne 0) { throw 'Mock bootstrap compilation failed.' }
     & $iscc "/DDistDir=$(Join-Path $windows 'dist')" "/DBootstrapDLL=$mock" "/DOutputDir=$work" (Join-Path $PSScriptRoot 'SFlip.iss')
     if ($LASTEXITCODE -ne 0) { throw 'Test installer compilation failed.' }
-    $setup = Join-Path $work 'SFlip-Setup-x64-unsigned.exe'
+    $setup = Join-Path $work 'SFlip-Setup-x64.exe'
     $uninstaller = $null
     $env:SFLIP_TEST_RUNTIME_FAILURE = '1'
     Invoke-Setup $setup $false

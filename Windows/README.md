@@ -13,9 +13,8 @@
 - 目标平台为 x64，最低 Windows 10 版本 1809（build 17763），也支持 Windows 11。
 - 安装版和绿色版均需要 Microsoft Windows App Runtime 2.4 x64；安装版会检测依赖并在缺少时提供官方下载链接。
 - 程序不依赖 .NET，Release 使用静态 C/C++ 运行库。
-- 当前产物是未签名测试构建，不等同于正式代码签名版本。
 
-**安装版（当前源码/CI 构建）**：运行 `SFlip-Setup-x64-unsigned.exe`，按向导安装。默认目录为 `%LOCALAPPDATA%\Programs\SFlip`，仅安装给当前用户，无需管理员权限。安装器提供简体中文和英文，默认按系统界面语言选择，也可手动切换。安装包不包含运行库，也不自动下载或安装依赖。复制文件前调用微软 Bootstrap 接口检测当前用户能否加载所需的 x64 兼容运行库；未安装、过旧或不可用时停止安装，询问是否打开[微软官方下载链接](https://aka.ms/windowsappsdk/2.4/2.4.0/windowsappruntimeinstall-x64.exe)。安装运行库后返回安装向导重试，即会重新检测；静默安装缺少依赖时失败退出，不打开浏览器。完成后从开始菜单启动 SFlip，可选创建桌面快捷方式；安装器不会自动启动应用。
+**安装版（当前源码/CI 构建）**：运行 `SFlip-Setup-x64.exe`，按向导安装。默认目录为 `%LOCALAPPDATA%\Programs\SFlip`，仅安装给当前用户，无需管理员权限。安装器提供简体中文和英文，默认按系统界面语言选择，也可手动切换。安装包不包含运行库，也不自动下载或安装依赖。复制文件前调用微软 Bootstrap 接口检测当前用户能否加载所需的 x64 兼容运行库；未安装、过旧或不可用时停止安装，询问是否打开[微软官方下载链接](https://aka.ms/windowsappsdk/2.4/2.4.0/windowsappruntimeinstall-x64.exe)。安装运行库后返回安装向导重试，即会重新检测；静默安装缺少依赖时失败退出，不打开浏览器。完成后从开始菜单启动 SFlip，可选创建桌面快捷方式；安装器不会自动启动应用。
 
 升级前先从托盘退出 SFlip，再运行新安装器；同版本可重新安装，拒绝覆盖更高版本。新版本通过运行标记阻止运行中安装/卸载，旧版本仍须手动退出。由绿色版迁移时也先退出原程序，改用开始菜单入口；若启用了登录启动，在新应用中关闭再开启一次以更新路径。
 
@@ -199,7 +198,7 @@ DDC、显示器唤醒、输入源、防火墙或系统设置。
 .\Windows\build-installer.ps1
 ```
 
-输出 `Windows\outputs\SFlip-Setup-x64-unsigned.exe` 及 `.sha256` 校验文件。脚本只下载并校验固定版本的 Inno Setup 7.1.0，缓存到 `Windows\.build\installer-tools`，不下载微软运行库。检测复用应用的小型 Bootstrap 加载 DLL，参数与应用 SDK 版本校验一致；安装包强制小于 20 MiB，防止误带运行库安装程序。应用与安装包仍未签名。版本直接取应用 EXE，不独立维护安装包版本。
+输出 `Windows\outputs\SFlip-Setup-x64.exe` 及 `.sha256` 校验文件。脚本只下载并校验固定版本的 Inno Setup 7.1.0，缓存到 `Windows\.build\installer-tools`，不下载微软运行库。检测复用应用的小型 Bootstrap 加载 DLL，参数与应用 SDK 版本校验一致；安装包强制小于 20 MiB，防止误带运行库安装程序。版本直接取应用 EXE，不独立维护安装包版本。
 
 Windows CI 分别提供绿色版和安装版 artifact。现有 v2.2.0 Release 仍只有绿色 ZIP，不包含新安装器。`installer/test-installer.ps1` 只允许在临时 GitHub runner 运行，使用模拟 Bootstrap DLL 验证中英文提示、依赖缺失/异常时中止、安装/重装、降级拒绝、运行中拒绝、卸载与配置/登录启动保留；不启动应用，不替代真实 Windows 首次启动及微软运行库安装验证。
 

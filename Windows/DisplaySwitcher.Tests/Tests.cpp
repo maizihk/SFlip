@@ -2505,7 +2505,7 @@ namespace
         auto missingMetadata = PublicAboutInfo(applicationExecutable.parent_path() / L"missing.exe");
         auto combined = about.applicationName + L" " + about.publicVersion + L" " + about.architecture + L" "
             + about.protocol + L" " + about.projectUrl + L" " + about.licenseUrl + L" "
-            + about.thirdPartyNoticesUrl + L" " + about.buildNotice;
+            + about.thirdPartyNoticesUrl;
         Check(about.applicationName == L"SFlip" && about.versionFromApplicationMetadata
             && !about.publicVersion.empty() && about.publicVersion != L"未知"
             && !missingMetadata.versionFromApplicationMetadata && missingMetadata.publicVersion == L"未知"
