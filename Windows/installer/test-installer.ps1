@@ -57,8 +57,11 @@ try {
 extern "C" __declspec(dllexport) HRESULT WINAPI MddBootstrapInitialize2(
     UINT32 majorMinor, PCWSTR tag, UINT64 minimum, UINT32 options) {
     // Validate the real x64 ABI and exact SDK requirements supplied by Pascal Script.
-    if (majorMinor != 0x00020004 || !tag || *tag || minimum != 0x0002000400000000ULL || options != 0)
-        return E_INVALIDARG;
+    if (majorMinor != 0x00020004) return HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS);
+    // Windows accepts both null and an empty string for the stable channel.
+    if (tag && *tag) return HRESULT_FROM_WIN32(ERROR_INVALID_NAME);
+    if (minimum != 0x0002000400000000ULL) return HRESULT_FROM_WIN32(ERROR_OLD_WIN_VERSION);
+    if (options != 0) return E_INVALIDARG;
     wchar_t failure[8]{};
     GetEnvironmentVariableW(L"SFLIP_TEST_RUNTIME_FAILURE", failure, 8);
     if (failure[0] == L'1') return HRESULT_FROM_WIN32(ERROR_INSTALL_RESOLVE_DEPENDENCY_FAILED);
