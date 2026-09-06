@@ -65,13 +65,27 @@ class MockRuntime {
         Assert ((Get-FileHash $file.FullName).Hash -eq (Get-FileHash (Join-Path $installed $relative)).Hash) "Installed file differs: $relative"
     }
     Invoke-Setup $setup $true # Same-version upgrade/reinstall.
+    $env:SFLIP_TEST_RUNTIME_FAILURE = '1'
+    Invoke-Setup $setup $false
+    Assert (Test-Path $uninstaller) 'Failed upgrade removed the existing installation.'
+    Remove-Item Env:SFLIP_TEST_RUNTIME_FAILURE
+    # Give the installed binary a newer version without running it.
+    $newerSource = Join-Path $work 'NewerVersion.cs'
+    '[assembly: System.Reflection.AssemblyFileVersion("99.0.0.0")] class NewerVersion { static void Main() {} }' | Set-Content $newerSource
+    $installedRuntime = Join-Path $installed 'runtime\DisplaySwitcher.Windows.exe'
+    & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:exe "/out:$installedRuntime" $newerSource
+    if ($LASTEXITCODE -ne 0) { throw 'Newer-version fixture compilation failed.' }
+    $newerHash = (Get-FileHash $installedRuntime).Hash
+    Invoke-Setup $setup $false
+    Assert ((Get-FileHash $installedRuntime).Hash -eq $newerHash) 'Downgrade replaced a newer binary.'
+    Copy-Item (Join-Path $windows 'dist\runtime\DisplaySwitcher.Windows.exe') $installedRuntime -Force
     $mutex = [Threading.Mutex]::new($false, 'Local\SFlip.Installation')
     try {
         Invoke-Setup $setup $false
         Invoke-Setup $uninstaller $false
         Assert (Test-Path (Join-Path $installed 'SFlip.exe')) 'Running-instance protection removed app files.'
     } finally { $mutex.Dispose() }
-    New-Item $runKey -Force | Out-Null
+    if (-not (Test-Path $runKey)) { New-Item $runKey | Out-Null }
     $portableCommand = '"C:\SFlip-test-portable\SFlip.exe"'
     New-ItemProperty $runKey $runName -Value $portableCommand -PropertyType String -Force | Out-Null
     Invoke-Setup $uninstaller $true
