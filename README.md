@@ -27,7 +27,8 @@ SFlip 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多台电�
 
 - **macOS DMG（当前主线构建）**：双击打开 DMG，将 `SFlip.app` 拖到旁边的 `Applications` 文件夹。复制后推出磁盘映像，从“应用程序”启动。替换旧版前先退出旧应用，不要直接从 DMG 运行。
 - **macOS ZIP（现有 v2.2.0 发布包）**：解压后将 `DisplaySwitcher.app` 放到固定的 `/Applications` 目录，再启动应用。
-- **Windows**：先安装 Microsoft Windows App Runtime 2.4 x64（[微软下载页](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)），再将 ZIP 完整解压到固定目录，运行顶层 `SFlip.exe`（现有 v2.2.0 包为 `DisplaySwitch.exe`）。必须保留旁边的 `runtime` 子目录，不能只复制一个 EXE。
+- **Windows 安装版（当前主线构建）**：运行 `SFlip-Setup-x64-unsigned.exe`，按向导安装后从开始菜单启动。内置微软运行库，无需另行下载；升级前先退出应用。卸载保留配置与共享运行库，详见 [Windows 安装说明](Windows/README.md#安装与升级)。现有 v2.2.0 Release 尚不含安装版。
+- **Windows 绿色版**：先安装 Microsoft Windows App Runtime 2.4 x64（[微软下载页](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)），再将 ZIP 完整解压到固定目录，运行顶层 `SFlip.exe`（现有 v2.2.0 包为 `DisplaySwitch.exe`）。必须保留旁边的 `runtime` 子目录，不能只复制一个 EXE。
 
 从旧名升级：先退出旧应用，再安装 SFlip。macOS 安装到 `/Applications/SFlip.app`，确认正常后可移除旧 `DisplaySwitcher.app`；Windows 从 `SFlip.exe` 启动并更新旧快捷方式。两端均保留原配置与身份标识；应用路径变化后，如已启用登录启动，请在新应用中关闭再开启并验证，系统权限复用仍以系统实际提示为准。
 
@@ -134,9 +135,10 @@ Apple Development 签名用于本机测试，不等同于 Developer ID 或公证
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\Windows\build-windows.ps1
+.\Windows\build-installer.ps1
 ```
 
-脚本构建 x64 Release、运行原生自动测试并生成 `Windows\dist\SFlip.exe` 和 `Windows\dist\runtime\...`。分发时保留完整 `dist` 目录。详细说明见 [Windows README](Windows/README.md)。
+脚本构建 x64 Release、运行原生自动测试并生成 `Windows\dist\SFlip.exe` 和 `Windows\dist\runtime\...`。绿色版分发时保留完整 `dist` 目录；第二条命令下载固定且校验哈希的 Inno Setup 与微软运行库，生成 `Windows\outputs\SFlip-Setup-x64-unsigned.exe` 和 SHA-256 校验文件。详细说明见 [Windows README](Windows/README.md)。
 
 正式源码位于 `macOS/` 和 `Windows/DisplaySwitcher.Native/`；`Windows/DisplaySwitcher.Launcher/` 是绿色版启动器。`Windows/DisplaySwitcher.Windows/` 仅为旧 C# 迁移参照，不参与正式构建。
 

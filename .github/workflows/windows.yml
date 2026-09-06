@@ -73,6 +73,24 @@ jobs:
           }
           "Verified Windows x64 unsigned framework-dependent artifact: {0:N2} MiB" -f ($bytes / 1MB)
 
+      - name: Build unsigned offline installer
+        shell: pwsh
+        run: ./Windows/build-installer.ps1
+
+      - name: Test installer lifecycle with simulated runtime
+        shell: pwsh
+        run: ./Windows/installer/test-installer.ps1
+
+      - name: Upload Windows x64 unsigned installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: SFlip-Windows-x64-unsigned-installer
+          path: |
+            Windows/outputs/SFlip-Setup-x64-unsigned.exe
+            Windows/outputs/SFlip-Setup-x64-unsigned.sha256
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload Windows x64 unsigned framework-dependent artifact
         uses: actions/upload-artifact@v6
         with:

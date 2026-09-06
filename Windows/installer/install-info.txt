@@ -1,0 +1,12 @@
+SFlip - unsigned test build
+
+Installs SFlip for the current Windows user and creates a Start menu shortcut.
+The included Microsoft Windows App Runtime installer checks and installs the required runtime packages. A healthy same-version or newer runtime is kept. Runtime installation must succeed before SFlip files are copied.
+
+Exit SFlip before upgrading or uninstalling. Setup will not force-close or automatically launch the application. Start SFlip from the Start menu after setup finishes.
+
+Existing settings are retained. If moving from a portable copy, exit that copy first, use the new Start menu shortcut, then turn login startup off and on in SFlip if previously enabled.
+
+Uninstall removes the installed application and its shortcuts. Settings and the shared Microsoft runtime are retained. Login startup is removed only when it points to this installation.
+
+No firewall rules, display settings, USB mappings, permissions, or login startup are enabled by this installer.

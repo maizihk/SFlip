@@ -1,5 +1,14 @@
 # Windows 交接记录
 
+## 当前任务：W-101 未签名 Windows 安装版（2026-09-06）
+
+- 分支 `codex/windows-installer`，基线 `origin/main@bad06b4`；GitHub 仓库现为 `maizihk/SFlip`。用户要求增加安装版，签名暂不处理。
+- Inno Setup 安装到当前用户目录，内置经哈希和微软签名验证的 App Runtime 2.4.0，依赖失败停止；开始菜单、可选桌面入口、卸载入口和同版重装，版本取应用 EXE。保留绿色版与用户配置，不开启登录启动、不自动启动应用。
+- 应用新增安装器可检测的生命周期 mutex，防止运行中覆盖/卸载；卸载只移除指向本安装目录的登录启动值，保留其他副本与共享运行库。旧版本仍需先手动退出。
+- 修改：`Windows/installer/{SFlip.iss,install-info.txt,test-installer.ps1}`、`Windows/build-installer.ps1`、`Windows/DisplaySwitcher.Native/App.xaml.h`、Windows README/清单、本交接、根 README 和 Windows workflow。协议、schema、版本和 macOS 不变。
+- 自动验证：生命周期测试使用模拟运行库，仅在临时 CI runner 操作测试配置与注册项，不启动真实应用。原生回归、x64 Release、安装包和生命周期结果待本 PR Windows CI；本机 macOS 无法执行 Windows 构建。
+- 实机待验：干净 Windows 的真实微软依赖安装、首次启动、升级、登录启动与卸载。未修改本机权限、签名信任、防火墙或执行真实硬件流程。
+
 ## 当前任务：W-035 SFlip 对外命名统一（2026-09-06）
 
 - 分支：`codex/macos-dmg-packaging`，在 PR #84 已完成的 DMG 基础上继续，改名前基线 `0285071`。用户明确授权双端对外名称统一；协议、schema 和版本不变。

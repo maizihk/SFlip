@@ -8,14 +8,20 @@
 `Windows/DisplaySwitcher.Launcher/` 是绿色版入口。`Windows/DisplaySwitcher.Windows/`
 只是旧 C# 迁移参照，不参与正式构建，也不承载新功能。
 
-## 支持环境与绿色版
+## 安装与升级
 
 - 目标平台为 x64，最低 Windows 10 版本 1809（build 17763），也支持 Windows 11。
-- 当前是 framework-dependent 绿色版，需要预装 Microsoft Windows App Runtime 2.4 x64。
+- 安装版内置 Microsoft Windows App Runtime 2.4 x64；绿色版需要自行预装该运行库。
 - 程序不依赖 .NET，Release 使用静态 C/C++ 运行库。
 - 当前产物是未签名测试构建，不等同于正式代码签名版本。
 
-安装时复制完整 `Windows\dist\` 目录到固定位置，保留 `runtime` 子目录，然后运行
+**安装版（当前源码/CI 构建）**：运行 `SFlip-Setup-x64-unsigned.exe`，按向导安装。默认目录为 `%LOCALAPPDATA%\Programs\SFlip`，仅安装给当前用户，无需管理员权限。安装器内置微软运行库，支持离线安装；微软安装器会保留健康的同版或更高版本依赖，依赖失败则不复制应用。完成后从开始菜单启动 SFlip，可选创建桌面快捷方式；安装器不会自动启动应用。
+
+升级前先从托盘退出 SFlip，再运行新安装器；同版本可重新安装，拒绝覆盖更高版本。新版本通过运行标记阻止运行中安装/卸载，旧版本仍须手动退出。由绿色版迁移时也先退出原程序，改用开始菜单入口；若启用了登录启动，在新应用中关闭再开启一次以更新路径。
+
+在 Windows“设置 → 应用 → 已安装的应用”中卸载 SFlip。卸载保留 `%LOCALAPPDATA%\DisplaySwitcher` 中的配置与诊断记录、共享微软运行库；仅清除指向该安装目录的登录启动项。需要彻底清除配置时，请在退出所有副本后自行删除该配置目录。
+
+**绿色版**：复制完整 `Windows\dist\` 目录到固定位置，保留 `runtime` 子目录，然后运行
 `SFlip.exe`。程序会常驻托盘；全新配置默认关闭协同、USB 自动切换、全部 DDC
 写入和详细诊断记录，不会猜测设备、显示器、输入源、地址或配对码。
 
@@ -184,6 +190,18 @@ Windows\dist\runtime\...
 消息和当前 6 条状态机向量，并读取 `contracts/usb-switch-v1/` 的 USB-001 至 USB-016；不再读取
 `contracts/protocol-v1/`。测试不会访问真实局域网、USB、
 DDC、显示器唤醒、输入源、防火墙或系统设置。
+
+## 构建安装包
+
+完成上面的应用构建后运行：
+
+```powershell
+.\Windows\build-installer.ps1
+```
+
+输出 `Windows\outputs\SFlip-Setup-x64-unsigned.exe` 及 `.sha256` 校验文件。脚本下载并校验固定版本的 Inno Setup 7.1.0 和微软运行库 2.4.0（额外约 111 MiB），缓存到 `Windows\.build\installer-tools`；微软依赖还验证 Authenticode 签名。应用与安装包仍未签名。版本直接取应用 EXE，不独立维护安装包版本。
+
+Windows CI 分别提供绿色版和安装版 artifact。现有 v2.2.0 Release 仍只有绿色 ZIP，不包含新安装器。`installer/test-installer.ps1` 只允许在临时 GitHub runner 运行，使用模拟依赖验证失败中止、安装/重装、运行中拒绝、卸载与配置/登录启动保留；不启动应用，不替代真实 Windows 首次启动及微软运行库安装验证。
 
 ## 实机验证边界
 
