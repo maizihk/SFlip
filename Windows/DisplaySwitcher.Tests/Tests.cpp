@@ -640,7 +640,7 @@ namespace
             L"再次开启也必须删除关闭前遗留的详细日志，不能混入新会话");
 
         DiagnosticSnapshot disabledSnapshot;
-        disabledSnapshot.about.applicationName = L"DisplaySwitch";
+        disabledSnapshot.about.applicationName = L"SFlip";
         disabledSnapshot.detailedRecordingEnabled = false;
         disabledSnapshot.sessions = { "udp.send success=1" };
         auto disabledPreview = BuildDiagnosticPreview(disabledSnapshot);
@@ -2506,7 +2506,7 @@ namespace
         auto combined = about.applicationName + L" " + about.publicVersion + L" " + about.architecture + L" "
             + about.protocol + L" " + about.projectUrl + L" " + about.licenseUrl + L" "
             + about.thirdPartyNoticesUrl + L" " + about.buildNotice;
-        Check(about.applicationName == L"DisplaySwitch" && about.versionFromApplicationMetadata
+        Check(about.applicationName == L"SFlip" && about.versionFromApplicationMetadata
             && !about.publicVersion.empty() && about.publicVersion != L"未知"
             && !missingMetadata.versionFromApplicationMetadata && missingMetadata.publicVersion == L"未知"
             && about.architecture.find(L"Windows") != std::wstring::npos && about.protocol == L"UDP 协议 v2"
@@ -2857,7 +2857,7 @@ namespace
         };
 
         DiagnosticSnapshot snapshot;
-        snapshot.about = { L"DisplaySwitch", L"2.2.0 (20)", L"Windows x64", L"UDP 协议 v2",
+        snapshot.about = { L"SFlip", L"2.2.0 (20)", L"Windows x64", L"UDP 协议 v2",
             L"https://example.invalid/project", L"https://example.invalid/license",
             L"https://example.invalid/notices", L"测试构建", true };
         snapshot.schemaVersion = CurrentAppConfigSchemaVersion;

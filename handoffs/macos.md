@@ -1,5 +1,21 @@
 # macOS 交接记录
 
+## 当前任务：M-102 SFlip 对外命名统一（2026-09-06）
+
+- 分支：`codex/macos-dmg-packaging`，在 PR #84 已完成的 DMG 基础上继续，改名前基线 `0285071`。用户明确授权双端对外名称统一；协议、schema 和版本不变。
+- macOS 元数据、权限/诊断提示、App/DMG/ZIP 和 CI 附件统一为 SFlip；保留 Bundle ID、配置、实例锁和协议认证字符串。272 项 XCTest、Release、DMG 及签名检查通过。
+- README 保留旧 Release 下载链接，补充旧名升级与登录启动重新确认步骤；未更名 GitHub 仓库或历史记录。
+- 待实机：旧版升级、权限复用、快捷方式和登录启动；未安装/启动应用或执行硬件流程。
+
+## 当前任务：M-102 DMG 分发打包（2026-09-06）
+
+- 分支：`codex/macos-dmg-packaging`；基线：`945b005`，包含 PR #82 修复及 #83 首次使用文档。
+- 原因：ZIP 需要用户自行寻找应用程序目录；DMG 提供应用与 Applications 快捷方式，明确拖拽安装路径。
+- 修改：新增 `macOS/scripts/package-dmg.sh`，接入现有构建及 macOS CI，保留 ZIP；README 补充安装和替换步骤。未改变版本、协议或发布 Release。
+- 自动验证：272 项 XCTest 全过，Release arm64 构建成功；DMG 校验和、只读挂载、Applications 链接、挂载应用和临时目录复制后的严格签名检查通过，默认 ad-hoc 签名。macOS 27 对 hdiutil 发出弃用提示但执行成功；为兼容现有系统保留此工具。
+- 外观补充：新增 AppKit Retina 背景生成脚本、dmgbuild 布局和固定依赖清单；首次打包在构建目录建立 Python 虚拟环境。固定图标坐标、卷图标、箭头与安装提示，文本说明隐藏以保持双图标界面。本机 Finder 已查看，窗口为状态栏及路径栏预留高度；美化后 272 项测试仍全过。
+- 待验：干净 Mac 下载后的 Finder 拖拽安装、替换和首次启动。未安装或启动应用，未修改权限或执行硬件操作；CI 结果以本次 PR checks 为准。
+
 ## 当前任务：README 首次使用指引（2026-09-06）
 
 - 分支：`codex/macos-readme-onboarding`；基线：`e5a571f`，已包含 PR #82 双端审核修复。

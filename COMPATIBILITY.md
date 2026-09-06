@@ -1,6 +1,6 @@
-# DisplaySwitch compatibility and validation boundaries
+# SFlip compatibility and validation boundaries
 
-DisplaySwitch controls hardware through operating-system display APIs. A display supporting DDC/CI does not guarantee that every GPU, cable, adapter, dock, KVM, port, or operating-system release will pass the same command in both directions.
+SFlip controls hardware through operating-system display APIs. A display supporting DDC/CI does not guarantee that every GPU, cable, adapter, dock, KVM, port, or operating-system release will pass the same command in both directions.
 
 This document describes the current `main` branch. It is a capability boundary, not a universal hardware compatibility claim.
 
@@ -76,7 +76,7 @@ Do not begin with unattended, remote-only, or whole-system sleep tests.
 Copy the template below into an Issue. Optional display make/model information may be included if it is already public and useful; never include a serial number.
 
 ```text
-DisplaySwitch version/build:
+SFlip version/build:
 Platform and OS version:
 CPU architecture:
 Display count:

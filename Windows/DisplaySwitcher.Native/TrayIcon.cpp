@@ -453,7 +453,7 @@ namespace DisplaySwitcher::Native
         data.uCallbackMessage = CallbackMessage;
         data.hIcon = icon_;
         data.guidItem = TrayGuid;
-        auto tip = Limit(L"显示器切换 · " + status_, 127);
+        auto tip = Limit(L"SFlip · " + status_, 127);
         wcscpy_s(data.szTip, tip.c_str());
         return data;
     }

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report reproducible DisplaySwitch behavior
+description: Report reproducible SFlip behavior
 title: "[Bug]: "
 labels:
   - bug
@@ -21,7 +21,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: DisplaySwitch version
+      label: SFlip version
       placeholder: "For example: 2.1.0 (19)"
     validations:
       required: true

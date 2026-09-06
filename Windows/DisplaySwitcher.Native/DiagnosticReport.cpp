@@ -99,7 +99,7 @@ namespace DisplaySwitcher::Native
     std::wstring BuildDiagnosticPreview(DiagnosticSnapshot const& snapshot)
     {
         std::wostringstream out;
-        out << L"DisplaySwitch 诊断预览\r\n"
+        out << L"SFlip 诊断预览\r\n"
             << L"应用：" << snapshot.about.applicationName << L"\r\n"
             << L"版本/构建：" << snapshot.about.publicVersion << L"\r\n"
             << L"架构：" << snapshot.about.architecture << L"\r\n"

@@ -52,7 +52,7 @@ namespace DisplaySwitcher::Native
 #endif
         auto version = VersionFromMetadata(applicationExecutable);
         return {
-            L"DisplaySwitch",
+            L"SFlip",
             version.value_or(L"未知"),
             architecture,
             L"UDP 协议 v2",

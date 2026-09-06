@@ -63,7 +63,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     if (!std::filesystem::is_regular_file(target))
     {
         MessageBoxW(nullptr, L"缺少 runtime\\DisplaySwitcher.Windows.exe，请重新复制完整程序目录。",
-            L"DisplaySwitch", MB_OK | MB_ICONERROR);
+            L"SFlip", MB_OK | MB_ICONERROR);
         return 2;
     }
 
@@ -84,8 +84,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     if (!CreateProcessW(target.c_str(), mutableCommand.data(), nullptr, nullptr, FALSE, 0, nullptr,
         runtimeDirectory.c_str(), &startup, &process))
     {
-        auto message = L"无法启动 DisplaySwitch：\n\n" + ErrorText(GetLastError());
-        MessageBoxW(nullptr, message.c_str(), L"DisplaySwitch", MB_OK | MB_ICONERROR);
+        auto message = L"无法启动 SFlip：\n\n" + ErrorText(GetLastError());
+        MessageBoxW(nullptr, message.c_str(), L"SFlip", MB_OK | MB_ICONERROR);
         return 3;
     }
     CloseHandle(process.hThread);

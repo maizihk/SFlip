@@ -1,4 +1,4 @@
-# Windows 托盘版安装、配置与测试
+# SFlip Windows 托盘版安装、配置与测试
 
 > 开发前请先阅读仓库根目录的 [`AGENTS.md`](../AGENTS.md)、
 > [`PROTOCOL.md`](../PROTOCOL.md) 和
@@ -16,8 +16,10 @@
 - 当前产物是未签名测试构建，不等同于正式代码签名版本。
 
 安装时复制完整 `Windows\dist\` 目录到固定位置，保留 `runtime` 子目录，然后运行
-`DisplaySwitch.exe`。程序会常驻托盘；全新配置默认关闭协同、USB 自动切换、全部 DDC
+`SFlip.exe`。程序会常驻托盘；全新配置默认关闭协同、USB 自动切换、全部 DDC
 写入和详细诊断记录，不会猜测设备、显示器、输入源、地址或配对码。
+
+从旧版升级时先退出应用，再复制完整新包并从 `SFlip.exe` 启动，更新原快捷方式；已开启登录启动的用户在新应用中关闭再开启一次。原配置目录和登录启动注册项名称保留，`runtime` 中的旧工程文件名属于内部实现。现有 v2.2.0 发布包的入口仍为 `DisplaySwitch.exe`。
 
 ## schema v5 本机配置
 
@@ -173,7 +175,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 脚本执行 x64 Release 构建和无硬件原生测试，生成：
 
 ```text
-Windows\dist\DisplaySwitch.exe
+Windows\dist\SFlip.exe
 Windows\dist\runtime\...
 ```
 

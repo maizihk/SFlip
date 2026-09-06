@@ -71,7 +71,7 @@ if (-not $distPath.StartsWith($windowsPath, [StringComparison]::OrdinalIgnoreCas
 }
 if (Test-Path -LiteralPath $distPath) { Remove-Item -LiteralPath $distPath -Recurse -Force }
 New-Item -ItemType Directory -Path $distPath | Out-Null
-$launcher = Join-Path $launcherOutput "DisplaySwitch.exe"
+$launcher = Join-Path $launcherOutput "SFlip.exe"
 if (-not (Test-Path -LiteralPath $launcher)) { throw "构建完成但缺少启动器：$launcher" }
 Copy-Item -LiteralPath $launcher -Destination $distPath
 $runtimePath = Join-Path $distPath "runtime"
@@ -92,7 +92,7 @@ foreach ($name in $releaseFiles) {
     Copy-Item -LiteralPath $source -Destination $runtimePath
 }
 
-$entryPoint = Join-Path $distPath "DisplaySwitch.exe"
+$entryPoint = Join-Path $distPath "SFlip.exe"
 if (-not (Test-Path -LiteralPath $entryPoint)) { throw "构建完成但未找到入口：$entryPoint" }
 $bytes = (Get-ChildItem -LiteralPath $distPath -File -Recurse | Measure-Object Length -Sum).Sum
 if ($bytes -ge 20MB) { throw ("dist 体积为 {0:N2} MiB，超过 20 MiB 目标。" -f ($bytes / 1MB)) }

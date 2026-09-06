@@ -34,7 +34,7 @@ struct LocalNetworkPermissionPresentation: Equatable {
         case .explicitSystemDenial:
             return Self(
                 statusText: "系统明确拒绝",
-                detailText: "请前往“系统设置 → 隐私与安全性 → 本地网络”，允许 DisplaySwitcher 访问。",
+                detailText: "请前往“系统设置 → 隐私与安全性 → 本地网络”，允许 SFlip 访问。",
                 isFailure: true,
                 isExplicitlyDenied: true
             )
@@ -99,7 +99,7 @@ struct AboutPageContent: Equatable {
         architecture: String = currentArchitecture
     ) -> AboutPageContent {
         let name = metadata.stringValue(forInfoDictionaryKey: "CFBundleName")
-            ?? "DisplaySwitcher"
+            ?? "SFlip"
         let shortVersion = metadata.stringValue(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) ?? "未知"
@@ -162,7 +162,7 @@ struct DiagnosticReport: Equatable {
     ) -> DiagnosticReport {
         let about = AboutPageContent.make(metadata: metadata, architecture: architecture)
         var lines = [
-            "DisplaySwitcher diagnostic preview",
+            "SFlip diagnostic preview",
             "Session-only anonymized data. No pairing code, IP, path, endpoint ID, display UUID, or USB identifier.",
             "Generating this preview does not access the network or perform USB, wake, DDC, or input-source operations.",
             "",

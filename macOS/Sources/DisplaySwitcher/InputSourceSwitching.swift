@@ -228,7 +228,7 @@ final class InputSourceDiagnosticStore: InputSourceDiagnosticRecording {
     func exportText() -> String {
         guard isRecordingEnabled else {
             return [
-                "DisplaySwitcher input-source diagnostic",
+                "SFlip input-source diagnostic",
                 "Detailed diagnostic recording is disabled."
             ].joined(separator: "\n")
         }
@@ -236,7 +236,7 @@ final class InputSourceDiagnosticStore: InputSourceDiagnosticRecording {
         let snapshot = lines
         lock.unlock()
         return ([
-            "DisplaySwitcher input-source diagnostic",
+            "SFlip input-source diagnostic",
             "Session-only anonymized data; KERN_SUCCESS is transport acceptance, not device execution."
         ] + snapshot).joined(separator: "\n")
     }

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="DisplaySwitcher"
+APP_NAME="SFlip"
 OUTPUT_DIR="$PROJECT_DIR/outputs"
 APP_DIR="$OUTPUT_DIR/$APP_NAME.app"
 DERIVED_DATA="$PROJECT_DIR/.build/xcode"
@@ -83,6 +83,8 @@ verify_app_signature "$STAGED_APP"
 /bin/mkdir -p "$EXTRACTED_DIR"
 /usr/bin/ditto -x -k "$ARCHIVE_PATH" "$EXTRACTED_DIR"
 verify_app_signature "$EXTRACTED_DIR/$APP_NAME.app"
+
+"$PROJECT_DIR/scripts/package-dmg.sh" "$STAGED_APP" "$OUTPUT_DIR/$APP_NAME-macOS-$ARCH-unsigned.dmg"
 
 echo "Signing mode: $SIGNING_MODE"
 echo "$APP_DIR"

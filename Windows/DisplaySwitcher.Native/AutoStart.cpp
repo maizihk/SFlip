@@ -14,7 +14,7 @@ namespace DisplaySwitcher::Native
             auto directoryName = current.parent_path().filename().wstring();
             if (_wcsicmp(directoryName.c_str(), L"runtime") == 0)
             {
-                auto launcher = current.parent_path().parent_path() / L"DisplaySwitch.exe";
+                auto launcher = current.parent_path().parent_path() / L"SFlip.exe";
                 if (std::filesystem::is_regular_file(launcher)) return launcher;
             }
             return current;
