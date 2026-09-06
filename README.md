@@ -23,7 +23,8 @@ DisplaySwitch 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多
 
 文件校验值见 [SHA256SUMS.txt](https://github.com/maizihk/DisplaySwitch/releases/download/v2.2.0/SHA256SUMS.txt)。Intel Mac 当前不支持原生 DDC；Windows 版不依赖 .NET。
 
-- **macOS**：解压后将 `DisplaySwitcher.app` 放到固定的 `/Applications` 目录，再启动应用。
+- **macOS DMG（当前主线构建）**：双击打开 DMG，将 `DisplaySwitcher.app` 拖到旁边的 `Applications` 文件夹。复制后推出磁盘映像，从“应用程序”启动。替换旧版前先退出旧应用，不要直接从 DMG 运行。
+- **macOS ZIP（现有 v2.2.0 发布包）**：解压后将 `DisplaySwitcher.app` 放到固定的 `/Applications` 目录，再启动应用。
 - **Windows**：先安装 Microsoft Windows App Runtime 2.4 x64（[微软下载页](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)），再将 ZIP 完整解压到固定目录，运行顶层 `DisplaySwitch.exe`。必须保留旁边的 `runtime` 子目录，不能只复制一个 EXE。
 
 运行前还需确认：显示器已启用 DDC/CI，当前接口、线材、转接器、扩展坞或 KVM 能透传 DDC/CI。支持情况取决于完整连接链路，详见 [兼容性说明](COMPATIBILITY.md)。
@@ -109,7 +110,7 @@ xcrun --sdk macosx --show-sdk-version
 DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./macOS/scripts/build-app.sh
 ```
 
-输出为 `macOS/outputs/DisplaySwitcher.app` 和 `macOS/outputs/DisplaySwitcher-macOS-<arch>.zip`。脚本默认使用 ad-hoc 签名；如需稳定保留本机权限记录，可指定钥匙串中的 Apple Development 身份：
+输出位于 `macOS/outputs/`：`DisplaySwitcher.app`、拖拽安装包 `DisplaySwitcher-macOS-<arch>-unsigned.dmg` 和原有 ZIP。DMG 包含应用、指向 `/Applications` 的快捷方式和安装说明；构建脚本会校验映像、挂载后的应用及复制后的签名。DMG 是未公证测试包，现有 v2.2.0 Release 仍只提供 ZIP。脚本默认使用 ad-hoc 签名；如需稳定保留本机权限记录，可指定钥匙串中的 Apple Development 身份：
 
 ```bash
 DISPLAYSWITCH_CODESIGN_IDENTITY="<identity SHA-1 or exact name>" \

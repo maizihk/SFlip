@@ -1,5 +1,13 @@
 # macOS 交接记录
 
+## 当前任务：M-102 DMG 分发打包（2026-09-06）
+
+- 分支：`codex/macos-dmg-packaging`；基线：`945b005`，包含 PR #82 修复及 #83 首次使用文档。
+- 原因：ZIP 需要用户自行寻找应用程序目录；DMG 提供应用与 Applications 快捷方式，明确拖拽安装路径。
+- 修改：新增 `macOS/scripts/package-dmg.sh`，接入现有构建及 macOS CI，保留 ZIP；README 补充安装和替换步骤。未改变版本、协议或发布 Release。
+- 自动验证：272 项 XCTest 全过，Release arm64 构建成功；DMG 校验和、只读挂载、Applications 链接、挂载应用和临时目录复制后的严格签名检查通过，默认 ad-hoc 签名。macOS 27 对 hdiutil 发出弃用提示但执行成功；为兼容现有系统保留此工具。
+- 待验：干净 Mac 下载后的 Finder 拖拽安装、替换和首次启动。未安装或启动应用，未修改权限或执行硬件操作；CI 结果以本次 PR checks 为准。
+
 ## 当前任务：README 首次使用指引（2026-09-06）
 
 - 分支：`codex/macos-readme-onboarding`；基线：`e5a571f`，已包含 PR #82 双端审核修复。

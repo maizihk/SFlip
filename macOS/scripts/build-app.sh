@@ -84,6 +84,8 @@ verify_app_signature "$STAGED_APP"
 /usr/bin/ditto -x -k "$ARCHIVE_PATH" "$EXTRACTED_DIR"
 verify_app_signature "$EXTRACTED_DIR/$APP_NAME.app"
 
+"$PROJECT_DIR/scripts/package-dmg.sh" "$STAGED_APP" "$OUTPUT_DIR/$APP_NAME-macOS-$ARCH-unsigned.dmg"
+
 echo "Signing mode: $SIGNING_MODE"
 echo "$APP_DIR"
 echo "$ARCHIVE_PATH"

@@ -60,11 +60,14 @@ jobs:
         run: |
           test -d macOS/outputs/DisplaySwitcher.app
           test -f "macOS/outputs/DisplaySwitcher-macOS-$(uname -m).zip"
+          test -f "macOS/outputs/DisplaySwitcher-macOS-$(uname -m)-unsigned.dmg"
           codesign --verify --deep --strict macOS/outputs/DisplaySwitcher.app
 
       - name: Upload unsigned test package
         uses: actions/upload-artifact@v6
         with:
           name: DisplaySwitcher-macOS-${{ runner.arch }}-unsigned
-          path: macOS/outputs/DisplaySwitcher-macOS-*.zip
+          path: |
+            macOS/outputs/DisplaySwitcher-macOS-*.zip
+            macOS/outputs/DisplaySwitcher-macOS-*-unsigned.dmg
           if-no-files-found: error
