@@ -115,7 +115,7 @@ namespace DisplaySwitcher::Native
         {
             std::scoped_lock lock(mediaKeyMutex_);
             mediaKeyEvents_.clear();
-            mediaKeyRouter_.ResetPending();
+            mediaKeyRouter_.ResetPending(configurationGeneration_.load());
         }
         auto config = Config();
         auto currentTopologyTrust = DisplayTopologyTrust::IncompleteOrUnavailable;
@@ -832,7 +832,21 @@ namespace DisplaySwitcher::Native
     {
         if (!sideEffectGate_.AllowsSideEffects() || profileDetectionActive_) return;
         auto generation = sideEffectGeneration_.load();
-        SubmitDdcWrite({ displayId, code, value, generation });
+        std::scoped_lock lock(mediaKeyMutex_);
+        if (!AllowsSideEffects(generation)) return;
+        auto config = Config();
+        auto backend = ddcBackends_.Lookup(NativeDdcBackendKey);
+        auto trust = backend ? backend->TopologyTrust() : DisplayTopologyTrust::IncompleteOrUnavailable;
+        for (auto const& control : BuildDdcControlProjection(config, trust, true))
+        {
+            if (control.code != code || !EqualId(control.displayId, displayId)
+                || control.targetDisplayIds.empty()) continue;
+            mediaKeyRouter_.OnWriteSubmitted(control.targetDisplayIds, code, value);
+            DdcWriteRequest request{ displayId, code, value, generation };
+            request.projectedTargetDisplayIds = control.targetDisplayIds;
+            SubmitDdcWrite(std::move(request));
+            break;
+        }
     }
 
     void Controller::SubmitDdcWrite(DdcWriteRequest request)
@@ -908,17 +922,18 @@ namespace DisplaySwitcher::Native
                     actionConfig = std::make_shared<AppConfig const>(std::move(currentAction));
                     mediaPlan = mediaKeyRouter_.Plan(*actionConfig, trust, event.first,
                         configurationGeneration_.load(), 5);
+                    // Keep projection and queue ordering identical across slider and media input.
+                    for (auto const& write : mediaPlan.writes)
+                    {
+                        DdcWriteRequest request{ write.displayId, write.code, write.value, generation };
+                        request.actionConfig = actionConfig;
+                        request.linkAllDisplays = write.linked;
+                        request.projectedTargetDisplayIds = write.targetDisplayIds;
+                        SubmitDdcWrite(std::move(request));
+                    }
                 }
                 WriteDiagnostic("media_key.plan state=" + std::to_string(static_cast<int>(mediaPlan.state))
                     + " writes=" + std::to_string(mediaPlan.writes.size()));
-                for (auto const& write : mediaPlan.writes)
-                {
-                    DdcWriteRequest request{ write.displayId, write.code, write.value, generation };
-                    request.actionConfig = actionConfig;
-                    request.linkAllDisplays = write.linked;
-                    request.mediaKeyTargetDisplayIds = write.targetDisplayIds;
-                    SubmitDdcWrite(std::move(request));
-                }
             }
         }
     }
@@ -939,10 +954,12 @@ namespace DisplaySwitcher::Native
             displayDiagnostics_->RecordBatch(config.displays, result, DiagnosticOperationKind::Write);
             if (!result.success || !AllowsSideEffects(request->generation))
             {
-                if (!request->mediaKeyTargetDisplayIds.empty())
+                if (!request->projectedTargetDisplayIds.empty())
                 {
                     std::scoped_lock lock(mediaKeyMutex_);
-                    mediaKeyRouter_.OnWriteFailed(request->code, request->mediaKeyTargetDisplayIds);
+                    if (AllowsSideEffects(request->generation))
+                        mediaKeyRouter_.OnWriteFinished(request->code,
+                            request->projectedTargetDisplayIds, request->value);
                 }
                 continue;
             }
@@ -979,8 +996,8 @@ namespace DisplaySwitcher::Native
                 std::scoped_lock mediaLock(mediaKeyMutex_);
                 if (!AllowsSideEffects(request->generation)) continue;
                 { std::scoped_lock lock(configMutex_); config_ = std::move(config); }
-                mediaKeyRouter_.OnWriteCompleted(request->code,
-                    request->mediaKeyTargetDisplayIds, request->value);
+                mediaKeyRouter_.OnWriteFinished(request->code,
+                    request->projectedTargetDisplayIds, request->value);
             }
             Enqueue([weak, generation = request->generation]
             {

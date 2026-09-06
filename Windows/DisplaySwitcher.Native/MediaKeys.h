@@ -69,15 +69,14 @@ namespace DisplaySwitcher::Native
     public:
         MediaKeyPlan Plan(AppConfig const& config, DisplayTopologyTrust topologyTrust,
             MediaKeyAction action, uint64_t configurationGeneration, int step = 5);
-        void OnWriteFailed(DdcVcpCode code, std::vector<std::wstring> const& targetDisplayIds);
-        void OnWriteCompleted(DdcVcpCode code, std::vector<std::wstring> const& targetDisplayIds, int value);
-        void ResetPending() noexcept;
+        void OnWriteFinished(DdcVcpCode code, std::vector<std::wstring> const& targetDisplayIds, int value);
+        void OnWriteSubmitted(std::vector<std::wstring> const& displayIds, DdcVcpCode code, int value);
+        void ResetPending(uint64_t configurationGeneration = 0) noexcept;
 
     private:
         using ValueKey = std::pair<std::wstring, DdcVcpCode>;
         static std::wstring CanonicalId(std::wstring value);
         std::optional<int> PendingValue(std::wstring const& displayId, DdcVcpCode code) const;
-        void SetPending(std::vector<std::wstring> const& displayIds, DdcVcpCode code, int value);
 
         uint64_t configurationGeneration_{};
         std::map<ValueKey, int> pendingValues_;
