@@ -10,9 +10,14 @@ $config = Join-Path $configDir 'settings.json'
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $runName = 'DisplaySwitcher.Windows'
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{AE3D56F2-6790-4E14-AC64-F109C402D06B}_is1'
+function Get-StartupCommand {
+    $key = Get-Item -LiteralPath $runKey -ErrorAction SilentlyContinue
+    if ($null -eq $key) { return $null }
+    return $key.GetValue($runName, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+}
 $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'SFlip\SFlip.lnk'
 if ((Test-Path $configDir) -or (Test-Path $uninstallKey) -or (Test-Path $shortcut) -or
-    (Get-ItemPropertyValue $runKey $runName -ErrorAction SilentlyContinue)) {
+    (Get-StartupCommand)) {
     throw 'Tests require a clean SFlip user profile; refusing to replace existing data.'
 }
 New-Item -ItemType Directory -Force $work, $configDir | Out-Null
@@ -89,14 +94,14 @@ class MockRuntime {
     $portableCommand = '"C:\SFlip-test-portable\SFlip.exe"'
     New-ItemProperty $runKey $runName -Value $portableCommand -PropertyType String -Force | Out-Null
     Invoke-Setup $uninstaller $true
-    Assert ((Get-ItemPropertyValue $runKey $runName) -eq $portableCommand) 'Uninstall removed another copy startup entry.'
+    Assert ((Get-StartupCommand) -eq $portableCommand) 'Uninstall removed another copy startup entry.'
     Assert (-not (Test-Path $shortcut)) 'Uninstall left Start menu shortcut.'
     Assert (-not (Test-Path $uninstallKey)) 'Uninstall left registration.'
     foreach ($entry in @('SFlip.exe', 'runtime\DisplaySwitcher.Windows.exe')) {
         Invoke-Setup $setup $true
         Set-ItemProperty $runKey $runName ('"' + (Join-Path $installed $entry) + '"')
         Invoke-Setup $uninstaller $true
-        Assert (-not (Get-ItemPropertyValue $runKey $runName -ErrorAction SilentlyContinue)) 'Uninstall retained its own startup entry.'
+        Assert (-not (Get-StartupCommand)) 'Uninstall retained its own startup entry.'
     }
     Assert (-not (Get-Process -Name 'DisplaySwitcher.Windows' -ErrorAction SilentlyContinue)) 'Installer launched SFlip.'
     Write-Host "Installer lifecycle: $checks checks passed (simulated runtime; no app launch)."
