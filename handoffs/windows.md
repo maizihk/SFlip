@@ -1,13 +1,14 @@
 # Windows 交接记录
 
-## 当前任务：W-101 未签名 Windows 安装版（2026-09-06）
+## 当前任务：W-101 Windows 安装器中文化与外部依赖检测（2026-09-06）
 
-- 分支 `codex/windows-installer`，基线 `origin/main@bad06b4`；GitHub 仓库现为 `maizihk/SFlip`。用户要求增加安装版，签名暂不处理。
-- Inno Setup 安装到当前用户目录，内置经哈希和微软签名验证的 App Runtime 2.4.0，依赖失败停止；开始菜单、可选桌面入口、卸载入口和同版重装，版本取应用 EXE。保留绿色版与用户配置，不开启登录启动、不自动启动应用。
-- 应用新增安装器可检测的生命周期 mutex，防止运行中覆盖/卸载；卸载只移除指向本安装目录的登录启动值，保留其他副本与共享运行库。旧版本仍需先手动退出。
-- 修改：`Windows/installer/{SFlip.iss,install-info.txt,test-installer.ps1}`、`Windows/build-installer.ps1`、`Windows/DisplaySwitcher.Native/App.xaml.h`、Windows README/清单、本交接、根 README 和 Windows workflow。协议、schema、版本和 macOS 不变。
-- 自动验证：生命周期测试使用模拟运行库，仅在临时 CI runner 操作测试配置与注册项，不启动真实应用。原生 416 checks、x64 Release 和安装包编译已由 Windows CI run `34036682841` 通过；生命周期测试修复缺失注册值读取及卸载子进程等待后，以 PR #86 最终 checks 为准。本机 macOS 无法执行 Windows 构建。
-- 实机待验：干净 Windows 的真实微软依赖安装、首次启动、升级、登录启动与卸载。未修改本机权限、签名信任、防火墙或执行真实硬件流程。
+- 分支 `codex/windows-installer`，在未合并 PR #86 / `963de1f` 上继续。用户要求中文安装、不内置运行库，缺少时提醒自行下载安装；签名继续延期。
+- 安装器切换为 x64，提供简体中文/英文，按系统界面语言选择并允许手动切换；安装说明、缺依赖、降级拒绝、桌面入口和卸载显示名均本地化。
+- 删除微软运行库下载与捆绑。复用应用 Bootstrap DLL 调用 `MddBootstrapInitialize2` 检测当前用户可加载的兼容运行库；版本参数依据 SDK 2.4.0 头文件，构建检查 SDK pin。每次重试重新检测；失败不复制文件，仅经用户选择打开微软官方 x64 下载链接；静默安装不打开浏览器。
+- 保留原安装目录、开始菜单/可选桌面入口、配置、登录启动清理和运行 mutex 行为。安装包限制小于 20 MiB，生成 SHA-256。协议、schema、版本和应用业务代码不变。
+- 修改：Windows 安装脚本、`installer/SFlip.iss`、中英文安装说明、模拟 Bootstrap 生命周期测试、Windows workflow、根/Windows README、本平台清单与交接。
+- 验证：前一提交已通过原生 416 checks、x64 Release 和 49 项旧安装回归。当前双语提示、Bootstrap ABI/失败关闭及全部安装生命周期由 PR #86 新 CI 执行，以最终 checks 为准；测试不启动真实应用、网络下载或硬件流程。
+- 实机待验：中文系统默认语言、真实缺失/已安装依赖、浏览器下载后重试、首次启动及登录启动。未改变本机权限、防火墙、签名信任或真实硬件状态。
 
 ## 当前任务：W-035 SFlip 对外命名统一（2026-09-06）
 

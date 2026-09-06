@@ -18,6 +18,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  installer-smoke:
+    # Exercise installer changes without waiting for the full WinUI compilation.
+    # This job uses inert payload fixtures and never uploads an application artifact.
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare inert installer payload
+        shell: pwsh
+        run: |
+          $dist = "Windows/dist"
+          New-Item -ItemType Directory -Force "$dist/runtime" | Out-Null
+          $source = Join-Path $env:RUNNER_TEMP "InstallerPayload.cs"
+          '[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")] class Payload { static void Main() {} }' | Set-Content $source
+          & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /target:exe "/out:$dist/runtime/DisplaySwitcher.Windows.exe" $source
+          if ($LASTEXITCODE -ne 0) { throw "Payload fixture compilation failed" }
+          Copy-Item "$dist/runtime/DisplaySwitcher.Windows.exe" "$dist/SFlip.exe"
+          foreach ($name in @('DisplaySwitcher.Windows.pri', 'DisplaySwitcher.Native.winmd', 'Microsoft.WindowsAppRuntime.Bootstrap.dll', 'App.xbf', 'SettingsWindow.xbf', 'AppIcon.ico', 'AppIcon-256.png')) {
+            Set-Content "$dist/runtime/$name" 'inert installer test payload'
+          }
+      - name: Compile installer fixture
+        shell: pwsh
+        run: ./Windows/build-installer.ps1
+      - name: Test localized installer lifecycle
+        shell: pwsh
+        run: ./Windows/installer/test-installer.ps1
+
   build-test-and-package:
     runs-on: windows-2025-vs2026
     timeout-minutes: 45
@@ -73,11 +100,11 @@ jobs:
           }
           "Verified Windows x64 unsigned framework-dependent artifact: {0:N2} MiB" -f ($bytes / 1MB)
 
-      - name: Build unsigned offline installer
+      - name: Build unsigned installer without runtime packages
         shell: pwsh
         run: ./Windows/build-installer.ps1
 
-      - name: Test installer lifecycle with simulated runtime
+      - name: Test localized installer with simulated bootstrap
         timeout-minutes: 5
         shell: pwsh
         run: ./Windows/installer/test-installer.ps1

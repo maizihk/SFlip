@@ -23,17 +23,13 @@ function Get-VerifiedDownload([string]$Url, [string]$Path, [string]$Sha256) {
     }
 }
 
-# Versions are pinned to official releases; update hashes only after upstream verification.
-$runtimeVersion = '2.4.0'
+# Match the detector constants to the application's pinned SDK; do not ship an installer EXE for it.
 [xml]$project = Get-Content (Join-Path $PSScriptRoot 'DisplaySwitcher.Native\DisplaySwitcher.Native.vcxproj') -Raw
 $runtimeReference = $project.SelectSingleNode("//*[local-name()='PackageReference' and @Include='Microsoft.WindowsAppSDK.Runtime']")
-if ($runtimeReference.Version -ne $runtimeVersion) { throw 'Update the installer runtime pin to match the application.' }
-$runtimeInstaller = Join-Path $cache 'WindowsAppRuntimeInstall-2.4.0-x64.exe'
-Get-VerifiedDownload 'https://aka.ms/windowsappsdk/2.4/2.4.0/windowsappruntimeinstall-x64.exe' $runtimeInstaller `
-    '851c35b0b0a59ce4c55f9171f601193322fc3413143b0dc3390ea11e14cfa7fc'
-$signature = Get-AuthenticodeSignature -LiteralPath $runtimeInstaller
-if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation(?:,|$)') {
-    throw 'Microsoft runtime installer signature validation failed.'
+$installerSource = Get-Content (Join-Path $PSScriptRoot 'installer\SFlip.iss') -Raw
+$runtimeVersion = [regex]::Match($installerSource, '#define RuntimeNugetVersion "([^"]+)"').Groups[1].Value
+if (-not $runtimeVersion -or $runtimeReference.Version -ne $runtimeVersion) {
+    throw 'Update the installer runtime detector constants to match the application SDK.'
 }
 if (-not $IsccPath) {
     $compilerSetup = Join-Path $cache 'innosetup-7.1.0-x64.exe'
@@ -54,8 +50,9 @@ foreach ($file in $required) {
 }
 $installer = Join-Path $output 'SFlip-Setup-x64-unsigned.exe'
 if (Test-Path -LiteralPath $installer) { Remove-Item -LiteralPath $installer }
-& $IsccPath "/DDistDir=$dist" "/DRuntimeInstaller=$runtimeInstaller" "/DOutputDir=$output" (Join-Path $PSScriptRoot 'installer\SFlip.iss')
+& $IsccPath "/DDistDir=$dist" "/DOutputDir=$output" (Join-Path $PSScriptRoot 'installer\SFlip.iss')
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $installer)) { throw 'SFlip installer compilation failed.' }
+if ((Get-Item $installer).Length -ge 20MB) { throw 'Installer exceeds 20 MiB; check for accidentally bundled runtime packages.' }
 $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($installer))" | Set-Content (Join-Path $output 'SFlip-Setup-x64-unsigned.sha256') -Encoding ascii
 Write-Host "Installer built: $installer"

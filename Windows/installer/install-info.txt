@@ -1,7 +1,8 @@
 SFlip - unsigned test build
 
 Installs SFlip for the current Windows user and creates a Start menu shortcut.
-The included Microsoft Windows App Runtime installer checks and installs the required runtime packages. A healthy same-version or newer runtime is kept. Runtime installation must succeed before SFlip files are copied.
+
+Requires Windows App Runtime 2.4 x64. This package does not include or automatically download/install the runtime. Setup checks whether the current user can load a compatible runtime before copying application files. If unavailable, it offers a Microsoft download link; install the runtime yourself, then return, click Back, and click Install to check again.
 
 Exit SFlip before upgrading or uninstalling. Setup will not force-close or automatically launch the application. Start SFlip from the Start menu after setup finishes.
 
