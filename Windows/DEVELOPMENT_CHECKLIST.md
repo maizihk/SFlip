@@ -405,3 +405,5 @@
 - [x] 新入口为 SFlip.exe，登录启动选择新入口；配置目录、注册项名称、协议与内部 runtime 名称保持兼容。
 - 本机为 macOS，完整 Windows 原生测试、x64 Release 和分发校验由本次 PR 的 Windows CI 验证。
 - [ ] 旧版升级后的快捷方式、登录启动及实际界面待 Windows 实机验证。
+
+2026-09-07 发布校验补充：Inno Setup 的 EXE 文件版本默认 0.0.0.0，与 AppVersion 独立；现让 VersionInfoVersion 跟随应用资源，并在打包脚本逐项检查四段版本，失败则拒绝交付。

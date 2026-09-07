@@ -52,6 +52,12 @@ $installer = Join-Path $output 'SFlip-Setup-x64.exe'
 if (Test-Path -LiteralPath $installer) { Remove-Item -LiteralPath $installer }
 & $IsccPath "/DDistDir=$dist" "/DOutputDir=$output" (Join-Path $PSScriptRoot 'installer\SFlip.iss')
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $installer)) { throw 'SFlip installer compilation failed.' }
+$applicationVersion = (Get-Item (Join-Path $dist 'runtime\DisplaySwitcher.Windows.exe')).VersionInfo
+$installerVersion = (Get-Item $installer).VersionInfo
+foreach ($part in @('FileMajorPart', 'FileMinorPart', 'FileBuildPart', 'FilePrivatePart')) {
+    if ($installerVersion.$part -ne $applicationVersion.$part) { throw 'Installer file version differs from the application.' }
+}
+Write-Host "Verified installer file version: $($installerVersion.FileVersion)"
 if ((Get-Item $installer).Length -ge 20MB) { throw 'Installer exceeds 20 MiB; check for accidentally bundled runtime packages.' }
 $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($installer))" | Set-Content (Join-Path $output 'SFlip-Setup-x64.sha256') -Encoding ascii
