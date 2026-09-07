@@ -1,5 +1,12 @@
 # macOS 交接记录
 
+## 当前任务：v2.3.0 正式发布（2026-09-07）
+
+- 用户确认已经实机测试，明确授权正式发布；基线 `main@28de478`，分支 `codex/macos-release-2-3-0`。
+- 双端版本统一为 2.3.0 / build 21；README 下载入口更新为 DMG、macOS ZIP、Windows Setup EXE、绿色版 ZIP 和 SHA256SUMS。
+- 仅修改版本资源与发布文档，协议、配置与应用行为不变。版本构建及 Release 校验以本任务 PR 和 v2.3.0 Release 为准；此前 PR #86 双端 CI 均通过。
+- 用户实机确认不代表覆盖全部硬件组合；本次代理不执行真实硬件动作。
+
 ## 当前任务：M-102 分发文案简化（2026-09-06）
 
 - 在 `codex/windows-installer` / PR #86 的 `3cc1090` 基线上继续，远端 main 为 `bad06b4`；用户明确授权双端清理。

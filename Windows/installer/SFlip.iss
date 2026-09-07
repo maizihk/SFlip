@@ -20,6 +20,7 @@
 AppId={{AE3D56F2-6790-4E14-AC64-F109C402D06B}
 AppName=SFlip
 AppVersion={#AppVersion}
+VersionInfoVersion={#AppVersion}
 AppVerName=SFlip {#AppVersion}
 AppPublisher=maizihk
 AppPublisherURL=https://github.com/maizihk/SFlip
