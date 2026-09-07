@@ -227,7 +227,6 @@ final class PublicPresentationModelsTests: XCTestCase {
             content.summary,
             content.versionText,
             content.platformText,
-            content.buildNotice,
             AboutPageContent.repositoryURL.absoluteString,
             AboutPageContent.licenseURL.absoluteString,
             AboutPageContent.thirdPartyURL.absoluteString

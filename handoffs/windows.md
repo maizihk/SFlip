@@ -1,5 +1,22 @@
 # Windows 交接记录
 
+## 当前任务：W-101/W-102 分发文案简化（2026-09-06）
+
+- 在 `codex/windows-installer` / PR #86 的 `3cc1090` 基线上继续，远端 main 为 `bad06b4`；用户明确授权双端清理。
+- 删除关于页、安装说明和公开文档中的签名状态提示，新构建附件按产品、平台、架构和格式命名；保留历史 Release URL 与构件标识，避免失效。
+- 构建签名与校验、运行库检测、安装和升级行为不变；无协议、schema、版本变更。
+- 验证：平台自动测试与 Release 打包正在执行，最终结果以 PR #86 检查为准。未启动应用或执行硬件流程；关于页显示、安装与首次启动仍待实机验证。
+
+## 当前任务：W-101 Windows 安装器中文化与外部依赖检测（2026-09-06）
+
+- 分支 `codex/windows-installer`，在未合并 PR #86 / `963de1f` 上继续。用户要求中文安装、不内置运行库，缺少时提醒自行下载安装；签名继续延期。
+- 安装器切换为 x64，提供简体中文/英文，按系统界面语言选择并允许手动切换；安装说明、缺依赖、降级拒绝、桌面入口和卸载显示名均本地化。
+- 删除微软运行库下载与捆绑。复用应用 Bootstrap DLL 调用 `MddBootstrapInitialize2` 检测当前用户可加载的兼容运行库；版本参数依据 SDK 2.4.0 头文件，构建检查 SDK pin。每次重试重新检测；失败不复制文件，仅经用户选择打开微软官方 x64 下载链接；静默安装不打开浏览器。
+- 保留原安装目录、开始菜单/可选桌面入口、配置、登录启动清理和运行 mutex 行为。安装包限制小于 20 MiB，生成 SHA-256。协议、schema、版本和应用业务代码不变。
+- 修改：Windows 安装脚本、`installer/SFlip.iss`、中英文安装说明、模拟 Bootstrap 生命周期测试、Windows workflow、根/Windows README、本平台清单与交接。
+- 验证：前一提交已通过原生 416 checks、x64 Release 和 49 项旧安装回归。当前双语提示、Bootstrap ABI/失败关闭及全部安装生命周期由 PR #86 新 CI 执行，以最终 checks 为准；测试不启动真实应用、网络下载或硬件流程。
+- 实机待验：中文系统默认语言、真实缺失/已安装依赖、浏览器下载后重试、首次启动及登录启动。未改变本机权限、防火墙、签名信任或真实硬件状态。
+
 ## 当前任务：W-035 SFlip 对外命名统一（2026-09-06）
 
 - 分支：`codex/macos-dmg-packaging`，在 PR #84 已完成的 DMG 基础上继续，改名前基线 `0285071`。用户明确授权双端对外名称统一；协议、schema 和版本不变。
@@ -185,7 +202,7 @@
 - 主线集成：PR [#54](https://github.com/maizihk/DisplaySwitch/pull/54) 已合并为 `e14ae6ea6d381dd31097406d7d735f41ec9a2699`，PR [#60](https://github.com/maizihk/DisplaySwitch/pull/60) 已合并为 `3a22c66afdb4838040e2fdc5d122ed955337bb13`。
 - CI：Windows runs `33366897393`、`33367712427` 均通过构建、自动测试、dist 验证和 artifact 上传。
 - 用户验收：最终 Windows 测试包、诊断页和真实局域网协同检测通过，单击检测不再卡死。
-- DS-021：PR [#61](https://github.com/maizihk/DisplaySwitch/pull/61) 已完成原生-only、v2-only、六页诊断和未签名绿色测试包的发布准备事实同步。
+- DS-021：PR [#61](https://github.com/maizihk/DisplaySwitch/pull/61) 已完成原生-only、v2-only、六页诊断和绿色测试包的发布准备事实同步。
 - 剩余边界：休眠恢复、热插拔、接口切换、高 DPI/辅助功能和清单中明确保留的未覆盖 DDC 场景。
 
 ## W-005 / W-203 诊断实现历史
@@ -235,7 +252,7 @@
 - 模拟时钟覆盖心跳 `Never -> Recent -> Expired`，并验证同一身份重新应用保留 Expired，认证身份/endpoint 变化、配置删除和会话重置安全清除。
 - D1、D2、D3 依次成功、相同绑定重枚举、同型号/重排、绑定及 generation 变化和歧义隔离均通过。
 - 既有 DS-004、DS-005、DS-007、DS-008、DS-009、DS-012、DS-013 回归通过；v2 公共向量为 1 条规范化、4 条认证、20 条消息、6 条状态机；USB-001 至 USB-016 全部通过。
-- dist 绿色版为 framework-dependent，构建脚本报告 1.74 MiB。未签名测试 ZIP 为 `Windows/outputs/DisplaySwitch-Windows-x64-unsigned-framework-dependent-detailed-diagnostics.zip`，850,734 字节，SHA-256 `05490C752161DF8FB7288F34823FE31D551014F38DB8EEA382B01635B69D7DD9`。
+- dist 绿色版为 framework-dependent，构建脚本报告 1.74 MiB。测试 ZIP 为 `Windows/outputs/DisplaySwitch-Windows-x64-unsigned-framework-dependent-detailed-diagnostics.zip`，850,734 字节，SHA-256 `05490C752161DF8FB7288F34823FE31D551014F38DB8EEA382B01635B69D7DD9`。
 - Release 编译启用基于 MSBuild 变量的路径映射；对 dist 扫描确认没有配置/日志、测试秘密、当前 Windows 用户目录或仓库绝对路径。
 - NuGet 漏洞索引在受限网络下产生 NU1900 警告；缓存依赖还原、编译、链接、测试和产物检查均成功。
 

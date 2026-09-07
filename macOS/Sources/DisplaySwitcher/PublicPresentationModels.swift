@@ -92,7 +92,6 @@ struct AboutPageContent: Equatable {
     let summary: String
     let versionText: String
     let platformText: String
-    let buildNotice: String
 
     static func make(
         metadata: AboutBundleMetadataSource,
@@ -109,8 +108,7 @@ struct AboutPageContent: Equatable {
             productName: name,
             summary: "一款在 macOS 与 Windows 之间协同切换显示器和 USB 设备的原生菜单栏工具。",
             versionText: "版本 \(shortVersion) (\(buildVersion))",
-            platformText: "macOS · \(architecture) · 协议 v2",
-            buildNotice: "源码构建和测试包不等于经过签名与公证的正式发行版。"
+            platformText: "macOS · \(architecture) · 协议 v2"
         )
     }
 

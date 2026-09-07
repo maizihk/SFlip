@@ -18,6 +18,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  installer-smoke:
+    # Exercise installer changes without waiting for the full WinUI compilation.
+    # This job uses inert payload fixtures and never uploads an application artifact.
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare inert installer payload
+        shell: pwsh
+        run: |
+          $dist = "Windows/dist"
+          New-Item -ItemType Directory -Force "$dist/runtime" | Out-Null
+          $source = Join-Path $env:RUNNER_TEMP "InstallerPayload.cs"
+          '[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")] class Payload { static void Main() {} }' | Set-Content $source
+          & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /target:exe "/out:$dist/runtime/DisplaySwitcher.Windows.exe" $source
+          if ($LASTEXITCODE -ne 0) { throw "Payload fixture compilation failed" }
+          Copy-Item "$dist/runtime/DisplaySwitcher.Windows.exe" "$dist/SFlip.exe"
+          foreach ($name in @('DisplaySwitcher.Windows.pri', 'DisplaySwitcher.Native.winmd', 'Microsoft.WindowsAppRuntime.Bootstrap.dll', 'App.xbf', 'SettingsWindow.xbf', 'AppIcon.ico', 'AppIcon-256.png')) {
+            Set-Content "$dist/runtime/$name" 'inert installer test payload'
+          }
+      - name: Compile installer fixture
+        shell: pwsh
+        run: ./Windows/build-installer.ps1
+      - name: Test localized installer lifecycle
+        shell: pwsh
+        run: ./Windows/installer/test-installer.ps1
+
   build-test-and-package:
     runs-on: windows-2025-vs2026
     timeout-minutes: 45
@@ -71,12 +98,31 @@ jobs:
             $relative = [IO.Path]::GetRelativePath((Resolve-Path "Windows/dist"), $_.FullName)
             "{0} ({1} bytes)" -f $relative, $_.Length
           }
-          "Verified Windows x64 unsigned framework-dependent artifact: {0:N2} MiB" -f ($bytes / 1MB)
+          "Verified Windows x64 framework-dependent artifact: {0:N2} MiB" -f ($bytes / 1MB)
 
-      - name: Upload Windows x64 unsigned framework-dependent artifact
+      - name: Build installer without runtime packages
+        shell: pwsh
+        run: ./Windows/build-installer.ps1
+
+      - name: Test localized installer with simulated bootstrap
+        timeout-minutes: 5
+        shell: pwsh
+        run: ./Windows/installer/test-installer.ps1
+
+      - name: Upload Windows x64 installer
         uses: actions/upload-artifact@v6
         with:
-          name: SFlip-Windows-x64-unsigned-framework-dependent
+          name: SFlip-Windows-x64-installer
+          path: |
+            Windows/outputs/SFlip-Setup-x64.exe
+            Windows/outputs/SFlip-Setup-x64.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Windows x64 framework-dependent artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: SFlip-Windows-x64-framework-dependent
           path: Windows/dist/
           if-no-files-found: error
           retention-days: 7

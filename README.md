@@ -14,7 +14,7 @@ SFlip 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多台电�
 
 产品和 GitHub 仓库名称均为 **SFlip**。内部工程、兼容标识及现有 v2.2.0 发布附件保留旧名，避免影响已有配置和下载。
 
-当前发布为 **v2.2.0（build 20）测试包**。macOS 使用 ad-hoc 签名且未经公证；Windows 包未签名。
+当前发布为 **v2.2.0（build 20）测试包**。
 
 > **发布包与主线的区别**：`main` 已合入 [#82](https://github.com/maizihk/SFlip/pull/82) 的协同和连续调节修复，现有 v2.2.0 下载包尚未包含这些修复。需要这些修复时，请按下方“源码构建”说明构建当前主线；发布包所含变更以对应 Release 说明为准。
 
@@ -27,7 +27,8 @@ SFlip 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多台电�
 
 - **macOS DMG（当前主线构建）**：双击打开 DMG，将 `SFlip.app` 拖到旁边的 `Applications` 文件夹。复制后推出磁盘映像，从“应用程序”启动。替换旧版前先退出旧应用，不要直接从 DMG 运行。
 - **macOS ZIP（现有 v2.2.0 发布包）**：解压后将 `DisplaySwitcher.app` 放到固定的 `/Applications` 目录，再启动应用。
-- **Windows**：先安装 Microsoft Windows App Runtime 2.4 x64（[微软下载页](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)），再将 ZIP 完整解压到固定目录，运行顶层 `SFlip.exe`（现有 v2.2.0 包为 `DisplaySwitch.exe`）。必须保留旁边的 `runtime` 子目录，不能只复制一个 EXE。
+- **Windows 安装版（当前主线构建）**：运行 `SFlip-Setup-x64.exe`，按向导安装后从开始菜单启动。支持简体中文/英文；不包含运行库，安装时检测依赖，缺少时提示从微软官网下载，装好后返回重试。升级前先退出应用。卸载保留配置与共享运行库，详见 [Windows 安装说明](Windows/README.md#安装与升级)。现有 v2.2.0 Release 尚不含安装版。
+- **Windows 绿色版**：先安装 Microsoft Windows App Runtime 2.4 x64（[微软下载页](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)），再将 ZIP 完整解压到固定目录，运行顶层 `SFlip.exe`（现有 v2.2.0 包为 `DisplaySwitch.exe`）。必须保留旁边的 `runtime` 子目录，不能只复制一个 EXE。
 
 从旧名升级：先退出旧应用，再安装 SFlip。macOS 安装到 `/Applications/SFlip.app`，确认正常后可移除旧 `DisplaySwitcher.app`；Windows 从 `SFlip.exe` 启动并更新旧快捷方式。两端均保留原配置与身份标识；应用路径变化后，如已启用登录启动，请在新应用中关闭再开启并验证，系统权限复用仍以系统实际提示为准。
 
@@ -116,14 +117,7 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./macOS/scripts/bu
 
 DMG 打包还需要 Python 3（含 venv/pip）。首次构建会下载固定版本的 dmgbuild 及其依赖，隔离安装到 `macOS/.build/dmg-tools`；后续构建复用该环境。背景由 AppKit 生成，布局配置随源码维护，无需 Finder 自动化权限。
 
-输出位于 `macOS/outputs/`：`SFlip.app`、拖拽安装包 `SFlip-macOS-<arch>-unsigned.dmg` 和 `SFlip-macOS-<arch>.zip`。DMG 包含应用、指向 `/Applications` 的快捷方式和安装说明；构建脚本会校验映像、挂载后的应用及复制后的签名。DMG 是未公证测试包，现有 v2.2.0 Release 仍只提供 ZIP。脚本默认使用 ad-hoc 签名；如需稳定保留本机权限记录，可指定钥匙串中的 Apple Development 身份：
-
-```bash
-DISPLAYSWITCH_CODESIGN_IDENTITY="<identity SHA-1 or exact name>" \
-  ./macOS/scripts/build-app.sh
-```
-
-Apple Development 签名用于本机测试，不等同于 Developer ID 或公证。
+输出位于 `macOS/outputs/`：`SFlip.app`、拖拽安装包 `SFlip-macOS-<arch>.dmg` 和 `SFlip-macOS-<arch>.zip`。DMG 包含应用、指向 `/Applications` 的快捷方式和安装说明；构建脚本会校验映像、挂载后的应用及复制后的签名。现有 v2.2.0 Release 仍只提供 ZIP。
 
 ### Windows
 
@@ -134,9 +128,10 @@ Apple Development 签名用于本机测试，不等同于 Developer ID 或公证
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\Windows\build-windows.ps1
+.\Windows\build-installer.ps1
 ```
 
-脚本构建 x64 Release、运行原生自动测试并生成 `Windows\dist\SFlip.exe` 和 `Windows\dist\runtime\...`。分发时保留完整 `dist` 目录。详细说明见 [Windows README](Windows/README.md)。
+脚本构建 x64 Release、运行原生自动测试并生成 `Windows\dist\SFlip.exe` 和 `Windows\dist\runtime\...`。绿色版分发时保留完整 `dist` 目录；第二条命令仅下载固定且校验哈希的 Inno Setup，生成 `Windows\outputs\SFlip-Setup-x64.exe` 和 SHA-256 校验文件。详细说明见 [Windows README](Windows/README.md)。
 
 正式源码位于 `macOS/` 和 `Windows/DisplaySwitcher.Native/`；`Windows/DisplaySwitcher.Launcher/` 是绿色版启动器。`Windows/DisplaySwitcher.Windows/` 仅为旧 C# 迁移参照，不参与正式构建。
 

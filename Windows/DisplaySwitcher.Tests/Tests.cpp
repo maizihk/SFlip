@@ -2505,7 +2505,7 @@ namespace
         auto missingMetadata = PublicAboutInfo(applicationExecutable.parent_path() / L"missing.exe");
         auto combined = about.applicationName + L" " + about.publicVersion + L" " + about.architecture + L" "
             + about.protocol + L" " + about.projectUrl + L" " + about.licenseUrl + L" "
-            + about.thirdPartyNoticesUrl + L" " + about.buildNotice;
+            + about.thirdPartyNoticesUrl;
         Check(about.applicationName == L"SFlip" && about.versionFromApplicationMetadata
             && !about.publicVersion.empty() && about.publicVersion != L"未知"
             && !missingMetadata.versionFromApplicationMetadata && missingMetadata.publicVersion == L"未知"
@@ -2859,7 +2859,7 @@ namespace
         DiagnosticSnapshot snapshot;
         snapshot.about = { L"SFlip", L"2.2.0 (20)", L"Windows x64", L"UDP 协议 v2",
             L"https://example.invalid/project", L"https://example.invalid/license",
-            L"https://example.invalid/notices", L"测试构建", true };
+            L"https://example.invalid/notices", true };
         snapshot.schemaVersion = CurrentAppConfigSchemaVersion;
         snapshot.safeMode = true;
         snapshot.detailedRecordingEnabled = true;

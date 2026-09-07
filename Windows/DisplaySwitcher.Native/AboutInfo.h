@@ -13,7 +13,6 @@ namespace DisplaySwitcher::Native
         std::wstring projectUrl;
         std::wstring licenseUrl;
         std::wstring thirdPartyNoticesUrl;
-        std::wstring buildNotice;
         bool versionFromApplicationMetadata{};
     };
 

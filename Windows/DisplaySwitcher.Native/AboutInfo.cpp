@@ -59,7 +59,6 @@ namespace DisplaySwitcher::Native
             L"https://github.com/maizihk/DisplaySwitch",
             L"https://github.com/maizihk/DisplaySwitch/blob/main/LICENSE",
             L"https://github.com/maizihk/DisplaySwitch/blob/main/THIRD_PARTY_NOTICES.md",
-            L"当前为未签名测试构建，不等同于正式发布版本。",
             version.has_value(),
         };
     }
