@@ -1338,8 +1338,12 @@ namespace winrt::DisplaySwitcher::Native::implementation
             auto dialog = ContentDialog(); dialog.Title(box_value(L"重新绑定显示器")); dialog.Content(content);
             dialog.PrimaryButtonText(L"确认绑定"); dialog.CloseButtonText(L"取消");
             dialog.IsPrimaryButtonEnabled(false);
-            picker.SelectionChanged([dialog](auto const& sender, auto const&)
-                { dialog.IsPrimaryButtonEnabled(sender.template as<ComboBox>().SelectedIndex() >= 0); });
+            auto weakDialog = winrt::make_weak(dialog);
+            picker.SelectionChanged([weakDialog](auto const& sender, auto const&)
+            {
+                if (auto currentDialog = weakDialog.get())
+                    currentDialog.IsPrimaryButtonEnabled(sender.template as<ComboBox>().SelectedIndex() >= 0);
+            });
             dialog.DefaultButton(ContentDialogButton::Close); dialog.XamlRoot(Content().XamlRoot());
             auto weak = get_weak();
             dialog.ShowAsync().Completed([weak, id, candidates, picker, dialog](auto const& operation, auto const& status)
