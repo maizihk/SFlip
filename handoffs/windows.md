@@ -1,5 +1,14 @@
 # Windows 交接记录
 
+## 当前任务：Windows v2.3.1 发布（2026-09-09）
+
+- 用户确认重新绑定修复测试通过并授权合并，PR #88 已合并至 25ad9e7；随后明确要求更新 Release。
+- 发布分支 codex/windows-release-2-3-1，Windows 版本 2.3.1 / build 22；macOS 保留 v2.3.0 下载，不改其代码或版本。
+- 修改 Windows 版本资源、根 README 下载说明、Windows 清单和本交接记录；不改变协议、配置或硬件行为。
+- 本机缺少 MSBuild，发布构建由 Windows CI 执行；发布前必须验证原生测试、x64 Release、安装器检查、两种分发文件版本和 SHA256。最终结果见发布 PR 与 v2.3.1 Release。
+- 用户实机验收只代表本次反馈场景，不代表全部 DP/扩展坞/同名显示器或高 DPI 组合已验证；本次发布不执行硬件操作。
+
+
 ## 当前任务：W-002 显示器显式重新绑定（2026-09-09）
 
 - 分支 `codex/windows-display-rebind`，PR [#88](https://github.com/maizihk/SFlip/pull/88)，基线 `origin/main@445aab9cbdc1e70e7b1500b519b8f0be9e793ee9`。代码提交 `da63cbb270ae15cd4fccd1e1724a51b37d8ed671` 已通过 [Windows CI](https://github.com/maizihk/SFlip/actions/runs/34333247960)：426 项原生检查、x64 Release、1.89 MiB 分发校验、61 项安装器生命周期检查及独立安装器冒烟全部通过；安装版与绿色版 artifact 已上传。后续仅补记此验证结果，不改代码。初始进入待确认的原因尚未确定；已确认的产品缺陷是待确认目录没有恢复入口，且诊断把待确认误报为离线。
