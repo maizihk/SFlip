@@ -8,7 +8,7 @@ namespace DisplaySwitcher::Native
 {
     enum class DiagnosticHeartbeatState { Never, Recent, Expired };
     enum class DiagnosticOperationKind { None, Enumerate, Read, Write, InputSource };
-    enum class DiagnosticOperationState { Idle, Success, Failed, Ambiguous, Offline, Stale };
+    enum class DiagnosticOperationState { Idle, Success, Failed, Ambiguous, NeedsConfirmation, Offline, Stale };
 
     struct DiagnosticProfileSummary
     {

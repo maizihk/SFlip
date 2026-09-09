@@ -1230,7 +1230,114 @@ namespace
             && retainedLegacy->bindingStatus == DisplayBindingStatus::NeedsConfirmation,
             L"DS-013: 旧配置有多个候选时必须保留原值并安全拒绝，不得选择第一项");
 
-        auto offlineConfig = strongFirst.displays;
+        auto pending = retainedLegacy != ambiguousMigration.displays.end() ? *retainedLegacy : legacy;
+        pending.brightnessMax = 100; pending.brightnessValue = 40;
+        pending.contrastMax = 90; pending.contrastValue = 30;
+        pending.volumeMax = 80; pending.volumeValue = 20;
+        auto pendingId = pending.id;
+        auto rebindMonitor = monitor(L"ds13:confirmed-dp", L"adapter-r:1", L"待确认显示器", L"DISPLAY20", 1);
+        rebindMonitor.topologyGeneration = 40;
+        auto candidates = FindDisplayRebindCandidates({ pending }, pendingId, { rebindMonitor },
+            DisplayTopologyTrust::LocalPhysicalAuthoritative);
+        Check(candidates.size() == 1 && candidates[0].monitorId == L"ds13:confirmed-dp",
+            L"W-002: 待确认目录只列出当前可信、强身份且单物理句柄的候选");
+        auto confirmed = ConfirmDisplayRebind({ pending }, pendingId, candidates[0], { rebindMonitor },
+            DisplayTopologyTrust::LocalPhysicalAuthoritative);
+        Check(confirmed.success && confirmed.displays.size() == 1 && confirmed.displays[0].id == pendingId
+            && confirmed.displays[0].nativeMonitorId == L"ds13:confirmed-dp"
+            && confirmed.displays[0].bindingStatus == DisplayBindingStatus::Resolved
+            && !confirmed.displays[0].brightnessMax && !confirmed.displays[0].brightnessValue
+            && !confirmed.displays[0].contrastMax && !confirmed.displays[0].contrastValue
+            && !confirmed.displays[0].volumeMax && !confirmed.displays[0].volumeValue,
+            L"W-002: 显式改绑保留逻辑ID并清空另一物理身份的旧DDC遥测缓存");
+        Check(pending.nativeMonitorId == L"legacy-interface-a" && pending.brightnessValue == 40,
+            L"W-002: 候选与确认决策不得在保存前修改旧配置");
+        DdcEnumerationResult freshRebind{ true, DdcErrorKind::None, {}, { rebindMonitor }, true,
+            DisplayTopologyTrust::LocalPhysicalAuthoritative };
+        int enumerateCalls{}; int saveCalls{};
+        auto cancelled = CommitDisplayRebind(false, { pending }, pendingId, candidates[0],
+            [&] { ++enumerateCalls; return freshRebind; },
+            [&](auto const&) { ++saveCalls; return true; });
+        Check(cancelled.outcome == DisplayRebindCommitOutcome::Cancelled && enumerateCalls == 0 && saveCalls == 0,
+            L"W-002: 取消重新绑定必须零枚举、零保存并保留旧配置");
+        AppConfig rebindConfig;
+        rebindConfig.displays = { pending };
+        rebindConfig.usbSwitch.displayInputs = { { pendingId, 25 } };
+        rebindConfig.collaborationProfiles = { Profile(L"重新绑定映射保留") };
+        rebindConfig.collaborationProfiles[0].displayInputs = { { pendingId, 24 } };
+        int successfulEnumerations{}; int successfulSaves{};
+        AppConfig savedRebindConfig;
+        auto savedRebind = CommitDisplayRebind(true, rebindConfig.displays, pendingId, candidates[0],
+            [&] { ++successfulEnumerations; return freshRebind; },
+            [&](auto const& displays)
+            {
+                ++successfulSaves;
+                savedRebindConfig = rebindConfig;
+                savedRebindConfig.displays = displays;
+                return true;
+            });
+        Check(savedRebind.outcome == DisplayRebindCommitOutcome::Saved
+            && successfulEnumerations == 1 && successfulSaves == 1
+            && savedRebind.displays[0].bindingStatus == DisplayBindingStatus::Resolved
+            && savedRebind.displays[0].id == pendingId
+            && savedRebind.displays[0].brightnessEnabled == pending.brightnessEnabled
+            && savedRebindConfig.usbSwitch.displayInputs[0].displayId == pendingId
+            && savedRebindConfig.usbSwitch.displayInputs[0].targetInput == 25
+            && savedRebindConfig.collaborationProfiles[0].displayInputs[0].displayId == pendingId
+            && savedRebindConfig.collaborationProfiles[0].displayInputs[0].peerInput == 24,
+            L"W-002: 成功提交只重新枚举和保存一次，并保留逻辑ID、用户开关及USB/协同映射");
+        auto failedSave = CommitDisplayRebind(true, { pending }, pendingId, candidates[0],
+            [&] { ++enumerateCalls; return freshRebind; },
+            [&](auto const&) { ++saveCalls; return false; });
+        auto throwingSave = CommitDisplayRebind(true, { pending }, pendingId, candidates[0],
+            [&] { return freshRebind; }, [](auto const&) -> bool { throw std::runtime_error("simulated save"); });
+        auto throwingEnumeration = CommitDisplayRebind(true, { pending }, pendingId, candidates[0],
+            []() -> DdcEnumerationResult { throw std::runtime_error("simulated enumeration"); },
+            [](auto const&) { return true; });
+        Check(failedSave.outcome == DisplayRebindCommitOutcome::SaveFailed
+            && throwingSave.outcome == DisplayRebindCommitOutcome::SaveFailed
+            && throwingEnumeration.outcome == DisplayRebindCommitOutcome::EnumerationFailed
+            && failedSave.displays[0].nativeMonitorId == pending.nativeMonitorId
+            && throwingSave.displays[0].nativeMonitorId == pending.nativeMonitorId,
+            L"W-002: 保存失败、保存异常或重新枚举异常必须返回旧目录且不提交候选绑定");
+
+        auto zeroHandle = rebindMonitor; zeroHandle.physicalHandleCount = 0;
+        auto twoHandles = rebindMonitor; twoHandles.physicalHandleCount = 2;
+        Check(NormalizeDdcMonitorCollection({ zeroHandle })[0].physicalHandleCount == 0
+            && FindDisplayRebindCandidates({ pending }, pendingId, { zeroHandle },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).empty()
+            && FindDisplayRebindCandidates({ pending }, pendingId, { twoHandles },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).empty(),
+            L"W-002: 零或多个物理句柄不得被归一化或确认成可操作绑定");
+        auto duplicateStrongA = rebindMonitor;
+        auto duplicateStrongB = rebindMonitor; duplicateStrongB.logicalTargetId = L"adapter-r:2";
+        auto duplicateTargetA = rebindMonitor;
+        auto duplicateTargetB = rebindMonitor; duplicateTargetB.id = L"ds13:other-identity";
+        Check(FindDisplayRebindCandidates({ pending }, pendingId, { duplicateStrongA, duplicateStrongB },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).empty()
+            && FindDisplayRebindCandidates({ pending }, pendingId, { duplicateTargetA, duplicateTargetB },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).empty(),
+            L"W-002: 重复强身份或重复逻辑target必须排除全部候选，不能选择第一项");
+        auto occupied = Display(L"已占用", L"ds13:confirmed-dp", 17);
+        Check(FindDisplayRebindCandidates({ pending, occupied }, pendingId, { rebindMonitor },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).empty(),
+            L"W-002: 已被其他逻辑目录占用的强身份不得用于重新绑定");
+
+        auto changedGeneration = rebindMonitor; changedGeneration.topologyGeneration = 41;
+        auto changedIdentity = rebindMonitor; changedIdentity.id = L"ds13:replacement";
+        auto mixedGeneration = rebindMonitor; mixedGeneration.id = L"ds13:second";
+        mixedGeneration.logicalTargetId = L"adapter-r:2"; mixedGeneration.topologyGeneration = 41;
+        Check(!ConfirmDisplayRebind({ pending }, pendingId, candidates[0], { changedGeneration },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).success
+            && !ConfirmDisplayRebind({ pending }, pendingId, candidates[0], { changedIdentity },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).success
+            && FindDisplayRebindCandidates({ pending }, pendingId, { rebindMonitor, mixedGeneration },
+                DisplayTopologyTrust::LocalPhysicalAuthoritative).empty()
+            && !ConfirmDisplayRebind({ pending }, pendingId, candidates[0], { rebindMonitor },
+                DisplayTopologyTrust::IncompleteOrUnavailable).success,
+            L"W-002: 对话框期间代次、身份、统一快照或拓扑信任变化必须安全拒绝");
+
+auto offlineConfig = strongFirst.displays;
         auto offlineId = firstLogicalIds[L"ds13:strong-a"];
         CollaborationProfile profile = Profile(L"保留映射");
         for (auto const& display : offlineConfig) profile.displayInputs.push_back({ display.id, 20 });
@@ -2872,7 +2979,8 @@ namespace
             DisplayTopologyTrust::RemoteSessionLimited, true, true, true };
         snapshot.displays = {
             { 1, DisplayBindingStatus::Resolved, true, false, true, DiagnosticOperationKind::Write, DiagnosticOperationState::Success },
-            { 2, DisplayBindingStatus::Ambiguous, false, false, false, DiagnosticOperationKind::None, DiagnosticOperationState::Ambiguous }
+            { 2, DisplayBindingStatus::Ambiguous, false, false, false, DiagnosticOperationKind::None, DiagnosticOperationState::Ambiguous },
+            { 3, DisplayBindingStatus::NeedsConfirmation, false, false, false, DiagnosticOperationKind::None, DiagnosticOperationState::NeedsConfirmation }
         };
         auto injected = SanitizeDiagnosticEvent(
             "udp.send success=1 host=10.23.45.67 password=TOP-SECRET endpoint=11111111-2222-3333-4444-555555555555 "
@@ -2895,7 +3003,9 @@ namespace
         Check(second.find(L"P1") != std::wstring::npos && second.find(L"D1") != std::wstring::npos &&
             second.find(L"S1 / O1") != std::wstring::npos && second.find(L"已阻断副作用") != std::wstring::npos &&
             second.find(L"最后合法心跳=最近合法") != std::wstring::npos
-            && second.find(L"topology=remote-limited") != std::wstring::npos,
+            && second.find(L"topology=remote-limited") != std::wstring::npos
+            && second.find(L"绑定=需要确认") != std::wstring::npos
+            && second.find(L"最后操作=无：安全拒绝（待确认）") != std::wstring::npos,
             L"W-203：严格脱敏后仍须保留匿名编号和必要的安全状态");
         Check(injected.find("10.23.45.67") == std::string::npos && injected.find("TOP-SECRET") == std::string::npos &&
             injected.find("redacted=1") != std::string::npos,

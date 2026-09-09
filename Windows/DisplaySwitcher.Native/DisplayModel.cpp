@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "DisplayModel.h"
+#include "DdcControl.h"
 
 namespace
 {
@@ -87,7 +88,6 @@ namespace DisplaySwitcher::Native
             if (monitor.logicalTargetId.empty()) monitor.logicalTargetId = groupingKey;
             if (!originalId.empty() && !ContainsInsensitive(monitor.legacyIds, originalId))
                 monitor.legacyIds.push_back(originalId);
-            if (monitor.physicalHandleCount == 0) monitor.physicalHandleCount = 1;
             auto found = std::find_if(unique.begin(), unique.end(), [&](auto const& value)
                 { return EqualInsensitive(MonitorGroupingKey(value), groupingKey); });
             if (found == unique.end()) unique.push_back(std::move(monitor));
@@ -308,6 +308,125 @@ namespace DisplaySwitcher::Native
         rows_ = std::move(next);
         topologyGeneration_ = currentGeneration;
         return !same;
+    }
+
+    std::vector<DisplayRebindCandidate> FindDisplayRebindCandidates(
+        std::vector<DisplayConfig> const& displays, std::wstring const& displayId,
+        std::vector<DdcMonitorInfo> const& connected, DisplayTopologyTrust topologyTrust)
+    {
+        std::vector<DisplayRebindCandidate> result;
+        if (topologyTrust != DisplayTopologyTrust::LocalPhysicalAuthoritative || connected.empty()) return result;
+        if (!FindDisplayById(displays, displayId)) return result;
+        auto generation = connected.front().topologyGeneration;
+        if (generation == 0 || std::any_of(connected.begin(), connected.end(), [&](auto const& monitor)
+            { return monitor.topologyGeneration != generation; })) return result;
+
+        for (auto const& monitor : connected)
+        {
+            if (!IsPersistedStrongMonitorBinding(monitor.id) || monitor.logicalTargetId.empty()
+                || monitor.physicalHandleCount != 1 || monitor.ambiguous || monitor.topologyGeneration == 0)
+                continue;
+            auto uniqueStrongId = std::count_if(connected.begin(), connected.end(), [&](auto const& other)
+                { return EqualInsensitive(other.id, monitor.id); }) == 1;
+            auto uniqueLogicalTarget = std::count_if(connected.begin(), connected.end(), [&](auto const& other)
+                { return EqualInsensitive(other.logicalTargetId, monitor.logicalTargetId); }) == 1;
+            if (!uniqueStrongId || !uniqueLogicalTarget) continue;
+
+            auto occupied = std::any_of(displays.begin(), displays.end(), [&](auto const& display)
+            {
+                if (EqualInsensitive(display.id, displayId)) return false;
+                if (EqualInsensitive(display.nativeMonitorId, monitor.id)) return true;
+                return display.nativeMonitorId.starts_with(PendingTargetPrefix)
+                    && EqualInsensitive(display.nativeMonitorId.substr(PendingTargetPrefix.size()), monitor.logicalTargetId);
+            });
+            if (occupied) continue;
+            result.push_back({ monitor.id, monitor.displayName.empty() ? L"显示器" : monitor.displayName,
+                monitor.logicalTargetId, monitor.topologyGeneration });
+        }
+        std::sort(result.begin(), result.end(), [](auto const& left, auto const& right)
+        {
+            auto byName = _wcsicmp(left.displayName.c_str(), right.displayName.c_str());
+            return byName != 0 ? byName < 0 : _wcsicmp(left.monitorId.c_str(), right.monitorId.c_str()) < 0;
+        });
+        return result;
+    }
+
+    DisplayRebindResult ConfirmDisplayRebind(
+        std::vector<DisplayConfig> const& displays, std::wstring const& displayId,
+        DisplayRebindCandidate const& selected, std::vector<DdcMonitorInfo> const& connected,
+        DisplayTopologyTrust topologyTrust)
+    {
+        DisplayRebindResult result{ false, displays, L"当前显示拓扑已经变化，请重新选择显示器。" };
+        auto displayIndex = FindDisplayById(displays, displayId);
+        if (!displayIndex) { result.message = L"要重新绑定的显示器配置已不存在。"; return result; }
+        auto candidates = FindDisplayRebindCandidates(displays, displayId, connected, topologyTrust);
+        auto match = std::find_if(candidates.begin(), candidates.end(), [&](auto const& candidate)
+        {
+            return EqualInsensitive(candidate.monitorId, selected.monitorId)
+                && EqualInsensitive(candidate.logicalTargetId, selected.logicalTargetId)
+                && candidate.topologyGeneration == selected.topologyGeneration;
+        });
+        if (match == candidates.end()) return result;
+
+        auto& display = result.displays[*displayIndex];
+        auto physicalIdentityChanged = !EqualInsensitive(display.nativeMonitorId, match->monitorId);
+        display.nativeMonitorId = match->monitorId;
+        display.topologyGeneration = match->topologyGeneration;
+        display.bindingStatus = DisplayBindingStatus::Resolved;
+        display.bindingMessage = L"原生 DDC/CI 已重新确认绑定";
+        if (physicalIdentityChanged)
+        {
+            display.brightnessMax.reset(); display.contrastMax.reset(); display.volumeMax.reset();
+            display.brightnessValue.reset(); display.contrastValue.reset(); display.volumeValue.reset();
+        }
+        result.success = true;
+        result.message = L"显示器绑定已重新确认。";
+        return result;
+    }
+
+    DisplayRebindCommitResult CommitDisplayRebind(
+        bool confirmed, std::vector<DisplayConfig> const& displays, std::wstring const& displayId,
+        DisplayRebindCandidate const& selected, std::function<DdcEnumerationResult()> const& enumerate,
+        std::function<bool(std::vector<DisplayConfig> const&)> const& save)
+    {
+        DisplayRebindCommitResult result{ DisplayRebindCommitOutcome::Cancelled, displays, {} };
+        if (!confirmed) return result;
+        DdcEnumerationResult fresh;
+        try { fresh = enumerate ? enumerate() : DdcEnumerationResult{}; }
+        catch (...) { result.outcome = DisplayRebindCommitOutcome::EnumerationFailed;
+            result.message = L"确认时无法重新检测显示器，旧绑定已保留。"; return result; }
+        if (!fresh.success || !fresh.IsTrustedNonEmptySnapshot())
+        {
+            result.outcome = DisplayRebindCommitOutcome::EnumerationFailed;
+            result.message = L"确认时无法取得可信的本地物理显示拓扑，旧绑定已保留。";
+            return result;
+        }
+        auto rebound = ConfirmDisplayRebind(displays, displayId, selected, fresh.monitors, fresh.topologyTrust);
+        if (!rebound.success)
+        {
+            result.outcome = DisplayRebindCommitOutcome::ValidationFailed;
+            result.message = std::move(rebound.message);
+            return result;
+        }
+        try
+        {
+            if (!save || !save(rebound.displays))
+            {
+                result.outcome = DisplayRebindCommitOutcome::SaveFailed;
+                result.message = L"显示器绑定未保存；旧配置和全部映射已完整保留。";
+                return result;
+            }
+        }
+        catch (...)
+        {
+            result.outcome = DisplayRebindCommitOutcome::SaveFailed;
+            result.message = L"显示器绑定未保存；旧配置和全部映射已完整保留。";
+            return result;
+        }
+        result.outcome = DisplayRebindCommitOutcome::Saved;
+        result.displays = std::move(rebound.displays);
+        result.message = L"显示器绑定已重新确认。";
+        return result;
     }
 
     std::vector<DisplayInputMapping> MergeVisibleProfileDisplayInputs(
