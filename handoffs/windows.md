@@ -2,7 +2,7 @@
 
 ## 当前任务：W-002 显示器显式重新绑定（2026-09-09）
 
-- 分支 `codex/windows-display-rebind`，PR [#88](https://github.com/maizihk/SFlip/pull/88)，基线 `origin/main@445aab9cbdc1e70e7b1500b519b8f0be9e793ee9`。CI 正在运行，最终结果以 PR checks 为准。初始进入待确认的原因尚未确定；已确认的产品缺陷是待确认目录没有恢复入口，且诊断把待确认误报为离线。
+- 分支 `codex/windows-display-rebind`，PR [#88](https://github.com/maizihk/SFlip/pull/88)，基线 `origin/main@445aab9cbdc1e70e7b1500b519b8f0be9e793ee9`。代码提交 `da63cbb270ae15cd4fccd1e1724a51b37d8ed671` 已通过 [Windows CI](https://github.com/maizihk/SFlip/actions/runs/34333247960)：426 项原生检查、x64 Release、1.89 MiB 分发校验、61 项安装器生命周期检查及独立安装器冒烟全部通过；安装版与绿色版 artifact 已上传。后续仅补记此验证结果，不改代码。初始进入待确认的原因尚未确定；已确认的产品缺陷是待确认目录没有恢复入口，且诊断把待确认误报为离线。
 - 设置页为显示器目录提供“重新绑定”。候选不默认选择，只来自当前本地可信拓扑，并要求持久强身份、逻辑 target、拓扑 generation 和单物理句柄可唯一复核，且未被其他逻辑目录占用；确认时重新枚举，连接状态变化即拒绝。
 - 成功改绑只替换物理身份，保留逻辑显示器 ID、功能开关及 USB/协同输入映射；物理身份变化会清空亮度、对比度、音量的旧值与上限，避免媒体键消费另一台显示器的缓存。保存通过既有原子持久化回调，失败或异常恢复旧配置。
 - `NormalizeDdcMonitorCollection` 不再把零物理句柄改写为一个，零/多句柄都保持不可操作。诊断将 `NeedsConfirmation` 显示为“安全拒绝（待确认）”，不再显示“不可用（离线）”。
