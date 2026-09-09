@@ -1,5 +1,15 @@
 # Windows 交接记录
 
+## 当前任务：W-002 显示器显式重新绑定（2026-09-09）
+
+- 分支 `codex/windows-display-rebind`，基线 `origin/main@445aab9cbdc1e70e7b1500b519b8f0be9e793ee9`。初始进入待确认的原因尚未确定；已确认的产品缺陷是待确认目录没有恢复入口，且诊断把待确认误报为离线。
+- 设置页为显示器目录提供“重新绑定”。候选不默认选择，只来自当前本地可信拓扑，并要求持久强身份、逻辑 target、拓扑 generation 和单物理句柄可唯一复核，且未被其他逻辑目录占用；确认时重新枚举，连接状态变化即拒绝。
+- 成功改绑只替换物理身份，保留逻辑显示器 ID、功能开关及 USB/协同输入映射；物理身份变化会清空亮度、对比度、音量的旧值与上限，避免媒体键消费另一台显示器的缓存。保存通过既有原子持久化回调，失败或异常恢复旧配置。
+- `NormalizeDdcMonitorCollection` 不再把零物理句柄改写为一个，零/多句柄都保持不可操作。诊断将 `NeedsConfirmation` 显示为“安全拒绝（待确认）”，不再显示“不可用（离线）”。
+- 模拟测试新增候选/确认、零与多句柄、重复强身份、重复逻辑 target、其他目录占用、取消、重新枚举/保存异常、拓扑代次或身份变化、成功提交和逻辑映射保留覆盖；未访问真实 USB、DDC、输入源、网络、唤醒或系统设置。
+- 本机构建阻塞：`pwsh -File Windows/build-windows.ps1 -Architecture x64 -Configuration Release` 在脚本第 32 行失败，明确报告缺少 64 位 MSBuild、Visual Studio C++ 桌面开发和 Windows App SDK C++ 组件。编译、自动测试与 dist 打包需由 PR CI 验证。
+- 实机待验：DP 待确认条目选择并保存、重启后保持、拔插期间安全取消、同名显示器候选可辨识、高 DPI/窄窗口按钮布局。此任务不声称已经确定 DP 条目最初进入待确认状态的原因。
+- 范围只含 `Windows/` 和本交接文件；未修改 macOS、协议、contracts、schemaVersion、版本、workflow、tag 或 Release。
 ## 当前任务：v2.3.0 正式发布（2026-09-07）
 
 - 用户确认已经实机测试，明确授权正式发布；基线 `main@28de478`，分支 `codex/macos-release-2-3-0`。

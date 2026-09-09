@@ -52,6 +52,7 @@ namespace
         case DiagnosticOperationState::Success: return L"成功";
         case DiagnosticOperationState::Failed: return L"失败";
         case DiagnosticOperationState::Ambiguous: return L"安全拒绝（歧义）";
+        case DiagnosticOperationState::NeedsConfirmation: return L"安全拒绝（待确认）";
         case DiagnosticOperationState::Offline: return L"不可用（离线）";
         case DiagnosticOperationState::Stale: return L"已失效";
         default: return L"尚未操作";
@@ -77,6 +78,7 @@ namespace
     DiagnosticOperationState StateFor(DisplayConfig const& display)
     {
         if (display.bindingStatus == DisplayBindingStatus::Ambiguous) return DiagnosticOperationState::Ambiguous;
+        if (display.bindingStatus == DisplayBindingStatus::NeedsConfirmation) return DiagnosticOperationState::NeedsConfirmation;
         if (display.bindingStatus != DisplayBindingStatus::Resolved) return DiagnosticOperationState::Offline;
         return DiagnosticOperationState::Idle;
     }

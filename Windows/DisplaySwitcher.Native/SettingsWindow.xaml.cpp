@@ -1191,6 +1191,9 @@ namespace winrt::DisplaySwitcher::Native::implementation
             read.IsEnabled(::DisplaySwitcher::Native::IsDisplayDdcResolved(display));
             AutomationProperties::SetName(read, L"读取 " + display.name + L" 的 DDC 参数");
             read.Click([this, id = display.id](auto const&, auto const&) { ReadDdc(id); });
+            auto rebind = Button(); rebind.Content(box_value(L"重新绑定"));
+            AutomationProperties::SetName(rebind, L"重新绑定 " + display.name);
+            rebind.Click([this, id = display.id](auto const&, auto const&) { RebindDisplay(id); });
             auto remove = Button(); remove.Content(box_value(L"删除"));
             remove.Visibility(::DisplaySwitcher::Native::CanDeleteOfflineDisplay(display, ddcTopologyTrust_)
                 ? Visibility::Visible : Visibility::Collapsed);
@@ -1292,7 +1295,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             displayTitle.VerticalAlignment(VerticalAlignment::Center);
             read.VerticalAlignment(VerticalAlignment::Center);
             auto actions = StackPanel(); actions.Orientation(Orientation::Horizontal); actions.Spacing(8);
-            actions.Children().Append(read); actions.Children().Append(remove);
+            actions.Children().Append(read); actions.Children().Append(rebind); actions.Children().Append(remove);
             actions.VerticalAlignment(VerticalAlignment::Center);
             Grid::SetColumn(actions, 1);
             header.Children().Append(displayTitle);
@@ -1301,6 +1304,83 @@ namespace winrt::DisplaySwitcher::Native::implementation
             fields.Children().Append(controls.status);
             displayEditorsPanel_.Children().Append(CreateCard(fields));
             displayEditors_.push_back(std::move(controls));
+        }
+    }
+
+    void SettingsWindow::RebindDisplay(std::wstring const& id)
+    {
+        if (!enumerateDdc_) { SetOperationFeedback(L"显示器枚举服务不可用。", true); return; }
+        try
+        {
+            auto initial = enumerateDdc_();
+            if (!initial.success || !initial.IsTrustedNonEmptySnapshot())
+            {
+                SetOperationFeedback(L"当前无法检测可用的本地显示器，未开始重新绑定。", true);
+                return;
+            }
+            auto candidates = ::DisplaySwitcher::Native::FindDisplayRebindCandidates(
+                original_.displays, id, initial.monitors, initial.topologyTrust);
+            if (candidates.empty())
+            {
+                SetOperationFeedback(L"当前没有可用于重新绑定的显示器。", true);
+                return;
+            }
+
+            auto content = StackPanel(); content.Spacing(10);
+            auto description = TextBlock();
+            description.Text(L"请选择要关联的显示器。若连接状态变化，将取消绑定并保留原设置。");
+            description.TextWrapping(TextWrapping::Wrap);
+            auto picker = ComboBox(); picker.HorizontalAlignment(HorizontalAlignment::Stretch);
+            for (auto const& candidate : candidates) picker.Items().Append(box_value(candidate.displayName));
+            picker.SelectedIndex(-1);
+            content.Children().Append(description); content.Children().Append(picker);
+
+            auto dialog = ContentDialog(); dialog.Title(box_value(L"重新绑定显示器")); dialog.Content(content);
+            dialog.PrimaryButtonText(L"确认绑定"); dialog.CloseButtonText(L"取消");
+            dialog.IsPrimaryButtonEnabled(false);
+            picker.SelectionChanged([dialog](auto const& sender, auto const&)
+                { dialog.IsPrimaryButtonEnabled(sender.template as<ComboBox>().SelectedIndex() >= 0); });
+            dialog.DefaultButton(ContentDialogButton::Close); dialog.XamlRoot(Content().XamlRoot());
+            auto weak = get_weak();
+            dialog.ShowAsync().Completed([weak, id, candidates, picker, dialog](auto const& operation, auto const& status)
+            {
+                auto self = weak.get();
+                if (!self) return;
+                try
+                {
+                    if (status != Windows::Foundation::AsyncStatus::Completed
+                        || operation.GetResults() != ContentDialogResult::Primary) return;
+                    auto selectedIndex = picker.SelectedIndex();
+                    if (selectedIndex < 0 || static_cast<size_t>(selectedIndex) >= candidates.size()) return;
+                    auto committed = ::DisplaySwitcher::Native::CommitDisplayRebind(true, self->original_.displays, id,
+                        candidates[static_cast<size_t>(selectedIndex)], self->enumerateDdc_,
+                        [self](auto const& displays)
+                        {
+                            auto candidate = self->original_;
+                            candidate.displays = displays;
+                            return self->saved_ && self->saved_(candidate);
+                        });
+                    if (committed.outcome != ::DisplaySwitcher::Native::DisplayRebindCommitOutcome::Saved)
+                    {
+                        self->LoadValues(self->original_);
+                        self->SetOperationFeedback(committed.message, true);
+                        return;
+                    }
+                    self->original_.displays = std::move(committed.displays);
+                    self->LoadValues(self->original_);
+                    self->SetOperationFeedback(committed.message);
+                }
+                catch (...)
+                {
+                    self->LoadValues(self->original_);
+                    self->SetOperationFeedback(L"显示器绑定未完成；旧配置和全部映射已保留。", true);
+                }
+            });
+        }
+        catch (...)
+        {
+            LoadValues(original_);
+            SetOperationFeedback(L"显示器检测失败；旧绑定和全部映射已保留。", true);
         }
     }
 

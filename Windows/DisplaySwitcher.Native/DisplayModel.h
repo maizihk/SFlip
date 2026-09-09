@@ -2,6 +2,7 @@
 
 namespace DisplaySwitcher::Native
 {
+    struct DdcEnumerationResult;
     inline constexpr int MinimumInputSourceValue = 1;
     inline constexpr int MaximumInputSourceValue = 65535;
 
@@ -145,6 +146,38 @@ namespace DisplaySwitcher::Native
         size_t removed{};
     };
 
+    // Runtime-only confirmation data. Never serialized or sent across endpoints.
+    struct DisplayRebindCandidate
+    {
+        std::wstring monitorId;
+        std::wstring displayName;
+        std::wstring logicalTargetId;
+        uint64_t topologyGeneration{};
+    };
+
+    struct DisplayRebindResult
+    {
+        bool success{};
+        std::vector<DisplayConfig> displays;
+        std::wstring message;
+    };
+
+    enum class DisplayRebindCommitOutcome
+    {
+        Cancelled,
+        EnumerationFailed,
+        ValidationFailed,
+        SaveFailed,
+        Saved,
+    };
+
+    struct DisplayRebindCommitResult
+    {
+        DisplayRebindCommitOutcome outcome{ DisplayRebindCommitOutcome::Cancelled };
+        std::vector<DisplayConfig> displays;
+        std::wstring message;
+    };
+
     struct DisplayMappingRow
     {
         std::wstring displayId;
@@ -179,6 +212,17 @@ namespace DisplaySwitcher::Native
         std::vector<DisplayConfig> const& existing,
         std::vector<DdcMonitorInfo> const& connected,
         DisplayTopologyTrust topologyTrust);
+    std::vector<DisplayRebindCandidate> FindDisplayRebindCandidates(
+        std::vector<DisplayConfig> const& displays, std::wstring const& displayId,
+        std::vector<DdcMonitorInfo> const& connected, DisplayTopologyTrust topologyTrust);
+    DisplayRebindResult ConfirmDisplayRebind(
+        std::vector<DisplayConfig> const& displays, std::wstring const& displayId,
+        DisplayRebindCandidate const& selected, std::vector<DdcMonitorInfo> const& connected,
+        DisplayTopologyTrust topologyTrust);
+    DisplayRebindCommitResult CommitDisplayRebind(
+        bool confirmed, std::vector<DisplayConfig> const& displays, std::wstring const& displayId,
+        DisplayRebindCandidate const& selected, std::function<DdcEnumerationResult()> const& enumerate,
+        std::function<bool(std::vector<DisplayConfig> const&)> const& save);
     std::vector<DisplayInputMapping> MergeVisibleProfileDisplayInputs(
         std::vector<DisplayInputMapping> const& existing,
         std::vector<VisibleDisplayInputEdit> const& visibleEdits);
