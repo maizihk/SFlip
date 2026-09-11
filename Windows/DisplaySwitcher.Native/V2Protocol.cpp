@@ -234,12 +234,8 @@ namespace DisplaySwitcher::Native
     {
         if (_wcsicmp(message.sourceEndpointId.c_str(), knownSourceEndpointId.c_str()) != 0)
             return { false, false, L"unknown_source" };
-        if (message.type == L"status_probe")
-        {
-            if (message.targetEndpointId && _wcsicmp(message.targetEndpointId->c_str(), localEndpointId.c_str()) != 0)
-                return { false, false, L"wrong_target" };
-        }
-        else if (!message.targetEndpointId || _wcsicmp(message.targetEndpointId->c_str(), localEndpointId.c_str()) != 0)
+        if (message.type != L"status_probe" &&
+            (!message.targetEndpointId || _wcsicmp(message.targetEndpointId->c_str(), localEndpointId.c_str()) != 0))
             return { false, false, L"wrong_target" };
         if (std::llabs(message.timestamp - nowUnixSeconds) > 10) return { false, false, L"timestamp_out_of_window" };
         auto expected = ComputeV2AuthenticationTag(authenticationKey, message);

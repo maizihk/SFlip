@@ -162,6 +162,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             Microsoft::UI::Xaml::Controls::TextBox peerHost{ nullptr };
             Microsoft::UI::Xaml::Controls::TextBox peerPort{ nullptr };
             Microsoft::UI::Xaml::Controls::PasswordBox pairingCode{ nullptr };
+            Microsoft::UI::Xaml::Controls::TextBlock enablementStatus{ nullptr };
             std::vector<ProfileMappingControls> mappings;
         };
         std::vector<ProfileEditorControls> profileEditors_;
