@@ -109,10 +109,10 @@ enum CollaborationConnectionState: Equatable {
         switch self {
         case .disabled: return "未启用"
         case .incomplete: return "配置不完整"
-        case .neverChecked: return "尚未检测"
+        case .neverChecked: return "正在连接"
         case .checking: return "正在检测"
         case .noResponse: return "无响应"
-        case .available: return "v2 可用"
+        case .available: return "已连接"
         case .connected: return "已连接"
         case .disconnected: return "连接已断开"
         }

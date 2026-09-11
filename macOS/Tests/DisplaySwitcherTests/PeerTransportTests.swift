@@ -3,6 +3,30 @@ import Foundation
 import XCTest
 
 final class PeerTransportTests: XCTestCase {
+    func testConfiguredHostnameMatchesResolvedDatagramAddressAndPort() {
+        let resolver = MockPeerHostAddressResolver(addresses: [
+            "peer.example": ["198.51.100.20"]
+        ])
+        let transport = PeerTransport(
+            factory: MockPeerTransportSocketFactory(),
+            hostResolver: resolver,
+            callbackQueue: .main
+        )
+
+        XCTAssertTrue(transport.sourceMatches(
+            PeerTransportEndpoint(host: "198.51.100.20", port: 49_731),
+            configuredHost: "peer.example", port: 49_731
+        ))
+        XCTAssertFalse(transport.sourceMatches(
+            PeerTransportEndpoint(host: "198.51.100.21", port: 49_731),
+            configuredHost: "peer.example", port: 49_731
+        ))
+        XCTAssertFalse(transport.sourceMatches(
+            PeerTransportEndpoint(host: "198.51.100.20", port: 49_732),
+            configuredHost: "peer.example", port: 49_731
+        ))
+    }
+
     func testListenerBindFailureIsReportedPrecisely() {
         let factory = MockPeerTransportSocketFactory()
         factory.onSocketCreated = { socket in
@@ -187,6 +211,14 @@ private enum MockTransportError: LocalizedError {
     case sendFailed
     case receiveFailed
     var errorDescription: String? { "simulated transport failure" }
+}
+
+private struct MockPeerHostAddressResolver: PeerHostAddressResolving {
+    let addresses: [String: Set<String>]
+
+    func numericIPv4Addresses(for host: String) -> Set<String> {
+        addresses[host.lowercased()] ?? []
+    }
 }
 
 private final class MockPeerTransportSocketFactory: PeerTransportSocketFactory {

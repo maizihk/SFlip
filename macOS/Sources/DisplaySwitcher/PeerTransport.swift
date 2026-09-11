@@ -36,6 +36,35 @@ protocol PeerTransportSocketFactory {
     func makeSocket() -> PeerTransportDatagramSocket
 }
 
+protocol PeerHostAddressResolving {
+    func numericIPv4Addresses(for host: String) -> Set<String>
+}
+
+struct BSDPeerHostAddressResolver: PeerHostAddressResolving {
+    func numericIPv4Addresses(for host: String) -> Set<String> {
+        var hints = addrinfo()
+        hints.ai_family = AF_INET
+        hints.ai_socktype = SOCK_DGRAM
+        hints.ai_protocol = IPPROTO_UDP
+        var result: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &result) == 0, let first = result else { return [] }
+        defer { freeaddrinfo(result) }
+        var addresses = Set<String>()
+        var current: UnsafeMutablePointer<addrinfo>? = first
+        while let item = current {
+            var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            if getnameinfo(
+                item.pointee.ai_addr, item.pointee.ai_addrlen,
+                &hostBuffer, socklen_t(hostBuffer.count), nil, 0, NI_NUMERICHOST
+            ) == 0 {
+                addresses.insert(String(cString: hostBuffer).lowercased())
+            }
+            current = item.pointee.ai_next
+        }
+        return addresses
+    }
+}
+
 enum PeerTransportError: LocalizedError {
     case invalidPort(Int)
     case notStarted
@@ -217,6 +246,7 @@ final class PeerTransport {
     private let queue: DispatchQueue
     private let callbackQueue: DispatchQueue
     private let factory: PeerTransportSocketFactory
+    private let hostResolver: PeerHostAddressResolving
     private let queueKey = DispatchSpecificKey<Void>()
     private var socket: PeerTransportDatagramSocket?
     private var generation = 0
@@ -224,13 +254,20 @@ final class PeerTransport {
 
     init(
         factory: PeerTransportSocketFactory = BSDPeerTransportSocketFactory(),
+        hostResolver: PeerHostAddressResolving = BSDPeerHostAddressResolver(),
         queue: DispatchQueue = DispatchQueue(label: "DisplaySwitcher.peer-network"),
         callbackQueue: DispatchQueue = .main
     ) {
         self.factory = factory
+        self.hostResolver = hostResolver
         self.queue = queue
         self.callbackQueue = callbackQueue
         queue.setSpecific(key: queueKey, value: ())
+    }
+
+    func sourceMatches(_ source: PeerTransportEndpoint, configuredHost: String, port: Int) -> Bool {
+        guard source.port == port else { return false }
+        return hostResolver.numericIPv4Addresses(for: configuredHost).contains(source.host.lowercased())
     }
 
     deinit { performSync { stopLocked() } }

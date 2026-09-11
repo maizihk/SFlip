@@ -314,9 +314,7 @@ enum V2MessageValidator {
         guard let localEndpoint = V2Crypto.normalizedUUID(context.localEndpointID) else {
             return result(.wrongTarget)
         }
-        if type == .statusProbe {
-            guard normalizedTarget == nil || normalizedTarget == localEndpoint else { return result(.wrongTarget) }
-        } else {
+        if type != .statusProbe {
             guard normalizedTarget == localEndpoint else { return result(.wrongTarget) }
         }
         guard timestamp >= 0, abs(timestamp - context.now) <= 10 else { return result(.timestampOutOfWindow) }
@@ -467,7 +465,6 @@ enum V2PeerCapabilityInspectionRejectionReason: Equatable {
     case missingEventID
     case eventIDMismatch
     case missingSourceEndpoint
-    case sourceEndpointMismatch
     case keyDerivationFailed
     case validation(V2MessageValidationReason)
     case wrongMessageType
@@ -479,7 +476,6 @@ enum V2PeerCapabilityInspectionRejectionReason: Equatable {
         case .missingEventID: return "missing-event-id"
         case .eventIDMismatch: return "event-id-mismatch"
         case .missingSourceEndpoint: return "missing-source-endpoint"
-        case .sourceEndpointMismatch: return "source-endpoint-mismatch"
         case .keyDerivationFailed: return "key-derivation-failed"
         case .validation(let reason): return "validation-\(reason.rawValue.replacingOccurrences(of: "_", with: "-"))"
         case .wrongMessageType: return "wrong-message-type"
@@ -502,12 +498,6 @@ enum V2PeerCapabilityInspection {
         timestamp: Int64,
         nonce: String
     ) throws -> V2Message {
-        let targetEndpointID: String?
-        if profile.peerProtocolVersion == 2 {
-            targetEndpointID = profile.peerEndpointID.flatMap(V2Crypto.normalizedUUID)
-        } else {
-            targetEndpointID = nil
-        }
         let key = try V2Crypto.deriveKey(
             pairingCode: profile.pairingCode,
             sourceEndpointID: localEndpointID
@@ -516,7 +506,7 @@ enum V2PeerCapabilityInspection {
             type: .statusProbe,
             eventID: eventID,
             sourceEndpointID: localEndpointID,
-            targetEndpointID: targetEndpointID,
+            targetEndpointID: nil,
             sourcePlatform: .macos,
             timestamp: timestamp,
             nonce: nonce
@@ -563,12 +553,6 @@ enum V2PeerCapabilityInspection {
         }
         guard let sourceEndpointID = V2MessageEnvelope.sourceEndpointID(in: data) else {
             return .rejected(.missingSourceEndpoint)
-        }
-
-        if profile.peerProtocolVersion == 2,
-           let expectedPeerEndpointID = profile.peerEndpointID.flatMap(V2Crypto.normalizedUUID),
-           sourceEndpointID != expectedPeerEndpointID {
-            return .rejected(.sourceEndpointMismatch)
         }
 
         guard let key = try? V2Crypto.deriveKey(
@@ -671,8 +655,32 @@ struct PeerInspectionEventTracker {
 }
 
 enum PeerInspectionDatagramSourceValidator {
-    static func rejectionReason(sourcePort: Int, expectedPort: Int) -> String? {
-        sourcePort == expectedPort ? nil : "source-port-mismatch"
+    static func rejectionReason(
+        sourceHost: String,
+        sourcePort: Int,
+        expectedHost: String,
+        expectedPort: Int
+    ) -> String? {
+        guard sourcePort == expectedPort else { return "source-port-mismatch" }
+        return normalizedHost(sourceHost) == normalizedHost(expectedHost) ? nil : "source-host-mismatch"
+    }
+
+    static func matches(sourceHost: String, sourcePort: Int, profile: CollaborationProfile) -> Bool {
+        rejectionReason(
+            sourceHost: sourceHost,
+            sourcePort: sourcePort,
+            expectedHost: profile.peerHost,
+            expectedPort: profile.peerPort
+        ) == nil
+    }
+
+    private static func normalizedHost(_ value: String) -> String {
+        var result = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if result.hasPrefix("[") && result.hasSuffix("]") {
+            result.removeFirst()
+            result.removeLast()
+        }
+        return result
     }
 }
 
@@ -896,18 +904,17 @@ struct V2EndpointRoutingTable {
     }
 }
 
-struct V2UnboundStatusProbeResolution {
+struct V2StatusProbeResolution {
     let profileID: String
     let request: V2Message
     let responseData: Data
 }
 
-enum V2UnboundStatusProbeResolver {
+enum V2StatusProbeResolver {
     static func eligibleProfiles(in document: DisplayConfigurationStoreV5Document) -> [CollaborationProfile] {
         let knownDisplays = Set(document.displays.map { $0.id.lowercased() })
         return document.collaborationProfiles.filter { profile in
-            profile.peerEndpointID == nil
-                && DisplayConfigurationStore.inspectProfile(
+            DisplayConfigurationStore.inspectProfile(
                     profile,
                     displays: document.displays,
                     ddcAvailableDisplayIDs: knownDisplays
@@ -919,22 +926,19 @@ enum V2UnboundStatusProbeResolver {
     static func resolve(
         data: Data,
         document: DisplayConfigurationStoreV5Document,
-        routingTable: V2EndpointRoutingTable,
+        sourceHost: String,
+        sourcePort: Int,
+        sourceMatchesProfile: ((CollaborationProfile) -> Bool)? = nil,
         now: Int64,
         responseNonce: String
-    ) -> V2UnboundStatusProbeResolution? {
+    ) -> V2StatusProbeResolution? {
         guard let sourceEndpointID = V2MessageEnvelope.sourceEndpointID(in: data),
-              routingTable.route(for: sourceEndpointID) == nil,
               V2Crypto.base64URLDecode(responseNonce)?.count == 16 else { return nil }
-
-        // A configured identity which is absent from the usable routing table is a conflict,
-        // not an invitation to replace or bootstrap that identity through another profile.
-        let conflictsWithConfiguredEndpoint = document.collaborationProfiles.contains { profile in
-            profile.peerEndpointID.flatMap(V2Crypto.normalizedUUID) == sourceEndpointID
+        let candidates = eligibleProfiles(in: document).filter { profile in
+            sourceMatchesProfile?(profile) ?? PeerInspectionDatagramSourceValidator.matches(
+                sourceHost: sourceHost, sourcePort: sourcePort, profile: profile
+            )
         }
-        guard !conflictsWithConfiguredEndpoint else { return nil }
-
-        let candidates = eligibleProfiles(in: document)
 
         let matches: [(CollaborationProfile, V2Message)] = candidates.compactMap { profile in
             guard let key = try? V2Crypto.deriveKey(
@@ -971,7 +975,7 @@ enum V2UnboundStatusProbeResolver {
         )
         response.authTag = V2Crypto.authenticationTag(for: response, key: responseKey)
         guard let responseData = try? JSONEncoder().encode(response) else { return nil }
-        return V2UnboundStatusProbeResolution(
+        return V2StatusProbeResolution(
             profileID: match.0.id,
             request: match.1,
             responseData: responseData
