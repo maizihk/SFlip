@@ -194,7 +194,10 @@ namespace DisplaySwitcher::Native
         if (!config.displayConfigurationSafeMode) sideEffectGate_.Allow();
         auto listenerPort = config.V2ListenerPort();
         if (!listenerPort) SetPeerConnectionStatus(!config.ReadonlyEnabledProfiles().empty() ? L"协同配置不完整" : L"协同未启用", false);
-        if (hasUnboundV2 && !hasV2) SetPeerConnectionStatus(L"等待首次检测", false);
+        if (hasUnboundV2 && !hasV2)
+            SetPeerConnectionStatus(std::any_of(bootstrapProfiles.begin(), bootstrapProfiles.end(),
+                [](auto const& profile) { return profile.coordinationEnabled; })
+                ? L"已开启，待确认对端" : L"等待首次检测", false);
         // A completed, enabled profile may listen automatically on later starts.
         // An unbound draft listens only after the user explicitly checks network access.
         if (listenerPort && (hasV2 || networkAccessPrepared_))
@@ -751,9 +754,11 @@ namespace DisplaySwitcher::Native
         if (!sideEffectGate_.AllowsSideEffects() || profileDetectionActive_) return;
         auto config = Config();
         auto profile = config.FindCollaborationProfile(profileId);
-        if (!profile || !profile->coordinationEnabled)
+        if (!config.CanCoordinateWithProfile(profileId))
         {
-            SetStatus(L"协同配置不可用"); return;
+            SetStatus(profile && profile->coordinationEnabled
+                ? L"协同已开启，请先检测连接并确认对端" : L"协同配置不可用");
+            return;
         }
         auto name = profile->name;
         SetStatus(L"正在切换到 " + name + L"…");

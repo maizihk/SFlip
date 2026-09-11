@@ -9,6 +9,7 @@
 #include "../DisplaySwitcher.Native/Diagnostics.h"
 #include "../DisplaySwitcher.Native/DisplayModel.h"
 #include "../DisplaySwitcher.Native/ProfileDetection.h"
+#include "../DisplaySwitcher.Native/V2StateMachine.h"
 #include "../DisplaySwitcher.Native/SystemActions.h"
 #include "../DisplaySwitcher.Native/UnboundProbeRouter.h"
 #include "../DisplaySwitcher.Native/UdpPeer.h"
@@ -748,6 +749,110 @@ namespace
             L"C-003: 配置重排后映射必须仍按 UUID 关联");
         Check(loaded.ReadonlyEnabledProfiles().size() == 2,
             L"C-006/U-003: 多个配置可同时开启且不得暗中选择列表第一项");
+    }
+
+    void TestOfflineCollaborationEnablement(std::filesystem::path const& root)
+    {
+        auto config = ConfigWithDisplays(1);
+        auto profileId = config.collaborationProfiles[0].id;
+        config.collaborationProfiles[0].coordinationEnabled = true;
+        auto path = root / L"offline-enable.json";
+        config.SaveToPath(path);
+        auto loaded = AppConfig::LoadFromPath(path);
+        Check(!loaded.displayConfigurationSafeMode &&
+            loaded.collaborationProfiles[0].coordinationEnabled,
+            L"W-037: 首次检测前可保存开启状态，重启后不回退或进入安全状态");
+        Check(loaded.collaborationProfiles[0].peerEndpointId.empty() &&
+            !loaded.collaborationProfiles[0].peerProtocolVersion &&
+            loaded.PeerInputForDisplay(profileId, loaded.displays[0].id) == 16,
+            L"W-037: 离线开启不伪造身份或协议，不改变显示器映射");
+        Check(loaded.ReadonlyEnabledProfiles().size() == 1 &&
+            loaded.EnabledCompleteProfiles().empty() && !loaded.CanCoordinateWithProfile(profileId) &&
+            loaded.UnboundBootstrapProfiles().size() == 1 && loaded.V2ListenerPort() == loaded.listenPort,
+            L"W-037: 已开启未绑定仅保留首次检测候选，不进入协同菜单和硬件执行入口");
+        Check(ReadObject(path).GetNamedNumber(L"schemaVersion") == 5,
+            L"W-037: 开启偏好保留在既有 v5 格式中");
+
+        auto disabled = loaded;
+        disabled.collaborationProfiles[0].coordinationEnabled = false;
+        disabled.SaveToPath(path);
+        Check(!AppConfig::LoadFromPath(path).collaborationProfiles[0].coordinationEnabled,
+            L"W-037: 等待对端期间仍可关闭并保存");
+
+        ProfileDetectionResult response;
+        response.outcome = ProfileDetectionOutcome::V2Available;
+        response.observedEndpointId = GenerateIdentifier();
+        response.endpointConfirmationRequired = true;
+        auto candidate = loaded.collaborationProfiles[0];
+        Check(!ApplyProfileDetectionResult(candidate, response, false) &&
+            candidate.coordinationEnabled && candidate.peerEndpointId.empty(),
+            L"W-037: 开关已开启也不能绕过首次身份确认");
+        Check(ApplyProfileDetectionResult(candidate, response, true) && candidate.coordinationEnabled,
+            L"W-037: 明确确认身份后保留用户已开启的选择");
+        loaded.collaborationProfiles[0] = candidate;
+        loaded.SaveToPath(path);
+        auto bound = AppConfig::LoadFromPath(path);
+        Check(bound.collaborationProfiles[0].coordinationEnabled &&
+            bound.CanCoordinateWithProfile(profileId) && bound.EnabledCompleteProfiles().size() == 1,
+            L"W-037: 已绑定配置开启与保存不依赖当前心跳或在线状态");
+
+        V2StateInitial initial{ bound.localEndpointId, true, V2CoordinatorState::Idle, {}, {}, {} };
+        for (auto const& profile : bound.EnabledCompleteProfiles())
+            initial.enabledTargets.push_back({ profile.peerEndpointId, 2, false });
+        V2StateMachine machine(std::move(initial));
+        auto actions = machine.OnManualSelect(0, candidate.peerEndpointId, GenerateIdentifier());
+        auto later = machine.Advance(10000);
+        actions.insert(actions.end(), later.begin(), later.end());
+        Check(std::none_of(actions.begin(), actions.end(), [](auto const& action)
+            { return action.kind == V2Action::Kind::RequestSwitch || action.kind == V2Action::Kind::RequestWake; }),
+            L"W-037: 对端未在线时开启偏好不产生切屏或唤醒动作");
+
+        auto unsafe = bound;
+        unsafe.displayConfigurationSafeMode = true;
+        Check(!unsafe.CanCoordinateWithProfile(profileId) && unsafe.EnabledCompleteProfiles().empty(),
+            L"W-037: 配置安全状态继续阻断协同执行");
+        auto self = bound;
+        self.collaborationProfiles[0].peerEndpointId = self.localEndpointId;
+        Check(!self.CanCoordinateWithProfile(profileId), L"W-037: 本机身份不能作为协同目标");
+        auto duplicate = bound;
+        auto second = duplicate.collaborationProfiles[0];
+        second.id = GenerateIdentifier(); second.name = L"另一个模拟配置";
+        duplicate.collaborationProfiles.push_back(second);
+        Check(duplicate.EnabledCompleteProfiles().empty() &&
+            !duplicate.CanCoordinateWithProfile(profileId) && !duplicate.CanCoordinateWithProfile(second.id),
+            L"W-037: 重复的已开启对端映射全部拒绝执行");
+
+        auto baseline = ReadBytes(path);
+        auto invalid = config;
+        invalid.collaborationProfiles[0].peerHost.clear();
+        Check(SaveRejected(invalid, path) && ReadBytes(path) == baseline,
+            L"W-037: 离线开启仍拒绝缺少地址并保留原文件");
+        invalid = config; invalid.collaborationProfiles[0].pairingCode = L"short";
+        Check(SaveRejected(invalid, path) && ReadBytes(path) == baseline,
+            L"W-037: 离线开启仍拒绝无效配对密码");
+        invalid = config; invalid.collaborationProfiles[0].displayInputs.clear();
+        Check(SaveRejected(invalid, path) && ReadBytes(path) == baseline,
+            L"W-037: 离线开启仍要求至少一条有效输入映射");
+        invalid = config; invalid.collaborationProfiles[0].peerProtocolVersion = 1;
+        Check(SaveRejected(invalid, path) && ReadBytes(path) == baseline,
+            L"W-037: 显式未知协议仍拒绝保存，不降级到 v1");
+
+        auto faultPath = root / L"offline-enable-save-fault.json";
+        config.SaveToPath(faultPath);
+        auto before = ReadBytes(faultPath);
+        auto changed = config; changed.collaborationProfiles[0].coordinationEnabled = false;
+        bool failed{};
+        try { changed.SaveToPath(faultPath, AppConfigSaveFaultForTesting::AtomicReplace); }
+        catch (...) { failed = true; }
+        auto recovered = AppConfig::LoadFromPath(faultPath);
+        Check(failed && ReadBytes(faultPath) == before && recovered.displayConfigurationSafeMode &&
+            recovered.EnabledCompleteProfiles().empty(),
+            L"W-037: 未绑定开启配置保存失败时保留旧文件并安全阻断");
+
+        Check(CollaborationEnablementText(true, false).find(L"待确认对端") != std::wstring::npos &&
+            CollaborationEnablementText(false, false).find(L"未开启") != std::wstring::npos &&
+            CollaborationEnablementText(true, true).find(L"待确认") == std::wstring::npos,
+            L"W-037: 状态文案区分开启意愿与对端身份确认，不将开启显示为在线");
     }
 
     void TestValidationAndNfc(std::filesystem::path const& root)
@@ -3288,6 +3393,7 @@ int wmain()
         TestMonochromeTrayIconContracts();
         TestDetailedDiagnosticRecording(root);
         TestProfileManagementAndReorder(root);
+        TestOfflineCollaborationEnablement(root);
         TestValidationAndNfc(root);
         TestInputSourceNullSafetyAndMigration(root);
         TestImmediateCommitSafety(root);
