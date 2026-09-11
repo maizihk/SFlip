@@ -377,7 +377,14 @@ namespace
             [](auto const& mapping) { return mapping.targetInput && DisplaySwitcher::Native::IsValidInputSourceValue(*mapping.targetInput); }))
             config.usbSwitch.enabled = false;
         for (auto& profile : config.collaborationProfiles)
-            if (profile.coordinationEnabled && profile.displayInputs.empty()) profile.coordinationEnabled = false;
+        {
+            if (!profile.coordinationEnabled || !profile.displayInputs.empty()) continue;
+            // Legacy zero-input migration disables execution and its linked wake.
+            // An already-disabled draft retains the user's existing link choice.
+            profile.coordinationEnabled = false;
+            if (EqualInsensitive(profile.id, config.usbSwitch.collaborationProfileId))
+                config.usbSwitch.collaborationWakeEnabled = false;
+        }
         if (config.usbSwitch.collaborationWakeEnabled)
         {
             auto profile = config.FindCollaborationProfile(config.usbSwitch.collaborationProfileId);
