@@ -1,5 +1,15 @@
 # macOS 交接记录
 
+## 当前任务：DS-042 设置页说明文案清理
+
+- 日期：2026-09-11
+- 分支：`codex/windows-settings-copy-cleanup`
+- 基线：`2371f44`；`origin/main@f12a224`
+- 协同页删除重复的零副作用说明及其分隔线；权限状态只在系统明确拒绝时显示系统设置路径，其他状态的空详情标签隐藏。
+- 诊断页保留“在常规中开启记录并复现问题”的行动提示，删除重复的内部行为清单。
+- 修改 `PublicPresentationModels.swift`、`SettingsWindowController.swift`、`PublicPresentationModelsTests.swift`、`macOS/DEVELOPMENT_CHECKLIST.md` 和本交接文件。
+- 未修改诊断导出、协议、连接、权限、网络或硬件行为；危险删除、安全模式和真实失败提示保持原样。Windows 主机无法运行 Xcode，自动测试与真实 GUI 布局待根任务验证。
+
 ## 当前任务：DS-041 协同连接成功文案统一
 
 - 日期：2026-09-11

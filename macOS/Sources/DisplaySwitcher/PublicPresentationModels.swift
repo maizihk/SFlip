@@ -20,14 +20,14 @@ struct LocalNetworkPermissionPresentation: Equatable {
         case .notChecked:
             return Self(
                 statusText: "未检测",
-                detailText: "点击“检测并申请权限”后，将使用当前协同配置执行一次真实连接检测。",
+                detailText: "",
                 isFailure: false,
                 isExplicitlyDenied: false
             )
         case .collaborationConnected:
             return Self(
                 statusText: "协同连接正常",
-                detailText: "已通过当前协同配置完成认证连接。",
+                detailText: "",
                 isFailure: false,
                 isExplicitlyDenied: false
             )
@@ -41,7 +41,7 @@ struct LocalNetworkPermissionPresentation: Equatable {
         case .timeout, .authenticationFailure, .ordinaryNetworkFailure:
             return Self(
                 statusText: "连接失败，请检查权限、地址和防火墙",
-                detailText: "未获得系统明确拒绝本地网络访问的证据。",
+                detailText: "",
                 isFailure: true,
                 isExplicitlyDenied: false
             )

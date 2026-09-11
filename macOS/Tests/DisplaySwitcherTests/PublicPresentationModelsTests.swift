@@ -150,7 +150,7 @@ final class PublicPresentationModelsTests: XCTestCase {
             let presentation = LocalNetworkPermissionPresentation.make(for: evidence)
             XCTAssertEqual(presentation.statusText, "连接失败，请检查权限、地址和防火墙")
             XCTAssertFalse(presentation.isExplicitlyDenied)
-            XCTAssertTrue(presentation.detailText.contains("未获得系统明确拒绝"))
+            XCTAssertEqual(presentation.detailText, "")
         }
     }
 

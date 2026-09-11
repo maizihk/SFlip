@@ -481,8 +481,6 @@ namespace winrt::DisplaySwitcher::Native::implementation
         connectionStatus_ = TextBlock(); connectionStatus_.VerticalAlignment(VerticalAlignment::Center);
         peerStatus.Children().Append(connectionDot_); peerStatus.Children().Append(connectionStatus_);
         SetConnectionStatus(L"协同未启用", false);
-        auto peerHint = TextBlock(); peerHint.Text(L"先检查网络权限，再检测连接。两项操作都不会执行 USB、唤醒或显示器操作。");
-        peerHint.TextWrapping(TextWrapping::Wrap); peerHint.Opacity(0.72);
         auto checkNetwork = Button(); checkNetwork.Content(box_value(L"检查网络权限"));
         ApplyStandardButtonGeometry(checkNetwork);
         checkNetwork.Click([this](auto const&, auto const&)
@@ -490,7 +488,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             if (!checkNetworkAccess_) { SetOperationFeedback(L"网络权限检查服务不可用。", true); return; }
             CaptureDisplayEditors(); CaptureProfileEditors();
             auto config = original_; config.displays = workingDisplays_; config.collaborationProfiles = workingProfiles_;
-            SetOperationFeedback(L"正在检查本机 UDP 监听；若 Windows 弹出提示，请允许专用网络访问。");
+            SetOperationFeedback(L"正在检查网络权限；如有系统提示，请允许专用网络访问。");
             auto weak = get_weak();
             checkNetworkAccess_(config, [weak](bool ready, std::wstring const& message)
             {
@@ -550,7 +548,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         profileConfigSection.Children().Append(CreateSubheading(L"配置详情"));
         auto peerLayout = ::DisplaySwitcher::Native::SettingsPageLayout(::DisplaySwitcher::Native::SettingsPage::Collaboration);
         peerTab.Content(CreatePage({
-            CreateSection(peerLayout.cards.at(0), { CreateTwoColumn(peerStatus, peerActions), peerHint }),
+            CreateSection(peerLayout.cards.at(0), { CreateTwoColumn(peerStatus, peerActions) }),
             CreateSection(peerLayout.cards.at(1), { profileConfigSection, profileEditorsPanel_ }) }));
 
         auto displayTab = TabViewItem(); displayTab.IsClosable(false); displayTab.HorizontalContentAlignment(HorizontalAlignment::Center);
@@ -570,9 +568,6 @@ namespace winrt::DisplaySwitcher::Native::implementation
         auto diagnosticTab = TabViewItem(); diagnosticTab.IsClosable(false);
         diagnosticTab.HorizontalContentAlignment(HorizontalAlignment::Center);
         diagnosticTab.Header(CreateTabHeader(L"\uE9D9", L"诊断"));
-        auto diagnosticHint = TextBlock();
-        diagnosticHint.Text(L"预览只读取当前配置快照和内存状态，不会发起网络检测、USB 或显示器操作。复制内容与下方可见文本完全一致。");
-        diagnosticHint.TextWrapping(TextWrapping::Wrap); diagnosticHint.Opacity(0.72);
         diagnosticPreview_ = TextBox();
         diagnosticPreview_.IsReadOnly(true); diagnosticPreview_.AcceptsReturn(true);
         diagnosticPreview_.TextWrapping(TextWrapping::NoWrap); diagnosticPreview_.MinHeight(390);
@@ -589,7 +584,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         auto diagnosticActions = StackPanel(); diagnosticActions.Orientation(Orientation::Horizontal);
         diagnosticActions.Spacing(8); diagnosticActions.Children().Append(refreshDiagnostic);
         diagnosticActions.Children().Append(copyDiagnostic);
-        diagnosticTab.Content(CreatePage({ CreateSection({}, { diagnosticHint, diagnosticActions, diagnosticPreview_ }) }));
+        diagnosticTab.Content(CreatePage({ CreateSection({}, { diagnosticActions, diagnosticPreview_ }) }));
         RefreshDiagnosticPreview();
 
         auto aboutTab = TabViewItem(); aboutTab.IsClosable(false); aboutTab.HorizontalContentAlignment(HorizontalAlignment::Center);
@@ -1634,7 +1629,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         if (result.outcome == Outcome::NetworkNotReady)
         {
             SetConnectionStatus(L"网络权限未就绪", false);
-            SetOperationFeedback(L"请先点击“检查网络权限”，确认本机 UDP 监听已就绪后再检测连接。", true); return;
+            SetOperationFeedback(L"请先点击“检查网络权限”，然后重试。", true); return;
         }
         if (result.outcome == Outcome::SendFailed)
         {

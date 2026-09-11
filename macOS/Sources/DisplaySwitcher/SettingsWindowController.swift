@@ -641,11 +641,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         requestMediaKeyPermissionButton.setAccessibilityLabel("申请媒体快捷键输入监控权限")
         learnUSBButton.setAccessibilityLabel("学习 USB 设备")
         peerStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        let peerHint = NSTextField(wrappingLabelWithString:
-            "检查网络权限和检测连接都只验证协同，不执行 USB、唤醒、DDC 或输入源切换。")
-        peerHint.textColor = .secondaryLabelColor
-        peerHint.font = .systemFont(ofSize: 11)
-        peerHint.maximumNumberOfLines = 2
         localNetworkPermissionStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         localNetworkPermissionDetailLabel.font = .systemFont(ofSize: 11)
         localNetworkPermissionDetailLabel.textColor = .secondaryLabelColor
@@ -725,9 +720,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             module(title: SettingsPageLayoutProjection.GroupID.collaborationStatus.title, views: [
                 peerStatusActions,
                 localNetworkPermissionStatusLabel,
-                localNetworkPermissionDetailLabel,
-                separator(),
-                peerHint
+                localNetworkPermissionDetailLabel
             ]),
             module(title: SettingsPageLayoutProjection.GroupID.collaborationConfiguration.title, views: [
                 profileSelectionRow,
@@ -916,7 +909,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         actions.spacing = 10
 
         let explanation = NSTextField(wrappingLabelWithString:
-            "预览只读取当前内存与配置状态，不执行网络检测、USB、唤醒、DDC 或输入源切换。需要详细轨迹时，请先在“常规”中开启记录并复现问题。")
+            "需要详细轨迹时，请先在“常规”中开启记录并复现问题。")
         explanation.font = .systemFont(ofSize: 11)
         explanation.textColor = .secondaryLabelColor
         explanation.maximumNumberOfLines = 2
@@ -2232,6 +2225,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         localNetworkPermissionStatusLabel.stringValue = presentation.statusText
         localNetworkPermissionStatusLabel.textColor = presentation.isFailure ? .systemRed : .labelColor
         localNetworkPermissionDetailLabel.stringValue = presentation.detailText
+        localNetworkPermissionDetailLabel.isHidden = presentation.detailText.isEmpty
     }
 
     private func showPeerInspectionResult(_ result: PeerCapabilityInspectionResult, profileID: String) {

@@ -1303,8 +1303,8 @@ namespace DisplaySwitcher::Native
             auto ready = self && !self->disposed_ && self->EnsurePeerListening(port);
             if (ready) self->networkAccessPrepared_ = true;
             auto message = ready
-                ? L"本机 UDP 端口已就绪，可以继续检测连接。若 Windows 弹出提示，请允许专用网络访问。"
-                : L"无法启动本机 UDP 监听。请检查端口占用和 Windows 网络权限。";
+                ? L"网络检查完成，可以检测连接。"
+                : L"无法启动网络服务，请检查端口占用或网络权限。";
             if (self && !self->disposed_)
                 self->Enqueue([completed = std::move(completed), ready, message = std::move(message)]() mutable
                 {
