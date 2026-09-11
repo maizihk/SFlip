@@ -14,14 +14,14 @@ SFlip 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多台电�
 
 产品和 GitHub 仓库名称均为 **SFlip**。内部工程与兼容标识保留，避免影响已有配置。
 
-Windows 当前正式版为 **v2.3.1（build 22）**，新增显示器重新绑定入口并修正待确认状态诊断；macOS 保持 **v2.3.0（build 21）**。
+Windows 当前正式版为 **v2.3.2（build 23）**，修复资源管理器重启后托盘图标消失，并增加自动恢复与失败重试；macOS 保持 **v2.3.0（build 21）**。
 
 | 平台 | 运行要求 | 下载 |
 | --- | --- | --- |
 | macOS | Apple Silicon，macOS 12 或更高版本 | [DMG 安装包](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.zip) |
-| Windows | x64，Windows 10 1809 或更高版本；Windows App Runtime 2.4 x64 | [EXE 安装包](https://github.com/maizihk/SFlip/releases/download/v2.3.1/SFlip-v2.3.1-Windows-x64-Setup.exe) · [绿色版 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.1/SFlip-v2.3.1-Windows-x64-portable.zip) |
+| Windows | x64，Windows 10 1809 或更高版本；Windows App Runtime 2.4 x64 | [EXE 安装包](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-Setup.exe) · [绿色版 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-portable.zip) |
 
-文件校验值见 [Windows v2.3.1](https://github.com/maizihk/SFlip/releases/download/v2.3.1/SHA256SUMS.txt) 和 [macOS v2.3.0](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SHA256SUMS.txt)。Intel Mac 当前不支持原生 DDC；Windows 版不依赖 .NET。
+文件校验值见 [Windows v2.3.2](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SHA256SUMS.txt) 和 [macOS v2.3.0](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SHA256SUMS.txt)。Intel Mac 当前不支持原生 DDC；Windows 版不依赖 .NET。
 
 - **macOS DMG**：双击打开 DMG，将 `SFlip.app` 拖到旁边的 `Applications` 文件夹。复制后推出磁盘映像，从“应用程序”启动。替换旧版前先退出旧应用，不要直接从 DMG 运行。
 - **macOS ZIP**：解压后将 `SFlip.app` 放到固定的 `/Applications` 目录，再启动应用。

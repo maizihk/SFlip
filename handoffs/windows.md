@@ -1,5 +1,13 @@
 # Windows 交接记录
 
+## 当前任务：Windows v2.3.2 发布（2026-09-11）
+
+- 用户在获取托盘恢复测试包后授权合并 PR #90（e6d7bac），并明确要求更新 Release；发布范围为 Windows v2.3.2 / build 23，macOS 保持 v2.3.0。
+- 发布分支 codex/windows-release-2-3-2，只更新 Windows 版本资源、根 README 下载入口、本清单和交接；不改变协议、schema 或硬件行为。
+- W-036 修复代码已经通过 431 项原生检查、x64 Release 与 61 项安装器检查；版本更新后的正式产物仍须由发布 PR CI 重新构建验证。
+- 本机缺少 MSBuild，发布前从 CI 下载安装版和绿色版，验证应用及安装器均为 2.3.2.23，生成 SHA256SUMS，并以已合并发布提交创建 v2.3.2。
+- 未执行新的 Explorer 重启、USB、DDC、切屏或系统设置变更；实机覆盖范围不因发布扩大。
+
 ## 当前任务：W-036 Explorer 重建后托盘图标恢复（2026-09-11）
 
 - 现场与根因：SFlip 进程及隐藏托盘宿主仍运行，但 Explorer 的启动时间晚于应用，通知项位置查询失败。正式实现只在构造时 `NIM_ADD` 一次，未处理 `TaskbarCreated`；后续 `NIM_MODIFY` 失败也不会重新添加，所以 Explorer 重建后进程继续运行而托盘入口消失。
