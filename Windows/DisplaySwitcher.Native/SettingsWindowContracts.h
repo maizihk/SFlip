@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <algorithm>
 #include <cstdint>
@@ -26,6 +26,13 @@ namespace DisplaySwitcher::Native
     {
         std::vector<SettingsCardContract> cards;
     };
+
+    inline std::wstring CollaborationEnablementText(bool enabled, bool peerConfirmed)
+    {
+        if (!enabled) return L"未开启。";
+        return peerConfirmed ? L"已开启；连接状态见上方。"
+            : L"已开启，正在等待对端上线并自动连接。";
+    }
 
     enum class SettingsSaveFeedbackScope
     {

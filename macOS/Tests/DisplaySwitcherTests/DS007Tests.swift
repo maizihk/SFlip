@@ -537,14 +537,67 @@ final class DS007Tests: XCTestCase {
         XCTAssertFalse(SettingsWindowLifecycleState.open.isReleasedWhenClosed)
     }
 
-    func testV1PeerIdentityCanNeverBeConfirmedInV2OnlyConfiguration() {
-        let profile = completeProfile(name: "Peer", displayID: UUID().uuidString)
-        XCTAssertEqual(
-            DisplayConfigurationStore.checkPeerIdentity(
-                profile, endpointID: UUID().uuidString, protocolVersion: 1
-            ),
-            .invalid
+    func testPeerEndpointCacheRejectsNonV2Update() {
+        let display = configuredDisplay()
+        let profile = completeProfile(name: "Peer", displayID: display.id)
+        let document = DisplayConfigurationStoreV5Document(
+            schemaVersion: 5,
+            localEndpointID: UUID().uuidString,
+            localDeviceName: "Local",
+            listenPort: 49_731,
+            linkAllDisplays: false,
+            displays: [display],
+            collaborationProfiles: [profile]
         )
+        XCTAssertNil(DisplayConfigurationStore.documentByCachingPeerEndpoint(
+            UUID().uuidString, protocolVersion: 1, forProfileID: profile.id, in: document
+        ))
+    }
+
+    func testPeerEndpointCachePreservesEnablementAndReturnsEqualDocumentWhenUnchanged() throws {
+        let display = configuredDisplay()
+        var profile = completeProfile(name: "Peer", displayID: display.id)
+        profile.coordinationEnabled = true
+        let document = DisplayConfigurationStoreV5Document(
+            schemaVersion: 5,
+            localEndpointID: UUID().uuidString,
+            localDeviceName: "Local",
+            listenPort: 49_731,
+            linkAllDisplays: false,
+            displays: [display],
+            collaborationProfiles: [profile]
+        )
+        let endpoint = "22222222-2222-4222-8222-222222222222"
+        let learned = try XCTUnwrap(DisplayConfigurationStore.documentByCachingPeerEndpoint(
+            endpoint, forProfileID: profile.id, in: document
+        ))
+        XCTAssertTrue(learned.collaborationProfiles[0].coordinationEnabled)
+        XCTAssertEqual(learned.collaborationProfiles[0].peerEndpointID, endpoint)
+        XCTAssertEqual(
+            DisplayConfigurationStore.documentByCachingPeerEndpoint(
+                endpoint.uppercased(), forProfileID: profile.id, in: learned
+            ),
+            learned
+        )
+    }
+
+    func testPeerEndpointCacheUpdatesDisabledProfileWithoutEnablingIt() throws {
+        let display = configuredDisplay()
+        var profile = completeProfile(name: "Peer", displayID: display.id)
+        profile.coordinationEnabled = false
+        profile.peerEndpointID = "22222222-2222-4222-8222-222222222222"
+        profile.peerProtocolVersion = 2
+        let document = DisplayConfigurationStoreV5Document(
+            schemaVersion: 5, localEndpointID: UUID().uuidString,
+            localDeviceName: "Local", listenPort: 49_731, linkAllDisplays: false,
+            displays: [display], collaborationProfiles: [profile]
+        )
+        let replacement = "33333333-3333-4333-8333-333333333333"
+        let updated = try XCTUnwrap(DisplayConfigurationStore.documentByCachingPeerEndpoint(
+            replacement, forProfileID: profile.id, in: document
+        ))
+        XCTAssertFalse(updated.collaborationProfiles[0].coordinationEnabled)
+        XCTAssertEqual(updated.collaborationProfiles[0].peerEndpointID, replacement)
     }
 
     func testU018ToU020StatusesAreIndependentAndExpireAfterSixSeconds() {

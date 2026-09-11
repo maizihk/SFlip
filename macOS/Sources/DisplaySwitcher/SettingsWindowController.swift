@@ -383,6 +383,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         updatePeerConnectionStatus(state.text, connected: state.connected)
     }
 
+    func reloadPersistedConfiguration() {
+        reloadValues()
+    }
+
     func updateDDCValues(stableID: String, values: [DDCCommand: DDCResolvedReading],
                          skipReason: DDCReadSkipReason? = nil) {
         guard let offset = configurationDocument?.displays.firstIndex(where: {
@@ -1534,7 +1538,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if sender === usbArrivalSwitchCheckbox {
             if sender.state == .on, !selectedCollaborationWakeProfileIsValid() {
                 sender.state = .off
-                showValidationError("请选择一个已开启、完整且已确认对端身份的协同配置。")
+                showValidationError("请选择一个已开启、完整且已建立连接的协同配置。")
                 return
             }
             persistDocument(feedbackScope: .usb) { $0.usbSwitch.collaborationWakeEnabled = sender.state == .on }
@@ -2228,29 +2232,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         guard let index = editingProfiles.firstIndex(where: { $0.id == profileID }) else { return }
         let profile = editingProfiles[index]
         switch result {
-        case .v2(let endpointID):
-            let identity = DisplayConfigurationStore.checkPeerIdentity(profile, endpointID: endpointID, protocolVersion: 2)
-            if identity == .unchanged {
-                peerStatusLabel.stringValue = "\(profile.name)：v2 可用"
-                return
-            }
-            let alert = NSAlert()
-            alert.alertStyle = .informational
-            alert.messageText = identity.requiresConfirmation ? "确认对端逻辑身份" : "检测结果无效"
-            alert.informativeText = "\(profile.name) 返回了新的逻辑身份。只有确认这是预期对端后才会用于协同。"
-            alert.addButton(withTitle: "确认")
-            alert.addButton(withTitle: "取消")
-            alert.beginSheetModal(for: window!) { [weak self] response in
-                guard let self, response == .alertFirstButtonReturn,
-                      let current = self.editingProfiles.firstIndex(where: { $0.id == profileID }) else { return }
-                self.editingProfiles[current].peerEndpointID = endpointID.lowercased()
-                self.editingProfiles[current].peerProtocolVersion = 2
-                self.persistDocument(feedbackScope: .collaboration) {
-                    $0.collaborationProfiles = self.editingProfiles
-                }
-            }
+        case .v2:
+            reloadValues()
+            peerStatusLabel.stringValue = "\(profile.name)：已连接"
         case .authenticationFailed:
-            peerStatusLabel.stringValue = "\(profile.name)：认证失败"
+            peerStatusLabel.stringValue = "\(profile.name)：配对码不匹配"
         case .noResponse:
             peerStatusLabel.stringValue = "\(profile.name)：无响应"
         }

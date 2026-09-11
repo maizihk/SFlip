@@ -42,7 +42,7 @@ final class PeerProtocolV2Tests: XCTestCase {
         let knownSource = try string(object, "knownSourceEndpointID")
         let key = try XCTUnwrap(V2Crypto.base64URLDecode(try string(object, "authKeyBase64Url")))
         let vectors = try array(object, "vectors")
-        XCTAssertEqual(vectors.count, 20)
+        XCTAssertEqual(vectors.count, 22)
 
         for vector in vectors {
             let vectorID = try string(vector, "id")
@@ -168,7 +168,7 @@ final class PeerProtocolV2Tests: XCTestCase {
         ])
     }
 
-    func testUnboundEndpointsCompleteFirstStatusProbeWithoutSavingIdentityOrHardwareEffects() throws {
+    func testStatusProbeResolverAuthenticatesWithoutHardwareEffects() throws {
         let localEndpoint = "11111111-1111-4111-8111-111111111111"
         let peerEndpoint = "22222222-2222-4222-8222-222222222222"
         let eventID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -184,10 +184,11 @@ final class PeerProtocolV2Tests: XCTestCase {
             timestamp: now
         )
 
-        let resolution = try XCTUnwrap(V2UnboundStatusProbeResolver.resolve(
+        let resolution = try XCTUnwrap(V2StatusProbeResolver.resolve(
             data: request,
             document: document,
-            routingTable: V2EndpointRoutingTable.build(from: document),
+            sourceHost: "peer.example",
+            sourcePort: 49_731,
             now: now,
             responseNonce: "EBESExQVFhcYGRobHB0eHw"
         ))
@@ -211,10 +212,11 @@ final class PeerProtocolV2Tests: XCTestCase {
             pairingCode: pairingCode,
             timestamp: now
         )
-        let reverseResolution = try XCTUnwrap(V2UnboundStatusProbeResolver.resolve(
+        let reverseResolution = try XCTUnwrap(V2StatusProbeResolver.resolve(
             data: reverseRequest,
             document: peerDocument,
-            routingTable: V2EndpointRoutingTable.build(from: peerDocument),
+            sourceHost: "peer.example",
+            sourcePort: 49_731,
             now: now,
             responseNonce: "ICEiIyQlJicoKSorLC0uLw"
         ))
@@ -231,7 +233,7 @@ final class PeerProtocolV2Tests: XCTestCase {
         XCTAssertEqual(hardwareCalls.ddc, 0)
     }
 
-    func testUnboundStatusProbeRequiresExactlyOneAuthenticatedCandidate() throws {
+    func testStatusProbeRequiresExactlyOneAddressAndCodeMatch() throws {
         let localEndpoint = "11111111-1111-4111-8111-111111111111"
         let peerEndpoint = "22222222-2222-4222-8222-222222222222"
         let eventID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -246,25 +248,33 @@ final class PeerProtocolV2Tests: XCTestCase {
         )
 
         let unique = unboundDocument(localEndpointID: localEndpoint, pairingCodes: [pairingCode, "different-code"])
-        XCTAssertNotNil(V2UnboundStatusProbeResolver.resolve(
-            data: request, document: unique, routingTable: V2EndpointRoutingTable.build(from: unique),
+        XCTAssertNotNil(V2StatusProbeResolver.resolve(
+            data: request, document: unique, sourceHost: "peer.example", sourcePort: 49_731,
             now: now, responseNonce: "EBESExQVFhcYGRobHB0eHw"
         ))
 
         let ambiguous = unboundDocument(localEndpointID: localEndpoint, pairingCodes: [pairingCode, pairingCode])
-        XCTAssertNil(V2UnboundStatusProbeResolver.resolve(
-            data: request, document: ambiguous, routingTable: V2EndpointRoutingTable.build(from: ambiguous),
+        XCTAssertNil(V2StatusProbeResolver.resolve(
+            data: request, document: ambiguous, sourceHost: "peer.example", sourcePort: 49_731,
             now: now, responseNonce: "EBESExQVFhcYGRobHB0eHw"
         ))
 
         let wrongPairing = unboundDocument(localEndpointID: localEndpoint, pairingCodes: ["different-code"])
-        XCTAssertNil(V2UnboundStatusProbeResolver.resolve(
-            data: request, document: wrongPairing, routingTable: V2EndpointRoutingTable.build(from: wrongPairing),
+        XCTAssertNil(V2StatusProbeResolver.resolve(
+            data: request, document: wrongPairing, sourceHost: "peer.example", sourcePort: 49_731,
+            now: now, responseNonce: "EBESExQVFhcYGRobHB0eHw"
+        ))
+        XCTAssertNil(V2StatusProbeResolver.resolve(
+            data: request, document: unique, sourceHost: "other.example", sourcePort: 49_731,
+            now: now, responseNonce: "EBESExQVFhcYGRobHB0eHw"
+        ))
+        XCTAssertNil(V2StatusProbeResolver.resolve(
+            data: request, document: unique, sourceHost: "peer.example", sourcePort: 49_732,
             now: now, responseNonce: "EBESExQVFhcYGRobHB0eHw"
         ))
     }
 
-    func testUnboundStatusProbeRejectsWrongTargetAndEndpointConflict() throws {
+    func testStatusProbeAcceptsStaleTargetAndIgnoresOldEndpointCache() throws {
         let localEndpoint = "11111111-1111-4111-8111-111111111111"
         let peerEndpoint = "22222222-2222-4222-8222-222222222222"
         let now: Int64 = 1_788_000_000
@@ -277,8 +287,8 @@ final class PeerProtocolV2Tests: XCTestCase {
             pairingCode: pairingCode,
             timestamp: now
         )
-        XCTAssertNil(V2UnboundStatusProbeResolver.resolve(
-            data: wrongTarget, document: document, routingTable: V2EndpointRoutingTable.build(from: document),
+        XCTAssertNotNil(V2StatusProbeResolver.resolve(
+            data: wrongTarget, document: document, sourceHost: "peer.example", sourcePort: 49_731,
             now: now, responseNonce: "EBESExQVFhcYGRobHB0eHw"
         ))
 
@@ -296,13 +306,13 @@ final class PeerProtocolV2Tests: XCTestCase {
             pairingCode: pairingCode,
             timestamp: now
         )
-        XCTAssertNil(V2UnboundStatusProbeResolver.resolve(
-            data: valid, document: conflict, routingTable: V2EndpointRoutingTable.build(from: conflict),
+        XCTAssertNotNil(V2StatusProbeResolver.resolve(
+            data: valid, document: conflict, sourceHost: "peer.example", sourcePort: 49_731,
             now: now, responseNonce: "EBESExQVFhcYGRobHB0eHw"
         ))
     }
 
-    func testCapabilityInspectionTargetsOnlyConfirmedV2Endpoint() throws {
+    func testCapabilityInspectionAlwaysUsesNullTarget() throws {
         let localEndpoint = "11111111-1111-4111-8111-111111111111"
         let peerEndpoint = "22222222-2222-4222-8222-222222222222"
         var profile = inspectionProfile(peerEndpointID: nil, peerProtocolVersion: nil)
@@ -324,10 +334,10 @@ final class PeerProtocolV2Tests: XCTestCase {
             timestamp: 1_788_000_000,
             nonce: "EBESExQVFhcYGRobHB0eHw"
         )
-        XCTAssertEqual(bound.targetEndpointID, peerEndpoint)
+        XCTAssertNil(bound.targetEndpointID)
     }
 
-    func testBoundCapabilityInspectionAcceptsOnlyMatchingAuthenticatedResponse() throws {
+    func testCapabilityInspectionAcceptsAuthenticatedReplacementEndpointResponse() throws {
         let localEndpoint = "11111111-1111-4111-8111-111111111111"
         let peerEndpoint = "22222222-2222-4222-8222-222222222222"
         let eventID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -356,7 +366,7 @@ final class PeerProtocolV2Tests: XCTestCase {
         XCTAssertEqual(V2PeerCapabilityInspection.validateResponse(
             data: try response(source: "33333333-3333-4333-8333-333333333333"),
             profile: profile, eventID: eventID, localEndpointID: localEndpoint, now: now
-        ), .rejected)
+        ), .accepted(endpointID: "33333333-3333-4333-8333-333333333333"))
         XCTAssertEqual(V2PeerCapabilityInspection.validateResponse(
             data: try response(target: "33333333-3333-4333-8333-333333333333"),
             profile: profile, eventID: eventID, localEndpointID: localEndpoint, now: now
@@ -405,7 +415,7 @@ final class PeerProtocolV2Tests: XCTestCase {
         XCTAssertEqual(V2PeerCapabilityInspection.validateResponseDetailed(
             data: try response(source: "33333333-3333-4333-8333-333333333333"),
             profile: profile, eventID: eventID, localEndpointID: localEndpoint, now: now
-        ), .rejected(.sourceEndpointMismatch))
+        ), .accepted(endpointID: "33333333-3333-4333-8333-333333333333"))
         XCTAssertEqual(V2PeerCapabilityInspection.validateResponseDetailed(
             data: try response(pairingCode: "wrong-code"),
             profile: profile, eventID: eventID, localEndpointID: localEndpoint, now: now
@@ -487,11 +497,17 @@ final class PeerProtocolV2Tests: XCTestCase {
 
     func testInspectionSourcePortAndEnvelopeProjectionAreExplicit() throws {
         XCTAssertNil(PeerInspectionDatagramSourceValidator.rejectionReason(
-            sourcePort: 49_731, expectedPort: 49_731
+            sourceHost: "PEER.EXAMPLE", sourcePort: 49_731,
+            expectedHost: "peer.example", expectedPort: 49_731
         ))
         XCTAssertEqual(PeerInspectionDatagramSourceValidator.rejectionReason(
-            sourcePort: 50_001, expectedPort: 49_731
+            sourceHost: "peer.example", sourcePort: 50_001,
+            expectedHost: "peer.example", expectedPort: 49_731
         ), "source-port-mismatch")
+        XCTAssertEqual(PeerInspectionDatagramSourceValidator.rejectionReason(
+            sourceHost: "other.example", sourcePort: 49_731,
+            expectedHost: "peer.example", expectedPort: 49_731
+        ), "source-host-mismatch")
 
         let message = try signedStatusProbe(
             eventID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",

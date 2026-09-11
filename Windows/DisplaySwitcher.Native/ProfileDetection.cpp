@@ -39,11 +39,11 @@ namespace DisplaySwitcher::Native
     }
 
     bool ApplyProfileDetectionResult(CollaborationProfile& profile,
-        ProfileDetectionResult const& result, bool endpointConfirmed)
+        ProfileDetectionResult const& result, bool)
     {
-        if (result.outcome != ProfileDetectionOutcome::V2Available) return false;
-        if (result.endpointConfirmationRequired && !endpointConfirmed) return false;
-        if (result.endpointConfirmationRequired) profile.peerEndpointId = result.observedEndpointId;
+        if (result.outcome != ProfileDetectionOutcome::V2Available ||
+            !IsValidDisplayId(result.observedEndpointId)) return false;
+        profile.peerEndpointId = result.observedEndpointId;
         profile.peerProtocolVersion = 2;
         return true;
     }
@@ -54,9 +54,13 @@ namespace DisplaySwitcher::Native
         expiresAtMilliseconds_ = expiresAtMilliseconds;
     }
 
+    bool PendingStatusProbe::Matches(std::wstring const& eventId, int64_t nowMilliseconds) const
+    {
+        return !eventId_.empty() && nowMilliseconds <= expiresAtMilliseconds_ && EqualId(eventId_, eventId);
+    }
     bool PendingStatusProbe::MatchesAndConsume(std::wstring const& eventId, int64_t nowMilliseconds)
     {
-        if (eventId_.empty() || nowMilliseconds > expiresAtMilliseconds_ || !EqualId(eventId_, eventId)) return false;
+        if (!Matches(eventId, nowMilliseconds)) return false;
         Clear();
         return true;
     }
@@ -99,7 +103,7 @@ namespace DisplaySwitcher::Native
         ProfileDetectionResult result;
         result.outcome = ProfileDetectionOutcome::V2Available;
         result.observedEndpointId = sourceEndpointId;
-        result.endpointConfirmationRequired = savedEndpointId_.empty() || !EqualId(savedEndpointId_, sourceEndpointId);
+        result.endpointConfirmationRequired = false;
         result.endpointChanged = !savedEndpointId_.empty() && !EqualId(savedEndpointId_, sourceEndpointId);
         return Complete(std::move(result));
     }
