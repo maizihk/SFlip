@@ -502,7 +502,7 @@ final class PeerProtocolV2Tests: XCTestCase {
 
         let text = store.exportText()
         XCTAssertTrue(text.contains(
-            "failure-socket-bind system-error-domain=getaddrinfo system-error-code=-2"
+            "failure-socket-bind-failed system-error-domain=getaddrinfo system-error-code=-2"
         ))
         XCTAssertTrue(text.contains(
             "failure-send-failed system-error-domain=unknown system-error-code=0"
