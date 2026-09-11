@@ -908,6 +908,90 @@ namespace
             L"DS-039: 状态文案只表达启用和自动连接，不要求确认身份");
     }
 
+    void TestIndependentSettingsSave(std::filesystem::path const& root)
+    {
+        auto original = ConfigWithDisplays(1);
+        auto profileId = original.collaborationProfiles[0].id;
+        original.collaborationProfiles[0].coordinationEnabled = true;
+        original.collaborationProfiles[0].peerEndpointId = GenerateIdentifier();
+        original.collaborationProfiles[0].peerProtocolVersion = 2;
+        original.usbSwitch.enabled = true;
+        original.usbSwitch.deviceLocalReference = L"synthetic-independent-device";
+        original.usbSwitch.deviceName = L"模拟独立设备";
+        original.usbSwitch.vendorId = 100;
+        original.usbSwitch.productId = 200;
+        original.usbSwitch.displayInputs = { { original.displays[0].id, 17 } };
+        original.usbSwitch.collaborationWakeEnabled = true;
+        original.usbSwitch.collaborationProfileId = profileId;
+
+        auto collaborationEdit = original;
+        collaborationEdit.collaborationProfiles[0].coordinationEnabled = false;
+        collaborationEdit.collaborationProfiles[0].peerHost.clear();
+        collaborationEdit.collaborationProfiles[0].displayInputs.clear();
+        collaborationEdit.usbSwitch.enabled = false;
+        collaborationEdit.usbSwitch.collaborationWakeEnabled = false;
+        auto collaborationResult = MergeSettingsForScope(
+            original, collaborationEdit, SettingsSaveFeedbackScope::Collaboration);
+        Check(!collaborationResult.collaborationProfiles[0].coordinationEnabled &&
+            collaborationResult.usbSwitch.enabled &&
+            collaborationResult.usbSwitch.collaborationWakeEnabled &&
+            collaborationResult.usbSwitch.collaborationProfileId == profileId &&
+            collaborationResult.usbSwitch.deviceLocalReference == original.usbSwitch.deviceLocalReference,
+            L"W-040: 关闭协同仅保存协同页，必须保留USB设置、联动选择和意愿");
+        auto path = root / L"independent-settings.json";
+        collaborationResult.SaveToPath(path);
+        auto reloaded = AppConfig::LoadFromPath(path);
+        Check(!reloaded.collaborationProfiles[0].coordinationEnabled &&
+            reloaded.collaborationProfiles[0].peerHost.empty() &&
+            reloaded.collaborationProfiles[0].displayInputs.empty() &&
+            reloaded.usbSwitch.collaborationWakeEnabled &&
+            reloaded.usbSwitch.collaborationProfileId == profileId,
+            L"W-040: disabled协同引用必须可保存加载，再次开启时可恢复联动");
+
+        auto usbEdit = reloaded;
+        usbEdit.usbSwitch.enabled = false;
+        usbEdit.collaborationProfiles[0].peerPort = -1;
+        auto usbResult = MergeSettingsForScope(reloaded, usbEdit, SettingsSaveFeedbackScope::Usb);
+        Check(!RequiresCompleteCollaborationLink(reloaded.usbSwitch, usbEdit.usbSwitch),
+            L"W-040: 已有暂停联动不得阻塞关闭USB主开关或保存其他USB字段");
+        auto newlyEnabledLink = reloaded.usbSwitch;
+        newlyEnabledLink.collaborationWakeEnabled = false;
+        Check(RequiresCompleteCollaborationLink(newlyEnabledLink, reloaded.usbSwitch),
+            L"W-040: 仅显式新开启联动时要求所选协同配置完整");
+        Check(!usbResult.usbSwitch.enabled &&
+            usbResult.collaborationProfiles[0].peerPort == reloaded.collaborationProfiles[0].peerPort,
+            L"W-040: USB页保存不得合并或校验无关协同草稿");
+
+        auto collaborationDraft = reloaded;
+        collaborationDraft.collaborationProfiles[0].name = L"独立保存后的名称";
+        collaborationDraft.usbSwitch.deviceLocalReference.clear();
+        auto isolatedCollaboration = MergeSettingsForScope(
+            reloaded, collaborationDraft, SettingsSaveFeedbackScope::Collaboration);
+        Check(isolatedCollaboration.collaborationProfiles[0].name == L"独立保存后的名称" &&
+            isolatedCollaboration.usbSwitch.deviceLocalReference == reloaded.usbSwitch.deviceLocalReference,
+            L"W-040: 协同页保存不得合并或校验无关USB草稿");
+
+        auto deleted = reloaded;
+        deleted.collaborationProfiles.clear();
+        auto deleteResult = MergeSettingsForScope(reloaded, deleted, SettingsSaveFeedbackScope::Collaboration);
+        Check(!deleteResult.usbSwitch.collaborationWakeEnabled &&
+            deleteResult.usbSwitch.collaborationProfileId.empty(),
+            L"W-040: 删除USB联动引用的协同配置必须在同次保存中关闭并清空关联");
+
+        UsbSwitchInitialState runtime;
+        runtime.enabled = true;
+        runtime.baselinePresence = true;
+        runtime.collaborationWakeEnabled = reloaded.usbSwitch.collaborationWakeEnabled;
+        runtime.collaborationProfileValid = false;
+        runtime.bindingKey = reloaded.usbSwitch.deviceLocalReference;
+        runtime.displayMappings.push_back({ reloaded.displays[0].id, 17, true, true });
+        auto actions = UsbSwitchCoordinator(runtime).ObserveUsb(1, false);
+        Check(std::count_if(actions.begin(), actions.end(), [](auto const& action)
+            { return action.kind == UsbSwitchAction::Kind::SwitchDisplay; }) == 1 &&
+            std::none_of(actions.begin(), actions.end(), [](auto const& action)
+            { return action.kind == UsbSwitchAction::Kind::SendWakeDisplay; }),
+            L"W-040: 保留联动意愿但协同关闭时运行时不得发送唤醒消息");
+    }
     void TestValidationAndNfc(std::filesystem::path const& root)
     {
         auto path = root / L"validation.json";
@@ -3564,6 +3648,7 @@ int wmain()
         TestDetailedDiagnosticRecording(root);
         TestProfileManagementAndReorder(root);
         TestOfflineCollaborationEnablement(root);
+        TestIndependentSettingsSave(root);
         TestValidationAndNfc(root);
         TestInputSourceNullSafetyAndMigration(root);
         TestImmediateCommitSafety(root);

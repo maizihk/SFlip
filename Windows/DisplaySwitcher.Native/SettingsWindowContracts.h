@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "AppConfig.h"
+
 namespace DisplaySwitcher::Native
 {
     struct SettingsSectionContract
@@ -37,10 +39,52 @@ namespace DisplaySwitcher::Native
     enum class SettingsSaveFeedbackScope
     {
         None,
+        General,
+        Displays,
         Usb,
         Collaboration,
     };
 
+    inline bool RequiresCompleteCollaborationLink(UsbSwitchConfig const& original,
+        UsbSwitchConfig const& edited)
+    {
+        return edited.collaborationWakeEnabled &&
+            (!original.collaborationWakeEnabled ||
+                _wcsicmp(original.collaborationProfileId.c_str(), edited.collaborationProfileId.c_str()) != 0);
+    }
+
+    inline AppConfig MergeSettingsForScope(AppConfig const& original, AppConfig const& edited,
+        SettingsSaveFeedbackScope scope)
+    {
+        auto result = original;
+        switch (scope)
+        {
+        case SettingsSaveFeedbackScope::Usb:
+            result.usbSwitch = edited.usbSwitch;
+            break;
+        case SettingsSaveFeedbackScope::Collaboration:
+            result.collaborationProfiles = edited.collaborationProfiles;
+            if (!result.usbSwitch.collaborationProfileId.empty() &&
+                !result.FindCollaborationProfile(result.usbSwitch.collaborationProfileId))
+            {
+                result.usbSwitch.collaborationWakeEnabled = false;
+                result.usbSwitch.collaborationProfileId.clear();
+            }
+            break;
+        case SettingsSaveFeedbackScope::General:
+            result.startWithWindows = edited.startWithWindows;
+            result.detailedDiagnosticRecording = edited.detailedDiagnosticRecording;
+            break;
+        case SettingsSaveFeedbackScope::Displays:
+            result.linkAllDisplays = edited.linkAllDisplays;
+            result.displays = edited.displays;
+            result.displayConfigurationSafeMode = edited.displayConfigurationSafeMode;
+            break;
+        case SettingsSaveFeedbackScope::None:
+            break;
+        }
+        return result;
+    }
     enum class SettingsPage
     {
         General,

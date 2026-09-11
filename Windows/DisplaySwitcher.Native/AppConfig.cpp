@@ -301,7 +301,7 @@ namespace
         if (config.usbSwitch.collaborationWakeEnabled)
         {
             auto profile = config.FindCollaborationProfile(config.usbSwitch.collaborationProfileId);
-            if (!profile || !profile->coordinationEnabled || !config.InspectProfile(profile->id).complete)
+            if (!profile)
                 throw std::runtime_error("invalid usb collaboration profile");
         }
         for (auto const& profile : config.collaborationProfiles)
@@ -381,7 +381,7 @@ namespace
         if (config.usbSwitch.collaborationWakeEnabled)
         {
             auto profile = config.FindCollaborationProfile(config.usbSwitch.collaborationProfileId);
-            if (!profile || !profile->coordinationEnabled || !config.InspectProfile(profile->id).complete)
+            if (!profile)
                 config.usbSwitch.collaborationWakeEnabled = false;
         }
         ValidateConfig(config);
