@@ -409,4 +409,13 @@
 - 本机为 macOS，完整 Windows 原生测试、x64 Release 和分发校验由本次 PR 的 Windows CI 验证。
 - [ ] 旧版升级后的快捷方式、登录启动及实际界面待 Windows 实机验证。
 
+### W-036 Windows Explorer 重建后托盘图标恢复
+
+- [x] 隐藏托盘窗口处理系统注册的 `TaskbarCreated` 广播；Explorer 重建通知区域后强制按当前 DPI 与主题刷新图标，并恢复完整提示、回调及 `NOTIFYICON_VERSION_4`。
+- [x] 恢复先用 `NIM_MODIFY` 幂等确认同一 GUID 通知项，失败时才执行 `NIM_ADD`；状态、气泡或主题刷新发现 `NIM_MODIFY` 失败时进入同一路径。
+- [x] Shell 暂时不可用时立即首试并以 500 ms 间隔最多尝试 8 次；成功、上限耗尽或销毁时停止定时器。重试期间的重复广播刷新外观但不重置次数或延后计时。
+- [x] 纯模拟调用生产恢复 helper，覆盖已有图标、丢失后新增、`SETVERSION` 失败后只修改已有项、持续失败上限及版本失败保留已有项；不访问真实任务栏或重启 Explorer。
+- 本机缺少 64 位 MSBuild、Visual Studio C++ 桌面开发和 Windows App SDK C++ 组件，x64 Release 构建在 `Windows/build-windows.ps1` 第 32 行按预期停止；完整编译与自动测试以本次 PR 的 Windows CI 为准。
+- [ ] Explorer 重启、主显示器 DPI 变化、主题切换期间恢复及退出时迟到定时消息仍需 Windows 实机验证；本任务未重启 Explorer/SFlip，未执行 USB、DDC、输入源、网络或系统设置操作。
+
 2026-09-07 发布校验补充：Inno Setup 的 EXE 文件版本默认 0.0.0.0，与 AppVersion 独立；现让 VersionInfoVersion 跟随应用资源，并在打包脚本逐项检查四段版本，失败则拒绝交付。

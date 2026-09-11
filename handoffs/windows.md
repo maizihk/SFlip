@@ -1,5 +1,15 @@
 # Windows 交接记录
 
+## 当前任务：W-036 Explorer 重建后托盘图标恢复（2026-09-11）
+
+- 现场与根因：SFlip 进程及隐藏托盘宿主仍运行，但 Explorer 的启动时间晚于应用，通知项位置查询失败。正式实现只在构造时 `NIM_ADD` 一次，未处理 `TaskbarCreated`；后续 `NIM_MODIFY` 失败也不会重新添加，所以 Explorer 重建后进程继续运行而托盘入口消失。
+- 修复：隐藏窗口注册并处理 `TaskbarCreated`，按当前 DPI/主题重绘图标，以完整字段先 `NIM_MODIFY`、缺失时 `NIM_ADD`，成功后恢复 `NOTIFYICON_VERSION_4`。状态、气泡和主题图标修改失败也进入相同恢复路径。
+- 生命周期：首次恢复立即执行，失败后每 500 ms 重试，最多 8 次；重复广播不会重置正在进行的次数或延后定时器，成功、耗尽和析构都会停止。退出 guards 与定时器清理由静态审核确认，自动测试不声称覆盖真实窗口析构或迟到 `WM_TIMER` 集成。
+- 自动验证：纯模拟直接调用生产恢复 helper，覆盖 MODIFY 成功不 ADD、丢失后 ADD、SETVERSION 失败后仅 MODIFY 既有项、Shell 持续失败上限和最终版本失败仍保留已有项。测试不访问真实 Shell、USB、显示器、网络或系统设置。
+- 本机构建阻塞：`Windows/build-windows.ps1 -Architecture x64 -Configuration Release` 在第 32 行失败，系统缺少 64 位 MSBuild、Visual Studio C++ 桌面开发和 Windows App SDK C++ 组件；完整编译、原生测试和分发校验以 PR CI 为准。
+- 实机待验：Explorer 重启后自动恢复、主显示器 DPI/主题变化广播、恢复期间退出。任务未重启 Explorer 或 SFlip，未执行真实 USB、DDC、输入源、唤醒、网络或系统设置操作。
+- 范围只含 Windows 正式 C++ 实现、原生模拟测试、Windows 清单与本交接；不修改协议、配置 schema、macOS、版本、tag 或 Release。
+
 ## 当前任务：Windows v2.3.1 发布（2026-09-09）
 
 - 用户确认重新绑定修复测试通过并授权合并，PR #88 已合并至 25ad9e7；随后明确要求更新 Release。

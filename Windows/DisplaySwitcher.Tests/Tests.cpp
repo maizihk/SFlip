@@ -18,6 +18,7 @@
 #include "../DisplaySwitcher.Native/SettingsWindowContracts.h"
 #include "../DisplaySwitcher.Native/TrayContracts.h"
 #include "../DisplaySwitcher.Native/TrayMonochromeIcon.h"
+#include "../DisplaySwitcher.Native/TrayRecoveryPolicy.h"
 #include <array>
 #include <iostream>
 
@@ -313,6 +314,63 @@ namespace
         }
     }
 
+    void TestTrayRecoveryContracts()
+    {
+        std::vector<wchar_t> operations;
+        auto modifyExisting = ExecuteTrayRecoveryAttempt(0, 8,
+            [&] { operations.push_back(L'M'); return true; },
+            [&] { operations.push_back(L'A'); return true; },
+            [&] { operations.push_back(L'V'); return true; });
+        Check(modifyExisting.outcome == TrayRecoveryAttemptOutcome::Complete && modifyExisting.iconPresent &&
+            operations == std::vector<wchar_t>{ L'M', L'V' },
+            L"W-036: 重复 TaskbarCreated 先修改现有通知项并恢复版本，不重复添加图标");
+
+        operations.clear();
+        auto addMissing = ExecuteTrayRecoveryAttempt(0, 8,
+            [&] { operations.push_back(L'M'); return false; },
+            [&] { operations.push_back(L'A'); return true; },
+            [&] { operations.push_back(L'V'); return true; });
+        Check(addMissing.outcome == TrayRecoveryAttemptOutcome::Complete && addMissing.iconPresent &&
+            operations == std::vector<wchar_t>{ L'M', L'A', L'V' },
+            L"W-036: Explorer 重建后 MODIFY 失败才 ADD，并恢复 NOTIFYICON_VERSION_4");
+
+        operations.clear();
+        auto versionRetry = ExecuteTrayRecoveryAttempt(0, 8,
+            [&] { operations.push_back(L'M'); return false; },
+            [&] { operations.push_back(L'A'); return true; },
+            [&] { operations.push_back(L'V'); return false; });
+        auto retryExisting = ExecuteTrayRecoveryAttempt(1, 8,
+            [&] { operations.push_back(L'M'); return true; },
+            [&] { operations.push_back(L'A'); return true; },
+            [&] { operations.push_back(L'V'); return true; });
+        Check(versionRetry.outcome == TrayRecoveryAttemptOutcome::Retry && versionRetry.iconPresent &&
+            retryExisting.outcome == TrayRecoveryAttemptOutcome::Complete &&
+            operations == std::vector<wchar_t>{ L'M', L'A', L'V', L'M', L'V' },
+            L"W-036: SETVERSION 暂时失败后通过 MODIFY 重试已有图标，不再次 ADD");
+
+        operations.clear();
+        auto firstFailure = ExecuteTrayRecoveryAttempt(0, 2,
+            [&] { operations.push_back(L'M'); return false; },
+            [&] { operations.push_back(L'A'); return false; },
+            [&] { operations.push_back(L'V'); return true; });
+        auto finalFailure = ExecuteTrayRecoveryAttempt(1, 2,
+            [&] { operations.push_back(L'M'); return false; },
+            [&] { operations.push_back(L'A'); return false; },
+            [&] { operations.push_back(L'V'); return true; });
+        Check(firstFailure.outcome == TrayRecoveryAttemptOutcome::Retry &&
+            finalFailure.outcome == TrayRecoveryAttemptOutcome::Exhausted &&
+            operations == std::vector<wchar_t>{ L'M', L'A', L'M', L'A' },
+            L"W-036: Shell 持续不可用时按固定上限停止，且无图标时不调用 SETVERSION");
+
+        operations.clear();
+        auto finalVersionFailure = ExecuteTrayRecoveryAttempt(7, 8,
+            [&] { operations.push_back(L'M'); return true; },
+            [&] { operations.push_back(L'A'); return true; },
+            [&] { operations.push_back(L'V'); return false; });
+        Check(finalVersionFailure.outcome == TrayRecoveryAttemptOutcome::Exhausted &&
+            finalVersionFailure.iconPresent && operations == std::vector<wchar_t>{ L'M', L'V' },
+            L"W-036: 版本协商耗尽时保留已存在图标状态，后续通知可开始新一轮恢复");
+    }
     void TestMonochromeTrayIconContracts()
     {
         Check(ClassifyTaskbarTheme(DWORD{ 1 }) == TaskbarTheme::Light &&
@@ -3226,6 +3284,7 @@ int wmain()
         TestFreshInstallAndCounts(root);
         TestSettingsWindowLayoutContracts();
         TestTrayInteractionAndLayoutContracts();
+        TestTrayRecoveryContracts();
         TestMonochromeTrayIconContracts();
         TestDetailedDiagnosticRecording(root);
         TestProfileManagementAndReorder(root);

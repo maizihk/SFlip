@@ -1,12 +1,16 @@
 #include "pch.h"
 #include "TrayIcon.h"
 #include "TrayMonochromeIcon.h"
+#include "TrayRecoveryPolicy.h"
 
 namespace
 {
     constexpr UINT CallbackMessage = WM_APP + 1;
     constexpr UINT PopupCommandMessage = WM_APP + 2;
     constexpr UINT_PTR PopupDismissTimer = 1;
+    constexpr UINT_PTR ShellRecoveryTimer = 2;
+    constexpr UINT ShellRecoveryIntervalMilliseconds = 500;
+    constexpr size_t MaximumShellRecoveryAttempts = 8;
     constexpr UINT FirstProfileCommand = 1100;
     constexpr UINT SettingsCommand = 1002;
     constexpr UINT ExitCommand = 1003;
@@ -377,6 +381,7 @@ namespace DisplaySwitcher::Native
         topologyChanged_(std::move(topologyChanged)), exit_(std::move(exit))
     {
         instance_ = GetModuleHandleW(nullptr);
+        taskbarCreatedMessage_ = RegisterWindowMessageW(L"TaskbarCreated");
         className_ = L"DisplaySwitcher.Tray." + std::to_wstring(GetCurrentProcessId());
         WNDCLASSEXW windowClass{ sizeof(windowClass) };
         windowClass.lpfnWndProc = WindowProcedure;
@@ -426,6 +431,8 @@ namespace DisplaySwitcher::Native
         disposed_ = true;
         if (window_)
         {
+            KillTimer(window_, ShellRecoveryTimer);
+            shellRecoveryPending_ = false;
             mediaKeyWatcher_.reset();
             if (sessionNotificationsRegistered_)
             {
@@ -463,7 +470,7 @@ namespace DisplaySwitcher::Native
         if (disposed_) return;
         status_ = status;
         auto data = Data(NIF_TIP);
-        Shell_NotifyIconW(NIM_MODIFY, &data);
+        if (!Shell_NotifyIconW(NIM_MODIFY, &data)) BeginShellRecovery(false);
     }
 
     void TrayIcon::SetUsbSwitchActive(bool active)
@@ -488,7 +495,7 @@ namespace DisplaySwitcher::Native
         wcscpy_s(data.szInfoTitle, Limit(title, 63).c_str());
         wcscpy_s(data.szInfo, Limit(message, 255).c_str());
         data.dwInfoFlags = NIIF_WARNING;
-        Shell_NotifyIconW(NIM_MODIFY, &data);
+        if (!Shell_NotifyIconW(NIM_MODIFY, &data)) BeginShellRecovery(false);
     }
 
     LRESULT CALLBACK TrayIcon::WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
@@ -505,6 +512,16 @@ namespace DisplaySwitcher::Native
 
     LRESULT TrayIcon::HandleMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
     {
+        if (taskbarCreatedMessage_ && message == taskbarCreatedMessage_)
+        {
+            BeginShellRecovery(true);
+            return 0;
+        }
+        if (message == WM_TIMER && wParam == ShellRecoveryTimer)
+        {
+            TryRecoverShellIcon();
+            return 0;
+        }
         if (IsTrayAppearanceMessage(message))
         {
             RefreshShellIcon();
@@ -543,6 +560,53 @@ namespace DisplaySwitcher::Native
         return DefWindowProcW(window, message, wParam, lParam);
     }
 
+    void TrayIcon::BeginShellRecovery(bool refreshAppearance)
+    {
+        if (disposed_ || !window_) return;
+        if (shellRecoveryPending_)
+        {
+            if (refreshAppearance)
+            {
+                trayAdded_ = false;
+                RefreshShellIcon(true);
+            }
+            return;
+        }
+        shellRecoveryPending_ = true;
+        shellRecoveryAttempts_ = 0;
+        trayAdded_ = false;
+        if (refreshAppearance) RefreshShellIcon(true);
+        TryRecoverShellIcon();
+    }
+
+    void TrayIcon::TryRecoverShellIcon()
+    {
+        if (disposed_ || !window_ || !shellRecoveryPending_) return;
+        KillTimer(window_, ShellRecoveryTimer);
+        auto data = Data(NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP);
+        auto result = ExecuteTrayRecoveryAttempt(shellRecoveryAttempts_, MaximumShellRecoveryAttempts,
+            [&] { return Shell_NotifyIconW(NIM_MODIFY, &data) != FALSE; },
+            [&] { return Shell_NotifyIconW(NIM_ADD, &data) != FALSE; },
+            [&]
+            {
+                data.uVersion = NOTIFYICON_VERSION_4;
+                return Shell_NotifyIconW(NIM_SETVERSION, &data) != FALSE;
+            });
+        ++shellRecoveryAttempts_;
+        trayAdded_ = result.iconPresent;
+        if (result.outcome == TrayRecoveryAttemptOutcome::Complete)
+        {
+            shellRecoveryPending_ = false;
+            shellRecoveryAttempts_ = 0;
+            return;
+        }
+        if (result.outcome == TrayRecoveryAttemptOutcome::Retry)
+        {
+            if (SetTimer(window_, ShellRecoveryTimer, ShellRecoveryIntervalMilliseconds, nullptr)) return;
+        }
+        shellRecoveryPending_ = false;
+    }
+
     bool TrayIcon::RefreshShellIcon(bool force)
     {
         auto dpi = window_ ? GetDpiForWindow(window_) : 0;
@@ -564,6 +628,7 @@ namespace DisplaySwitcher::Native
                 icon_ = previous;
                 ownsIcon_ = previousOwned;
                 DestroyIcon(replacement);
+                BeginShellRecovery(false);
                 return false;
             }
         }
