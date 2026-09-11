@@ -770,6 +770,32 @@ namespace
             loaded.EnabledCompleteProfiles().empty() && !loaded.CanCoordinateWithProfile(profileId) &&
             loaded.UnboundBootstrapProfiles().size() == 1 && loaded.V2ListenerPort() == loaded.listenPort,
             L"W-037: 已开启未绑定仅保留首次检测候选，不进入协同菜单和硬件执行入口");
+        auto routeCache = loaded;
+        auto learnedEndpoint = GenerateIdentifier();
+        Check(routeCache.UpdateAuthenticatedPeerRoute(profileId, learnedEndpoint) ==
+                PeerRouteCacheUpdate::Changed &&
+            routeCache.collaborationProfiles[0].coordinationEnabled &&
+            routeCache.collaborationProfiles[0].peerEndpointId == learnedEndpoint &&
+            routeCache.UpdateAuthenticatedPeerRoute(profileId, learnedEndpoint) ==
+                PeerRouteCacheUpdate::Unchanged,
+            L"DS-039: 生产路由缓存更新保持启用意愿，相同endpoint幂等且不要求重复保存");
+        auto closedRouteCache = routeCache;
+        closedRouteCache.collaborationProfiles[0].coordinationEnabled = false;
+        auto reinstalledEndpoint = GenerateIdentifier();
+        Check(closedRouteCache.UpdateAuthenticatedPeerRoute(profileId, reinstalledEndpoint) ==
+                PeerRouteCacheUpdate::Changed &&
+            !closedRouteCache.collaborationProfiles[0].coordinationEnabled &&
+            closedRouteCache.collaborationProfiles[0].peerEndpointId == reinstalledEndpoint &&
+            closedRouteCache.UpdateAuthenticatedPeerRoute(profileId, closedRouteCache.localEndpointId) ==
+                PeerRouteCacheUpdate::Invalid,
+            L"DS-039: 关闭配置可更新缓存但保持关闭，本机endpoint不得成为对端路由");
+        auto routePath = root / L"automatic-route-cache.json";
+        closedRouteCache.SaveToPath(routePath);
+        auto persistedRoute = AppConfig::LoadFromPath(routePath);
+        Check(!persistedRoute.collaborationProfiles[0].coordinationEnabled &&
+            persistedRoute.collaborationProfiles[0].peerEndpointId == reinstalledEndpoint &&
+            persistedRoute.collaborationProfiles[0].peerProtocolVersion == 2,
+            L"DS-039: 自动学习路由沿用v5原子保存且不迁移显示器映射");
         Check(ReadObject(path).GetNamedNumber(L"schemaVersion") == 5,
             L"W-037: 开启偏好保留在既有 v5 格式中");
 
@@ -782,13 +808,11 @@ namespace
         ProfileDetectionResult response;
         response.outcome = ProfileDetectionOutcome::V2Available;
         response.observedEndpointId = GenerateIdentifier();
-        response.endpointConfirmationRequired = true;
+        response.endpointConfirmationRequired = false;
         auto candidate = loaded.collaborationProfiles[0];
-        Check(!ApplyProfileDetectionResult(candidate, response, false) &&
-            candidate.coordinationEnabled && candidate.peerEndpointId.empty(),
-            L"W-037: 开关已开启也不能绕过首次身份确认");
-        Check(ApplyProfileDetectionResult(candidate, response, true) && candidate.coordinationEnabled,
-            L"W-037: 明确确认身份后保留用户已开启的选择");
+        Check(ApplyProfileDetectionResult(candidate, response, false) &&
+            candidate.coordinationEnabled && candidate.peerEndpointId == response.observedEndpointId,
+            L"DS-039: 配对码认证成功后自动写入路由缓存并保留用户启用意愿");
         loaded.collaborationProfiles[0] = candidate;
         loaded.SaveToPath(path);
         auto bound = AppConfig::LoadFromPath(path);
@@ -840,19 +864,48 @@ namespace
         auto faultPath = root / L"offline-enable-save-fault.json";
         config.SaveToPath(faultPath);
         auto before = ReadBytes(faultPath);
-        auto changed = config; changed.collaborationProfiles[0].coordinationEnabled = false;
+        auto changed = config;
+        auto faultLearnedEndpoint = GenerateIdentifier();
+        Check(changed.UpdateAuthenticatedPeerRoute(profileId, faultLearnedEndpoint) ==
+                PeerRouteCacheUpdate::Changed,
+            L"DS-039: 保存故障测试必须经过生产路由缓存更新入口");
         bool failed{};
         try { changed.SaveToPath(faultPath, AppConfigSaveFaultForTesting::AtomicReplace); }
         catch (...) { failed = true; }
         auto recovered = AppConfig::LoadFromPath(faultPath);
         Check(failed && ReadBytes(faultPath) == before && recovered.displayConfigurationSafeMode &&
             recovered.EnabledCompleteProfiles().empty(),
-            L"W-037: 未绑定开启配置保存失败时保留旧文件并安全阻断");
+            L"DS-039: 自动路由缓存保存失败时必须保留旧文件并安全阻断");
 
-        Check(CollaborationEnablementText(true, false).find(L"待确认对端") != std::wstring::npos &&
-            CollaborationEnablementText(false, false).find(L"未开启") != std::wstring::npos &&
-            CollaborationEnablementText(true, true).find(L"待确认") == std::wstring::npos,
-            L"W-037: 状态文案区分开启意愿与对端身份确认，不将开启显示为在线");
+        auto routeA = GenerateIdentifier();
+        auto routeB = GenerateIdentifier();
+        auto routeBEvent = GenerateIdentifier();
+        V2StateMachine routeMachine({ bound.localEndpointId, true, V2CoordinatorState::Idle,
+            {}, {}, { { routeA, 2, true }, { routeB, 2, true } } });
+        auto routeBStarted = routeMachine.OnManualSelect(0, routeB, routeBEvent);
+        auto unrelatedRouteUpdate = routeMachine.UpdatePeerRoutesAfterAuthenticatedCacheChange(
+            routeA, true, { { GenerateIdentifier(), 2, false }, { routeB, 2, true } });
+        auto routeBAfterUnrelated = routeMachine.Snapshot();
+        auto routeBRetry = routeMachine.Advance(150);
+        Check(routeBStarted.size() == 2 && unrelatedRouteUpdate.empty() &&
+            routeBAfterUnrelated.state == V2CoordinatorState::AwaitingReady &&
+            routeBAfterUnrelated.activeEventId == routeBEvent && routeBRetry.size() == 1 &&
+            routeBRetry[0].kind == V2Action::Kind::SendMessage &&
+            routeBRetry[0].endpointId == routeB,
+            L"DS-039: A路由缓存变化不得取消B的活动事件、重试计时器或可达状态");
+        auto lockedRouteUpdate = routeMachine.UpdatePeerRoutesAfterAuthenticatedCacheChange(
+            routeB, true, { { GenerateIdentifier(), 2, false } });
+        auto routeBAfterReplacement = routeMachine.Snapshot();
+        Check(lockedRouteUpdate.size() == 1 &&
+            lockedRouteUpdate[0].kind == V2Action::Kind::ClearEvent &&
+            lockedRouteUpdate[0].reason == L"configuration_changed" &&
+            routeBAfterReplacement.state == V2CoordinatorState::Cancelled &&
+            routeBAfterReplacement.activeEventId.empty() && routeMachine.Advance(1000).empty(),
+            L"DS-039: 仅锁定的旧endpoint被替换时取消事件和计时器");
+        Check(CollaborationEnablementText(true, false).find(L"自动连接") != std::wstring::npos &&
+            CollaborationEnablementText(false, false) == L"未开启。" &&
+            CollaborationEnablementText(true, true).find(L"已开启") != std::wstring::npos,
+            L"DS-039: 状态文案只表达启用和自动连接，不要求确认身份");
     }
 
     void TestValidationAndNfc(std::filesystem::path const& root)
@@ -920,7 +973,7 @@ namespace
         profile.peerEndpointId = GenerateIdentifier();
         auto changed = config.InspectProfile(profile.id, GenerateIdentifier(), 2);
         auto unknown = config.InspectProfile(profile.id, profile.peerEndpointId, 3);
-        Check(changed.endpointConfirmationRequired && !changed.complete, L"C-007: endpoint 变化必须等待用户确认");
+        Check(!changed.endpointConfirmationRequired && changed.complete, L"DS-039: endpoint 变化不再阻塞完整配置");
         Check(!unknown.complete, L"C-007: 未知协议版本应由本机检查拒绝");
 
         auto selected = config.SelectProfileDisplays(profile.id);
@@ -2853,9 +2906,9 @@ auto offlineConfig = strongFirst.displays;
         Check(!first.result && first.session.Active(), L"网络检测：非待处理 eventID 不得完成检测或更新在线状态");
         first.Apply(first.session.OnV2StatusResponse(1200, v2Event, endpointA, true));
         Check(first.result && first.result->outcome == ProfileDetectionOutcome::V2Available &&
-            first.result->observedEndpointId == endpointA && first.result->endpointConfirmationRequired &&
+            first.result->observedEndpointId == endpointA && !first.result->endpointConfirmationRequired &&
             !first.result->endpointChanged,
-            L"网络检测：首次 endpoint 必须匹配 eventID 并要求用户确认");
+            L"网络检测：首次 endpoint 匹配eventID后直接返回可保存路由");
         first.Apply(first.session.OnV2StatusResponse(1300, v2Event, endpointA, true));
         Check(first.v2Sends == 1,
             L"网络检测：已完成会话的重复响应不得产生新发送或新完成结果");
@@ -2863,15 +2916,13 @@ auto offlineConfig = strongFirst.displays;
         Harness changed;
         changed.Apply(changed.session.Start(2000, true, endpointA, v2Event));
         changed.Apply(changed.session.OnV2StatusResponse(2100, v2Event, endpointB, true));
-        Check(changed.result && changed.result->endpointConfirmationRequired && changed.result->endpointChanged &&
+        Check(changed.result && !changed.result->endpointConfirmationRequired && changed.result->endpointChanged &&
             changed.result->observedEndpointId == endpointB,
-            L"网络检测：已保存 endpoint 变化必须等待确认且不得自动替换");
-        auto changedProfile = Profile(L"待确认对端"); changedProfile.peerEndpointId = endpointA;
-        Check(!ApplyProfileDetectionResult(changedProfile, *changed.result, false) && changedProfile.peerEndpointId == endpointA,
-            L"网络检测：拒绝确认时必须保留已保存 endpoint");
-        Check(ApplyProfileDetectionResult(changedProfile, *changed.result, true) && changedProfile.peerEndpointId == endpointB &&
-            changedProfile.peerProtocolVersion == 2,
-            L"网络检测：endpoint 变化只有用户确认后才能进入待保存配置");
+            L"网络检测：已保存endpoint变化应作为可自动替换的路由缓存");
+        auto changedProfile = Profile(L"自动连接对端"); changedProfile.peerEndpointId = endpointA;
+        Check(ApplyProfileDetectionResult(changedProfile, *changed.result, false) &&
+            changedProfile.peerEndpointId == endpointB && changedProfile.peerProtocolVersion == 2,
+            L"网络检测：认证响应自动替换待保存路由缓存");
 
         Harness known;
         known.Apply(known.session.Start(3000, true, endpointA, v2Event));
@@ -2881,10 +2932,9 @@ auto offlineConfig = strongFirst.displays;
             L"网络检测：已确认 endpoint 的匹配响应应报告 v2 可用");
 
         auto firstProfile = Profile(L"首次对端");
-        Check(!ApplyProfileDetectionResult(firstProfile, *first.result, false) && firstProfile.peerEndpointId.empty(),
-            L"网络检测：首次 endpoint 未确认时不得写入待保存配置");
-        Check(ApplyProfileDetectionResult(firstProfile, *first.result, true) && firstProfile.peerEndpointId == endpointA,
-            L"网络检测：首次 endpoint 必须由用户确认后才能进入待保存配置");
+        Check(ApplyProfileDetectionResult(firstProfile, *first.result, false) &&
+            firstProfile.peerEndpointId == endpointA,
+            L"网络检测：首次认证endpoint直接进入待保存路由缓存");
 
         Harness authentication;
         authentication.Apply(authentication.session.Start(4000, true, endpointA, v2Event));
@@ -2951,9 +3001,9 @@ auto offlineConfig = strongFirst.displays;
         boundConfig.collaborationProfiles[0].coordinationEnabled = true;
         boundConfig.collaborationProfiles[0].peerEndpointId = GenerateIdentifier();
         boundConfig.collaborationProfiles[0].peerProtocolVersion = 2;
-        Check(boundConfig.UnboundBootstrapProfiles().empty() && boundConfig.EnabledCompleteProfiles().size() == 1 &&
+        Check(boundConfig.UnboundBootstrapProfiles().size() == 1 && boundConfig.EnabledCompleteProfiles().size() == 1 &&
             boundConfig.V2ListenerPort() == boundConfig.listenPort,
-            L"首次 endpoint：已绑定配置必须继续只走正常定向协同路径");
+            L"DS-039：已缓存配置仍须按地址和配对码响应状态探测");
         V2Message probe;
         probe.type = L"status_probe"; probe.eventId = GenerateIdentifier();
         probe.sourceEndpointId = senderEndpoint; probe.targetEndpointId.reset();
@@ -2988,19 +3038,32 @@ auto offlineConfig = strongFirst.displays;
         Check(response.eventId == probe.eventId && response.targetEndpointId == senderEndpoint &&
             ValidateV2Message(response, senderEndpoint, receiverEndpoint, responseKey, 5000).accepted &&
             senderSavedPeerEndpoint.empty() && receiverProfile.peerEndpointId.empty(),
-            L"首次 endpoint：响应必须复用 eventID 且不得自动保存或信任 endpoint");
+            L"首次 endpoint：纯响应构造必须复用 eventID 且自身不改写配置");
         ProfileDetectionSession unboundSender;
         unboundSender.Start(1000, true, senderSavedPeerEndpoint, probe.eventId);
         auto discovered = unboundSender.OnV2StatusResponse(1100, response.eventId, receiverEndpoint, true);
         Check(discovered.kind == ProfileDetectionAction::Kind::Complete &&
-            discovered.result.endpointConfirmationRequired && senderSavedPeerEndpoint.empty(),
-            L"首次 endpoint：发送端收到合法响应后仍必须等待用户确认");
+            !discovered.result.endpointConfirmationRequired && senderSavedPeerEndpoint.empty(),
+            L"DS-039：发送端收到合法响应后直接返回可保存路由且无确认门");
 
         auto duplicateProfile = receiverProfile; duplicateProfile.id = GenerateIdentifier(); duplicateProfile.name = L"重复候选";
         auto ambiguous = MatchUnboundStatusProbe({ receiverProfile, duplicateProfile }, receiverEndpoint,
             simulatedSource, probe, 5000, 1100, hostMatcher);
         Check(ambiguous.status == UnboundProbeMatchStatus::Ambiguous,
             L"首次 endpoint：多个 host/port 和凭据均匹配的配置必须安全拒绝");
+        auto composedCodeProfile = receiverProfile;
+        composedCodeProfile.pairingCode = L"PAIRING-\u00E9-123456";
+        auto decomposedCodeProfile = composedCodeProfile;
+        decomposedCodeProfile.id = GenerateIdentifier();
+        decomposedCodeProfile.pairingCode = L"PAIRING-e\u0301-123456";
+        auto normalizedProbe = probe;
+        normalizedProbe.nonce = GenerateV2Nonce();
+        normalizedProbe = SignV2Message(std::move(normalizedProbe), DeriveV2AuthenticationKey(
+            NormalizeV2PairingSecret(composedCodeProfile.pairingCode), senderEndpoint));
+        Check(MatchUnboundStatusProbe({ composedCodeProfile, decomposedCodeProfile }, receiverEndpoint,
+            simulatedSource, normalizedProbe, 5000, 1150, hostMatcher).status ==
+                UnboundProbeMatchStatus::Ambiguous,
+            L"DS-039：NFC等价配对码必须视为相同凭据并按重复候选拒绝");
         auto wrongSecretProfile = receiverProfile; wrongSecretProfile.pairingCode = L"SYNTHETIC-WRONG-CODE";
         auto unauthenticated = MatchUnboundStatusProbe({ wrongSecretProfile }, receiverEndpoint,
             simulatedSource, probe, 5000, 1200, hostMatcher);
@@ -3015,13 +3078,13 @@ auto offlineConfig = strongFirst.displays;
         auto duplicateBinding = boundSenderProfile; duplicateBinding.id = GenerateIdentifier();
         auto duplicateBound = MatchUnboundStatusProbe({ boundSenderProfile, duplicateBinding }, receiverEndpoint,
             simulatedSource, probe, 5000, 1350, hostMatcher);
-        Check(duplicateBound.status == UnboundProbeMatchStatus::EndpointConflict,
-            L"非对称首次 endpoint：同一 endpoint 对应多个配置必须拒绝");
+        Check(duplicateBound.status == UnboundProbeMatchStatus::Ambiguous,
+            L"DS-039：多个地址和配对码均匹配的配置必须按歧义拒绝");
         auto conflictingProfile = boundSenderProfile; conflictingProfile.peerEndpointId = GenerateIdentifier();
         auto conflict = MatchUnboundStatusProbe({ conflictingProfile }, receiverEndpoint,
             simulatedSource, probe, 5000, 1400, hostMatcher);
-        Check(conflict.status == UnboundProbeMatchStatus::EndpointConflict,
-            L"非对称首次 endpoint：相同来源和凭据声称不同 endpoint 必须拒绝");
+        Check(conflict.status == UnboundProbeMatchStatus::Matched,
+            L"DS-039：旧endpoint缓存不得阻止地址和配对码匹配的新来源身份");
         auto boundWrongPort = MatchUnboundStatusProbe({ boundSenderProfile }, receiverEndpoint,
             wrongPortSource, probe, 5000, 1450, hostMatcher);
         Check(boundWrongPort.status == UnboundProbeMatchStatus::NoMatch,
@@ -3048,17 +3111,17 @@ auto offlineConfig = strongFirst.displays;
             L"双方已绑定：正常定向 status_probe 必须继续通过既有 v2 校验");
         Check(ShouldRouteUnboundStatusProbe(probe, receiverEndpoint, true) &&
             ShouldRouteUnboundStatusProbe(directedProbe, receiverEndpoint, false) &&
-            !ShouldRouteUnboundStatusProbe(directedProbe, receiverEndpoint, true),
-            L"非对称绑定：空目标继续bootstrap，指向本机仅在没有正常已绑定路由时回退");
+            ShouldRouteUnboundStatusProbe(directedProbe, receiverEndpoint, true),
+            L"DS-039：所有status_probe均按地址和配对码路由，不由旧缓存短路");
         auto wrongTargetProbe = directedProbe;
         wrongTargetProbe.targetEndpointId = GenerateIdentifier();
         wrongTargetProbe.nonce = GenerateV2Nonce();
         wrongTargetProbe = SignV2Message(std::move(wrongTargetProbe),
             DeriveV2AuthenticationKey(probeSecret, senderEndpoint));
-        Check(!ShouldRouteUnboundStatusProbe(wrongTargetProbe, receiverEndpoint, false) &&
+        Check(ShouldRouteUnboundStatusProbe(wrongTargetProbe, receiverEndpoint, false) &&
             MatchUnboundStatusProbe(bootstrapCandidates, receiverEndpoint, simulatedSource,
-                wrongTargetProbe, 5000, 1500, hostMatcher).status == UnboundProbeMatchStatus::NotApplicable,
-            L"非对称绑定：错误target不得进入bootstrap或获得回复");
+                wrongTargetProbe, 5000, 1500, hostMatcher).status == UnboundProbeMatchStatus::Matched,
+            L"DS-039：合法旧target提示不阻止status_probe认证和回复");
 
         auto enabledUnboundConfig = receiverConfig;
         enabledUnboundConfig.collaborationProfiles[0].coordinationEnabled = true;
@@ -3091,8 +3154,24 @@ auto offlineConfig = strongFirst.displays;
                 UnboundProbeMatchStatus::AuthenticationFailed,
             L"非对称绑定：定向探测的错误签名必须拒绝");
         Check(MatchUnboundStatusProbe({ conflictingProfile }, receiverEndpoint, simulatedSource,
-            directedProbe, 5000, 1545, hostMatcher).status == UnboundProbeMatchStatus::EndpointConflict,
-            L"非对称绑定：同地址和凭据已绑定为另一身份时必须报告endpoint冲突");
+            directedProbe, 5000, 1545, hostMatcher).status == UnboundProbeMatchStatus::Matched,
+            L"DS-039：同地址和凭据认证通过时旧缓存身份不构成冲突");
+        auto outgoingProbe = CreateStatusProbe(senderEndpoint, GenerateIdentifier(), 5000,
+            GenerateV2Nonce(), receiverProfile.pairingCode);
+        Check(!outgoingProbe.targetEndpointId &&
+            ValidateV2Message(outgoingProbe, receiverEndpoint, senderEndpoint,
+                DeriveV2AuthenticationKey(probeSecret, senderEndpoint), 5000).accepted,
+            L"DS-039：生产状态探测构造器必须始终发送认证null target");
+        std::map<std::wstring, V2Message> responseCache;
+        auto cachedResponseFirst = GetOrCreateStatusResponse(responseCache, directedProbe,
+            receiverEndpoint, 5000, GenerateV2Nonce(), receiverProfile.pairingCode);
+        auto cachedResponseSecond = GetOrCreateStatusResponse(responseCache, directedProbe,
+            receiverEndpoint, 5001, GenerateV2Nonce(), receiverProfile.pairingCode);
+        Check(responseCache.size() == 1 &&
+            SerializeV2Message(cachedResponseFirst) == SerializeV2Message(cachedResponseSecond) &&
+            cachedResponseFirst.nonce == cachedResponseSecond.nonce &&
+            cachedResponseFirst.authTag == cachedResponseSecond.authTag,
+            L"DS-039：重复status_probe必须复用完全相同的响应字段、nonce和authTag");
         auto directedResponse = CreateUnboundStatusResponse(directedProbe, receiverEndpoint, 5000,
             GenerateV2Nonce(), receiverProfile.pairingCode);
         Check(directedResponse.type == L"status_response" &&

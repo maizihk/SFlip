@@ -2236,7 +2236,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             reloadValues()
             peerStatusLabel.stringValue = "\(profile.name)：已连接"
         case .authenticationFailed:
-            peerStatusLabel.stringValue = "\(profile.name)：认证失败"
+            peerStatusLabel.stringValue = "\(profile.name)：配对码不匹配"
         case .noResponse:
             peerStatusLabel.stringValue = "\(profile.name)：无响应"
         }

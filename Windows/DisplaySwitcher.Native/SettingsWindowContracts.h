@@ -29,9 +29,9 @@ namespace DisplaySwitcher::Native
 
     inline std::wstring CollaborationEnablementText(bool enabled, bool peerConfirmed)
     {
-        if (!enabled) return L"未开启；对端离线时也可开启此配置。";
+        if (!enabled) return L"未开启。";
         return peerConfirmed ? L"已开启；连接状态见上方。"
-            : L"已开启，待确认对端；对端上线后请检测连接并确认。";
+            : L"已开启，正在等待对端上线并自动连接。";
     }
 
     enum class SettingsSaveFeedbackScope

@@ -615,6 +615,18 @@ namespace DisplaySwitcher::Native
             }) == 1;
     }
 
+    PeerRouteCacheUpdate AppConfig::UpdateAuthenticatedPeerRoute(
+        std::wstring const& profileId, std::wstring const& endpointId)
+    {
+        auto profile = FindCollaborationProfile(profileId);
+        if (!profile || !IsValidDisplayId(endpointId) ||
+            EqualInsensitive(endpointId, localEndpointId)) return PeerRouteCacheUpdate::Invalid;
+        if (EqualInsensitive(profile->peerEndpointId, endpointId) &&
+            profile->peerProtocolVersion == 2) return PeerRouteCacheUpdate::Unchanged;
+        profile->peerEndpointId = endpointId;
+        profile->peerProtocolVersion = 2;
+        return PeerRouteCacheUpdate::Changed;
+    }
     std::vector<CollaborationProfile> AppConfig::EnabledCompleteProfiles() const
     {
         std::vector<CollaborationProfile> result;
@@ -628,10 +640,17 @@ namespace DisplaySwitcher::Native
         std::vector<CollaborationProfile> result;
         if (displayConfigurationSafeMode || !IsValidDisplayId(localEndpointId)) return result;
         for (auto const& profile : collaborationProfiles)
-            if (profile.peerEndpointId.empty() &&
-                (!profile.peerProtocolVersion || *profile.peerProtocolVersion == 2) &&
+            if ((!profile.peerProtocolVersion || *profile.peerProtocolVersion == 2) &&
                 InspectProfile(profile.id).complete)
                 result.push_back(profile);
+        return result;
+    }
+
+    std::vector<CollaborationProfile> AppConfig::EnabledStatusProbeProfiles() const
+    {
+        auto result = UnboundBootstrapProfiles();
+        result.erase(std::remove_if(result.begin(), result.end(), [](auto const& profile)
+            { return !profile.coordinationEnabled; }), result.end());
         return result;
     }
 
@@ -695,12 +714,10 @@ namespace DisplaySwitcher::Native
         if (!observedEndpointId.empty())
         {
             if (!IsValidDisplayId(observedEndpointId)) result.problems.push_back(L"检测到的 endpointID 无效");
-            else if (!profile->peerEndpointId.empty() && !EqualInsensitive(profile->peerEndpointId, observedEndpointId))
-                result.endpointConfirmationRequired = true;
         }
         if (observedProtocolVersion && *observedProtocolVersion != 2)
             result.problems.push_back(L"检测到未知协议版本");
-        result.complete = result.problems.empty() && !result.endpointConfirmationRequired;
+        result.complete = result.problems.empty();
         return result;
     }
 

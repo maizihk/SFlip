@@ -1597,7 +1597,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         if (profile && profile->peerProtocolVersion && *profile->peerProtocolVersion != 2)
             result.problems.push_back(L"协议版本无效");
         if (!::DisplaySwitcher::Native::IsValidDisplayId(config.localEndpointId) || config.listenPort < 1 || config.listenPort > 65535)
-            result.problems.push_back(L"本机身份或监听端口无效");
+            result.problems.push_back(L"本机连接设置无效");
         if (!result.problems.empty() || !detectProfile_)
         {
             SetConnectionStatus(L"本机配置不完整", false);
@@ -1606,7 +1606,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             SetOperationFeedback(message, true);
             return;
         }
-        SetOperationFeedback(L"正在检测；不会执行 USB、蓝牙、唤醒或显示器操作。");
+        SetOperationFeedback(L"正在连接…");
         SetConnectionStatus(L"正在检测…", false);
         detectingProfileId_ = id;
         auto generation = ++profileDetectionGeneration_;
@@ -1635,69 +1635,36 @@ namespace winrt::DisplaySwitcher::Native::implementation
         }
         if (result.outcome == Outcome::SendFailed)
         {
-            SetConnectionStatus(L"探测发送失败", false);
-            SetOperationFeedback(L"无法发送状态探测。请检查对端地址、端口和本机网络状态。", true); return;
+            SetConnectionStatus(L"连接请求发送失败", false);
+            SetOperationFeedback(L"无法发送连接请求，请检查地址、端口和网络。", true); return;
         }
         if (result.outcome == Outcome::LocalConfigurationIncomplete)
         {
-            SetConnectionStatus(L"本机配置不完整", false); SetOperationFeedback(L"本机配置不完整，未发送探测消息。", true); return;
+            SetConnectionStatus(L"本机配置不完整", false); SetOperationFeedback(L"请补全本机连接设置。", true); return;
         }
         if (result.outcome == Outcome::AuthenticationFailed)
         {
-            SetConnectionStatus(L"认证失败", false); SetOperationFeedback(L"v2 对端已响应，但认证失败。请检查配对密码。", true); return;
+            SetConnectionStatus(L"配对码不匹配", false); SetOperationFeedback(L"请确认两端填写的配对码相同。", true); return;
+        }
+        if (result.outcome == Outcome::RouteSaveFailed)
+        {
+            SetConnectionStatus(L"连接信息保存失败", false);
+            SetOperationFeedback(L"无法保存连接信息；原设置已保留，自动操作保持停用。", true); return;
         }
         if (result.outcome == Outcome::NoResponse)
         {
-            SetConnectionStatus(L"无响应", false); SetOperationFeedback(L"v2 状态探测无响应。", true); return;
+            SetConnectionStatus(L"无响应", false); SetOperationFeedback(L"对端无响应，请检查地址、网络和防火墙。", true); return;
         }
         auto profile = std::find_if(workingProfiles_.begin(), workingProfiles_.end(), [&](auto const& item)
         { return _wcsicmp(item.id.c_str(), id.c_str()) == 0; });
         if (profile == workingProfiles_.end()) return;
         if (result.outcome != Outcome::V2Available) return;
-        if (!result.endpointConfirmationRequired)
-        {
-            ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*profile, result, false);
-            if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration))
-            {
-                SetConnectionStatus(L"v2 可用", true);
-                SetOperationFeedback(L"v2 可用；检测结果已保存，未执行任何硬件操作。");
-            }
-            return;
-        }
-        auto title = result.endpointChanged ? L"对端身份已变化" : L"确认首次发现的对端";
-        auto message = result.endpointChanged
-            ? L"检测到的对端身份与已保存值不同。确认后将立即保存。"
-            : L"检测到新的对端身份。确认后将立即保存。";
-        auto dialog = ContentDialog(); dialog.Title(box_value(title)); dialog.Content(box_value(message));
-        dialog.PrimaryButtonText(L"确认对端"); dialog.CloseButtonText(L"保留原值"); dialog.DefaultButton(ContentDialogButton::Close);
-        dialog.XamlRoot(Content().XamlRoot());
-        auto observed = result.observedEndpointId;
-        auto generation = profileDetectionGeneration_;
-        auto weak = get_weak();
-        dialog.ShowAsync().Completed([weak, id, observed, dialog, generation](auto const& operation, auto const& status)
-        {
-            auto self = weak.get();
-            if (!self || self->windowClosed_ || self->profileDetectionGeneration_ != generation) return;
-            if (status != Windows::Foundation::AsyncStatus::Completed || operation.GetResults() != ContentDialogResult::Primary)
-            {
-                self->SetConnectionStatus(L"v2 可用，对端身份未确认", false);
-                self->SetOperationFeedback(L"未确认对端身份；原配置保持不变。"); return;
-            }
-            auto target = std::find_if(self->workingProfiles_.begin(), self->workingProfiles_.end(), [&](auto const& item)
-            { return _wcsicmp(item.id.c_str(), id.c_str()) == 0; });
-            if (target == self->workingProfiles_.end()) return;
-            ::DisplaySwitcher::Native::ProfileDetectionResult confirmed;
-            confirmed.outcome = ::DisplaySwitcher::Native::ProfileDetectionOutcome::V2Available;
-            confirmed.observedEndpointId = observed; confirmed.endpointConfirmationRequired = true;
-            ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*target, confirmed, true);
-            if (self->SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration))
-            {
-                self->SetConnectionStatus(L"v2 可用，对端身份已确认", true);
-                self->SetOperationFeedback(L"对端身份已确认并保存。");
-            }
-        });
+        ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*profile, result, false);
+        if (auto saved = original_.FindCollaborationProfile(id))
+            ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*saved, result, false);
+        SetConnectionStatus(L"已连接", true);
+        SetOperationFeedback(L"已连接。");
     }
-
     void SettingsWindow::CancelProfileDetection()
     {
         if (detectingProfileId_.empty()) return;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <map>
+
 #include "DisplayModel.h"
 #include "V2Protocol.h"
 
@@ -38,6 +40,14 @@ namespace DisplaySwitcher::Native
         std::wstring const& localEndpointId, DatagramSource const& source, V2Message const& message,
         int64_t nowUnixSeconds, int64_t nowMilliseconds, ProbeHostMatcher const& hostMatches,
         V2ReplayCache* replayCache = nullptr, ProbeKeyProvider const& keyProvider = {});
+
+    V2Message CreateStatusProbe(std::wstring const& localEndpointId, std::wstring eventId,
+        int64_t nowUnixSeconds, std::wstring nonce, std::wstring const& pairingCode,
+        ProbeKeyProvider const& keyProvider = {});
+
+    V2Message GetOrCreateStatusResponse(std::map<std::wstring, V2Message>& cache,
+        V2Message const& probe, std::wstring const& localEndpointId, int64_t nowUnixSeconds,
+        std::wstring nonce, std::wstring const& pairingCode, ProbeKeyProvider const& keyProvider = {});
 
     V2Message CreateUnboundStatusResponse(V2Message const& probe, std::wstring const& localEndpointId,
         int64_t nowUnixSeconds, std::wstring nonce, std::wstring const& pairingCode,

@@ -20,8 +20,8 @@
 | `version` | integer | 是 | 固定为 `2` |
 | `type` | string | 是 | 必须为已知 v2 类型 |
 | `eventID` | UUID string | 是 | 比较时字母不区分大小写 |
-| `sourceEndpointID` | UUID string | 是 | 安装实例随机生成的逻辑身份 |
-| `targetEndpointID` | UUID string/null | 是 | 仅首次或未绑定的 `status_probe` 可以为 `null` |
+| `sourceEndpointID` | UUID string | 是 | 安装实例随机生成的路由标识 |
+| `targetEndpointID` | UUID string/null | 是 | 仅 `status_probe` 可以为 `null`；主动探测始终使用 `null` |
 | `sourcePlatform` | string | 是 | `macos` 或 `windows`，只用于显示和诊断 |
 | `timestamp` | integer | 是 | 非负 Unix 整秒，接收时间差绝对值不超过 10 秒，包含边界 |
 | `nonce` | base64url string | 是 | 16 个密码学安全随机字节，无 `=` 填充，共 22 个字符 |
@@ -61,7 +61,7 @@
 1. 先完成本机配置完整性检查。
 2. 主动发送 `version = 2`、`targetEndpointID = null` 的 `status_probe`，不依赖旧缓存；收到旧版携带任意合法 UUID target 的探测同样按来源地址/端口和配对码验证。`status_response` 必须保持相同 `eventID`，且全程零硬件副作用。
 3. 无响应时不得发送 v1 或其他版本探测，不得猜测兼容能力。
-4. 结果只显示 `v2 可用`、`认证失败`、`无响应` 或 `本机配置不完整`。
+4. 连接成功显示 `已连接`；失败显示配对码不匹配、无响应、本机配置不完整或连接信息保存失败等具体原因。
 5. 检测可自动更新路由缓存，但不得自动开启用户关闭的配置、修改防火墙、执行 DDC、切换输入设备或唤醒显示器。字段完整即可开启并监听/定期探测，不要求先获得缓存。关闭配置可回复探测并更新缓存，仍保持关闭。
 
 ## 认证

@@ -25,6 +25,8 @@ namespace DisplaySwitcher::Native
         std::atomic<bool> blocked_{};
     };
 
+    enum class PeerRouteCacheUpdate { Invalid, Unchanged, Changed };
+
     struct AppConfig
     {
         UsbSwitchConfig usbSwitch;
@@ -47,7 +49,10 @@ namespace DisplaySwitcher::Native
         std::vector<CollaborationProfile> ReadonlyEnabledProfiles() const;
         std::vector<CollaborationProfile> EnabledCompleteProfiles() const;
         bool CanCoordinateWithProfile(std::wstring const& profileId) const;
+        PeerRouteCacheUpdate UpdateAuthenticatedPeerRoute(std::wstring const& profileId,
+            std::wstring const& endpointId);
         std::vector<CollaborationProfile> UnboundBootstrapProfiles() const;
+        std::vector<CollaborationProfile> EnabledStatusProbeProfiles() const;
         std::optional<int> V2ListenerPort() const;
         std::vector<std::wstring> OrderedDisplayIds() const;
         bool HasValidProfileDisplayMapping(std::wstring const& profileId) const noexcept;

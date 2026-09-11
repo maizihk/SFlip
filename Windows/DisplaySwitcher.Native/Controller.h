@@ -29,7 +29,7 @@ namespace DisplaySwitcher::Native
         Controller(winrt::Microsoft::UI::Dispatching::DispatcherQueue const& dispatcher, std::function<void()> exitApplication);
         void Initialize();
         AppConfig Config() const;
-        void ApplyConfiguration(bool applyAutoStart = true);
+        void ApplyConfiguration(bool applyAutoStart = true, bool preserveProbeReplay = false);
         void EnterSafeStateAfterSaveFailure();
         void BeginUsbLearning();
         void EndUsbLearning();
@@ -60,6 +60,8 @@ namespace DisplaySwitcher::Native
         void CompleteProfileDetection(ProfileDetectionResult const& result);
         void SendV2(V2Action const& action);
         void SendV2Probe(CollaborationProfile const& profile);
+        bool ApplyAuthenticatedPeerRoute(std::wstring const& profileId,
+            std::wstring const& endpointId, uint64_t expectedConfigurationGeneration);
         void ManualSwitch(std::wstring const& profileId);
         bool EnsurePeerListening(int port);
         bool IsPeerListening(int port) const;
