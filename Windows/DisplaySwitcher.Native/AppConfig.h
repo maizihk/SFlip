@@ -46,6 +46,7 @@ namespace DisplaySwitcher::Native
         CollaborationProfile* FindCollaborationProfile(std::wstring const& profileId) noexcept;
         std::vector<CollaborationProfile> ReadonlyEnabledProfiles() const;
         std::vector<CollaborationProfile> EnabledCompleteProfiles() const;
+        bool CanCoordinateWithProfile(std::wstring const& profileId) const;
         std::vector<CollaborationProfile> UnboundBootstrapProfiles() const;
         std::optional<int> V2ListenerPort() const;
         std::vector<std::wstring> OrderedDisplayIds() const;

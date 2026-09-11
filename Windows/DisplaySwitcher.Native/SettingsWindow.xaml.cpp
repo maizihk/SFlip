@@ -1505,9 +1505,13 @@ namespace winrt::DisplaySwitcher::Native::implementation
             });
             fields.Children().Append(mappingGrid);
 
-            auto triggerSummary = TextBlock();
-            triggerSummary.Text(profile.triggerDevices.empty() ? L"未引用本机触发设备" : L"已引用 " + std::to_wstring(profile.triggerDevices.size()) + L" 个本机触发设备");
-            triggerSummary.Opacity(0.72); fields.Children().Append(triggerSummary);
+            controls.enablementStatus = TextBlock();
+            controls.enablementStatus.Text(::DisplaySwitcher::Native::CollaborationEnablementText(
+                profile.coordinationEnabled, profile.peerProtocolVersion == 2 &&
+                ::DisplaySwitcher::Native::IsValidDisplayId(profile.peerEndpointId)));
+            controls.enablementStatus.TextWrapping(TextWrapping::Wrap);
+            controls.enablementStatus.Opacity(0.72);
+            fields.Children().Append(controls.enablementStatus);
             auto remove = Button(); remove.Content(box_value(L"删除配置")); remove.IsEnabled(workingProfiles_.size() > 1);
             remove.Click([this, id = profile.id](auto const&, auto const&) { RemoveProfile(id); });
             ApplyStandardButtonGeometry(remove);
@@ -1846,9 +1850,13 @@ namespace winrt::DisplaySwitcher::Native::implementation
             {
                 auto candidate = original_; candidate.displays = workingDisplays_; candidate.collaborationProfiles = workingProfiles_;
                 auto inspection = candidate.InspectProfile(profile.id);
-                if (!inspection.complete || profile.peerProtocolVersion != 2 ||
-                    !::DisplaySwitcher::Native::IsValidDisplayId(profile.peerEndpointId))
-                { reject(2, profile.name + L"配置不完整，无法启用。"); return false; }
+                if (!inspection.complete)
+                {
+                    auto message = profile.name + L"无法启用：";
+                    for (auto const& problem : inspection.problems) message += problem + L"；";
+                    reject(2, message);
+                    return false;
+                }
             }
         }
         CaptureDisplayEditors();
@@ -1927,6 +1935,12 @@ namespace winrt::DisplaySwitcher::Native::implementation
             return false;
         }
         original_ = result;
+        for (auto const& controls : profileEditors_)
+            if (auto profile = original_.FindCollaborationProfile(controls.id))
+                controls.enablementStatus.Text(::DisplaySwitcher::Native::CollaborationEnablementText(
+                    profile->coordinationEnabled, profile->peerProtocolVersion == 2 &&
+                    ::DisplaySwitcher::Native::IsValidDisplayId(profile->peerEndpointId)));
+        if (scope == ::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration) SetOperationFeedback(L"");
         auto action = saveFeedback_.RecordSaveResult(scope, true, true, L"✓ 已保存", SteadyMs());
         if (action == ::DisplaySwitcher::Native::SettingsSaveFeedbackAction::ShowScopedFeedback)
         {

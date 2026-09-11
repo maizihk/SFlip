@@ -50,7 +50,7 @@ namespace DisplaySwitcher::Native
             V2ValidationResult const& validation, uint64_t configurationGeneration);
         bool HandleUnboundStatusProbe(V2Message const& message, DatagramSource const& source,
             AppConfig const& config, std::vector<CollaborationProfile> const& candidates,
-            uint64_t configurationGeneration);
+            uint64_t configurationGeneration, uint64_t sideEffectGeneration);
         void CheckNetworkAccess(AppConfig const& workingConfig,
             std::function<void(bool, std::wstring const&)> completed);
         void BeginProfileDetection(AppConfig const& workingConfig, std::wstring const& profileId,
