@@ -240,7 +240,7 @@ namespace DisplaySwitcher::Native
             bool succeeded, std::wstring const& message, int64_t nowMs)
         {
             if (!changed) return SettingsSaveFeedbackAction::None;
-            if (scope == SettingsSaveFeedbackScope::None)
+            if (scope != SettingsSaveFeedbackScope::Usb && scope != SettingsSaveFeedbackScope::Collaboration)
                 return succeeded ? SettingsSaveFeedbackAction::None : SettingsSaveFeedbackAction::ShowOperationFailure;
             if (succeeded)
             {
@@ -269,7 +269,8 @@ namespace DisplaySwitcher::Native
 
         void ClearTransientSuccess(SettingsSaveFeedbackScope scope)
         {
-            if (scope != SettingsSaveFeedbackScope::None) FeedbackFor(scope).ClearTransientSuccess();
+            if (scope == SettingsSaveFeedbackScope::Usb || scope == SettingsSaveFeedbackScope::Collaboration)
+                FeedbackFor(scope).ClearTransientSuccess();
         }
 
         void ClearTransientSuccesses()

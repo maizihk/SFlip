@@ -253,6 +253,15 @@ namespace
             && feedback.collaborationFeedback.failure,
             L"无实际变化不显示也不重置保存状态");
 
+        for (auto scope : { SettingsSaveFeedbackScope::General, SettingsSaveFeedbackScope::Displays })
+        {
+            Check(feedback.RecordSaveResult(scope, true, true, L"saved", 16001) ==
+                SettingsSaveFeedbackAction::None && feedback.collaborationFeedback.failure,
+                L"W-040: general/display success must not replace collaboration feedback");
+            Check(feedback.RecordSaveResult(scope, true, false, L"failed", 16002) ==
+                SettingsSaveFeedbackAction::ShowOperationFailure,
+                L"W-040: general/display save failure remains visible on current page");
+        }
         for (auto const& value : { L"", L"   " })
             Check(ParseInputSourceText(value).status == InputSourceTextStatus::Empty
                 && !ParseInputSourceText(value).value, L"空白输入源应解析为 null");
