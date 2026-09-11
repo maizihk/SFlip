@@ -42,6 +42,8 @@ namespace DisplaySwitcher::Native
         LRESULT HandleMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
         void ShowContextMenu();
         bool RefreshShellIcon(bool force = false);
+        void BeginShellRecovery(bool refreshAppearance);
+        void TryRecoverShellIcon();
         NOTIFYICONDATAW Data(UINT flags) const;
         static std::wstring Limit(std::wstring const& value, size_t length);
 
@@ -64,6 +66,9 @@ namespace DisplaySwitcher::Native
         std::vector<std::pair<std::wstring, std::wstring>> profiles_;
         std::vector<TrayDdcItem> ddcItems_;
         bool sessionNotificationsRegistered_{};
+        UINT taskbarCreatedMessage_{};
+        size_t shellRecoveryAttempts_{};
+        bool shellRecoveryPending_{};
         bool disposed_{};
     };
 }

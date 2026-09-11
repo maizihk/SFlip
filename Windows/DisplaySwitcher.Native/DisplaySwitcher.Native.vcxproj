@@ -89,6 +89,7 @@
     <ClInclude Include="TrayIcon.h" />
     <ClInclude Include="TrayContracts.h" />
     <ClInclude Include="TrayMonochromeIcon.h" />
+    <ClInclude Include="TrayRecoveryPolicy.h" />
     <ClInclude Include="UdpPeer.h" />
     <ClInclude Include="UnboundProbeRouter.h" />
     <ClInclude Include="UsbWatcher.h" />
