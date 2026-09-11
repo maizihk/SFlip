@@ -1,5 +1,27 @@
 # macOS 交接记录
 
+## 当前任务：DS-040 协同监听与发送失败终态诊断
+
+- 日期：2026-09-11
+- 分支：`codex/macos-send-failure-diagnostics`
+- 基线：`codex/windows-independent-settings@eb022c5`（PR #95 待合并）；`origin/main@f12a224`
+- 提交 / PR / CI：本轮按任务边界不提交、不推送，由根任务统一审查与运行 macOS CI。
+
+### 原因与实现
+
+- 最新实机诊断显示 listener 成功后发送完成为失败，最后却统一落到 timeout/no-response；原实现只记录粗分类，发送失败回调也没有结束对应 pending。
+- 传输结果现保留安全错误域和 `Int32` 系统码；BSD `sendto` 失败返回后立即捕获 `errno`。详细诊断输出数字域/码，不输出地址、配对码、authTag 或 endpoint 原值。
+- 监听启动失败在发送前立即完成为 `listenerFailed`；异步发送失败只按自己的 inspection ID 完成为 `sendFailed`。完成入口先移除 pending、取消 timeout 并登记 event 已结束，因此迟到回调、取消和计时器不能重复完成或误伤其他检测。
+- 手动检测的失败终态保存在连接状态存储中，周期刷新仍显示监听/发送失败和系统码；新检测开始或认证成功会清除。后台 `reportsStatus=false` 探测不写该状态。
+- 本地网络权限证据把监听和发送失败统一视为 ordinary network failure。现有 BSD UDP 路径没有公开可靠证据将任意 errno（包括 65）等价为 TCC 明确拒绝，因此不作该断言。
+
+### 修改范围与待验
+
+- 生产源码：`PeerTransport.swift`、`PeerProtocolV2.swift`、`main.swift`、`DS007SettingsModels.swift`、`PublicPresentationModels.swift`、`SettingsWindowController.swift`。
+- 测试源码由并行测试任务补充：`PeerTransportTests.swift`、`PeerProtocolV2Tests.swift`、`PublicPresentationModelsTests.swift`、`DS007Tests.swift`。
+- 文档：`macOS/DEVELOPMENT_CHECKLIST.md`、`handoffs/macos.md`。
+- Windows 主机无法运行 Xcode；自动测试、Release 构建、严格验签和 macOS CI 由根任务继续。仍需用户实机确认发送失败显示真实系统码、成功恢复状态，以及双向协同检测。未执行真实网络或硬件操作。
+
 ## 当前任务：DS-039 配对码直接连接（2026-09-11）
 
 - 基线：共享分支 `codex/windows-pairing-code-connection`，已包含批准后的协议与 22 条公共消息向量；本任务只修改 macOS 源码、测试、清单和本交接文件，不改协议、schema、版本、工作流或 Windows 实现。

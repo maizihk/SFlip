@@ -65,6 +65,8 @@ enum LocalNetworkPermissionInspectionAction {
                 evidence = .authenticationFailure
             case .noResponse:
                 evidence = .timeout
+            case .listenerFailed, .sendFailed:
+                evidence = .ordinaryNetworkFailure
             }
             completion(result, evidence)
         }

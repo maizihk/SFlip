@@ -2239,7 +2239,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             peerStatusLabel.stringValue = "\(profile.name)：配对码不匹配"
         case .noResponse:
             peerStatusLabel.stringValue = "\(profile.name)：无响应"
+        case .listenerFailed(let error):
+            peerStatusLabel.stringValue = "\(profile.name)：监听失败（系统码：\(systemErrorCode(error))）"
+        case .sendFailed(let error):
+            peerStatusLabel.stringValue = "\(profile.name)：发送失败（系统码：\(systemErrorCode(error))）"
         }
+    }
+
+    private func systemErrorCode(_ error: PeerTransportSystemError?) -> String {
+        guard let error else { return "unknown" }
+        return "\(error.domain.rawValue) \(error.code)"
     }
 
     @available(macOS 13.0, *)

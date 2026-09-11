@@ -452,6 +452,8 @@ enum PeerCapabilityInspectionResult: Equatable {
     case v2(endpointID: String)
     case authenticationFailed
     case noResponse
+    case listenerFailed(PeerTransportSystemError?)
+    case sendFailed(PeerTransportSystemError?)
 }
 
 enum V2PeerCapabilityInspectionResponse: Equatable {
@@ -839,7 +841,9 @@ private extension PeerTransportOperationResult {
     var safeDescription: String {
         switch self {
         case .success: return "success"
-        case .failure(let category): return "failure-\(category.rawValue)"
+        case .failure(let category, let systemError):
+            guard let systemError else { return "failure-\(category.rawValue)" }
+            return "failure-\(category.rawValue) system-error-domain=\(systemError.domain.rawValue) system-error-code=\(systemError.code)"
         }
     }
 }

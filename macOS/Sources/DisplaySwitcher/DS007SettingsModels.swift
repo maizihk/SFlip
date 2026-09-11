@@ -101,6 +101,8 @@ enum CollaborationConnectionState: Equatable {
     case neverChecked
     case checking
     case noResponse
+    case listenerFailed(PeerTransportSystemError?)
+    case sendFailed(PeerTransportSystemError?)
     case available
     case connected
     case disconnected
@@ -112,6 +114,10 @@ enum CollaborationConnectionState: Equatable {
         case .neverChecked: return "正在连接"
         case .checking: return "正在检测"
         case .noResponse: return "无响应"
+        case .listenerFailed(let error):
+            return "监听失败（系统码：\(Self.errorCode(error))）"
+        case .sendFailed(let error):
+            return "发送失败（系统码：\(Self.errorCode(error))）"
         case .available: return "已连接"
         case .connected: return "已连接"
         case .disconnected: return "连接已断开"
@@ -119,6 +125,11 @@ enum CollaborationConnectionState: Equatable {
     }
 
     var connected: Bool { self == .available || self == .connected }
+
+    private static func errorCode(_ error: PeerTransportSystemError?) -> String {
+        guard let error else { return "unknown" }
+        return "\(error.domain.rawValue) \(error.code)"
+    }
 }
 
 final class CollaborationStatusStore {
@@ -127,6 +138,7 @@ final class CollaborationStatusStore {
         var checked = false
         var responded = false
         var lastAuthenticatedAtMs: Int64?
+        var inspectionFailure: CollaborationConnectionState?
     }
 
     private var states: [String: RuntimeState] = [:]
@@ -143,6 +155,7 @@ final class CollaborationStatusStore {
         ).issues.isEmpty else { return .incomplete }
         let runtime = states[profile.id] ?? RuntimeState()
         if runtime.checking { return .checking }
+        if let inspectionFailure = runtime.inspectionFailure { return inspectionFailure }
         if let last = runtime.lastAuthenticatedAtMs {
             return nowMs - last <= 6_000 ? .connected : .disconnected
         }
@@ -155,6 +168,7 @@ final class CollaborationStatusStore {
         var value = states[profileID] ?? RuntimeState()
         value.checking = true
         value.checked = true
+        value.inspectionFailure = nil
         states[profileID] = value
     }
 
@@ -163,6 +177,16 @@ final class CollaborationStatusStore {
         value.checking = false
         value.checked = true
         value.responded = responded
+        value.inspectionFailure = nil
+        states[profileID] = value
+    }
+
+    func finishCheck(profileID: String, failure: CollaborationConnectionState) {
+        var value = states[profileID] ?? RuntimeState()
+        value.checking = false
+        value.checked = true
+        value.responded = false
+        value.inspectionFailure = failure
         states[profileID] = value
     }
 
@@ -170,6 +194,7 @@ final class CollaborationStatusStore {
         var value = states[profileID] ?? RuntimeState()
         value.checking = false
         value.responded = true
+        value.inspectionFailure = nil
         value.lastAuthenticatedAtMs = nowMs
         states[profileID] = value
     }

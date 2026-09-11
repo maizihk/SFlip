@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 
@@ -444,7 +445,10 @@ final class PeerProtocolV2Tests: XCTestCase {
         )
         store.record(.sendStarted(listeningPort: 49_731), context: context)
         now += 4
-        store.record(.sendFinished(.success), context: context)
+        store.record(.sendFinished(.failure(
+            .send,
+            systemError: .init(domain: .posix, code: ENETUNREACH)
+        )), context: context)
         now += 6
         store.record(.datagramReceived(
             sourceHost: "198.51.100.25", sourcePort: 49_732,
@@ -459,7 +463,8 @@ final class PeerProtocolV2Tests: XCTestCase {
 
         let text = store.exportText()
         for expected in [
-            "inspection=I1", "stage=listener", "actual-port=49731", "stage=send-finished result=success",
+            "inspection=I1", "stage=listener", "actual-port=49731",
+            "stage=send-finished result=failure-send-failed system-error-domain=errno system-error-code=51",
             "stage=datagram-received", "source-port=49732", "source-port-match=false",
             "version=2", "type=status_response", "event-match=true",
             "reason=source-port-mismatch", "stage=timeout timeout-ms=1000 received-datagrams=1"
@@ -472,6 +477,40 @@ final class PeerProtocolV2Tests: XCTestCase {
         ] {
             XCTAssertFalse(text.contains(privateValue), privateValue)
         }
+    }
+
+    func testInspectionDiagnosticProjectsOnlyControlledSystemErrorFields() {
+        let store = PeerInspectionDiagnosticStore(nowMs: { 1_000 })
+        let context = store.begin(
+            eventID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            targetHost: "private-peer.example",
+            targetPort: 49_731
+        )
+
+        store.record(.listener(
+            result: .failure(
+                .socketBind,
+                systemError: .init(domain: .addressResolution, code: -2)
+            ),
+            requestedPort: 49_731,
+            actualPort: nil
+        ), context: context)
+        store.record(.sendFinished(.failure(
+            .send,
+            systemError: .init(domain: .unknown, code: 0)
+        )), context: context)
+
+        let text = store.exportText()
+        XCTAssertTrue(text.contains(
+            "failure-socket-bind system-error-domain=getaddrinfo system-error-code=-2"
+        ))
+        XCTAssertTrue(text.contains(
+            "failure-send-failed system-error-domain=unknown system-error-code=0"
+        ))
+        XCTAssertFalse(text.contains("private-peer.example"))
+        XCTAssertFalse(text.contains("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+        XCTAssertFalse(text.localizedCaseInsensitiveContains("sample-code"))
+        XCTAssertFalse(text.localizedCaseInsensitiveContains("authTag"))
     }
 
     func testInspectionEventTrackerDistinguishesActiveLateAndUnrelatedResponses() {

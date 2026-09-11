@@ -1379,6 +1379,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             .listener(result: startResult, requestedPort: listenPort, actualPort: peerTransport.listeningPort),
             context: diagnosticContext
         )
+        if case .failure = startResult {
+            completePeerCapabilityInspection(
+                inspectionID, result: .listenerFailed(startResult.systemError)
+            )
+            return
+        }
         guard let data = makeV2StatusProbe(eventID: eventID, profile: profile) else {
             peerInspectionDiagnostics.record(
                 .responseRejected("probe-construction-failed"), context: diagnosticContext
@@ -1391,7 +1397,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         )
         peerTransport.send(data, host: profile.peerHost, port: profile.peerPort) {
             [weak self] result in
-            self?.peerInspectionDiagnostics.record(.sendFinished(result), context: diagnosticContext)
+            guard let self else { return }
+            self.peerInspectionDiagnostics.record(.sendFinished(result), context: diagnosticContext)
+            if case .failure = result {
+                self.completePeerCapabilityInspection(
+                    inspectionID, result: .sendFailed(result.systemError)
+                )
+            }
         }
         schedule("v2-inspection-\(inspectionID)", after: 1_000) { [weak self] in
             guard let self, let pending = self.pendingPeerInspections[inspectionID] else { return }
@@ -1428,9 +1440,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             eventID: pending.v2EventID, context: pending.diagnosticContext
         )
         if pending.reportsStatus {
-            if case .v2 = result {
+            switch result {
+            case .v2:
                 collaborationStatusStore.finishCheck(profileID: pending.profile.id, responded: true)
-            } else {
+            case .listenerFailed(let error):
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .listenerFailed(error)
+                )
+            case .sendFailed(let error):
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .sendFailed(error)
+                )
+            case .authenticationFailed, .noResponse:
                 collaborationStatusStore.finishCheck(profileID: pending.profile.id, responded: false)
             }
         }
@@ -1439,6 +1460,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         case .v2: diagnosticResult = "v2-available"
         case .authenticationFailed: diagnosticResult = "authentication-failed"
         case .noResponse: diagnosticResult = "no-response"
+        case .listenerFailed: diagnosticResult = "listener-failed"
+        case .sendFailed: diagnosticResult = "send-failed"
         }
         peerInspectionDiagnostics.record(
             .completed(diagnosticResult), context: pending.diagnosticContext

@@ -1,3 +1,4 @@
+import Darwin
 import XCTest
 
 final class DS007Tests: XCTestCase {
@@ -620,6 +621,54 @@ final class DS007Tests: XCTestCase {
         XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 8_001), .disabled)
         second.peerHost = ""
         XCTAssertEqual(store.state(for: second, displays: [display], nowMs: 8_001), .incomplete)
+    }
+
+    func testInspectionSendFailureRemainsVisiblePastTimeoutAndSuccessfulCheckRecovers() {
+        let display = configuredDisplay()
+        let profile = completeProfile(name: "Peer", displayID: display.id)
+        let store = CollaborationStatusStore()
+        let error = PeerTransportSystemError(domain: .posix, code: ENETUNREACH)
+
+        store.beginCheck(profileID: profile.id)
+        store.finishCheck(profileID: profile.id, failure: .sendFailed(error))
+
+        XCTAssertEqual(
+            store.state(for: profile, displays: [display], nowMs: 0),
+            .sendFailed(error)
+        )
+        XCTAssertEqual(
+            store.state(for: profile, displays: [display], nowMs: 1_001),
+            .sendFailed(error),
+            "a later timeout observation must not replace the completed send failure"
+        )
+        XCTAssertEqual(
+            CollaborationConnectionState.sendFailed(error).text,
+            "发送失败（系统码：errno 51）"
+        )
+
+        store.beginCheck(profileID: profile.id)
+        store.finishCheck(profileID: profile.id, responded: true)
+        XCTAssertEqual(store.state(for: profile, displays: [display], nowMs: 2_000), .available)
+    }
+
+    func testInspectionListenerFailureClearsWhenAuthenticatedTrafficRecovers() {
+        let display = configuredDisplay()
+        let profile = completeProfile(name: "Peer", displayID: display.id)
+        let store = CollaborationStatusStore()
+        let error = PeerTransportSystemError(domain: .addressResolution, code: -2)
+
+        store.finishCheck(profileID: profile.id, failure: .listenerFailed(error))
+        XCTAssertEqual(
+            store.state(for: profile, displays: [display], nowMs: 1_000),
+            .listenerFailed(error)
+        )
+        XCTAssertEqual(
+            CollaborationConnectionState.listenerFailed(nil).text,
+            "监听失败（系统码：unknown）"
+        )
+
+        store.recordAuthenticatedMessage(profileID: profile.id, nowMs: 2_000)
+        XCTAssertEqual(store.state(for: profile, displays: [display], nowMs: 8_000), .connected)
     }
 
     func testU021OneHundredRapidWritesCoalesceToInflightAndLatest() {
