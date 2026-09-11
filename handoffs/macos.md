@@ -1,5 +1,15 @@
 # macOS 交接记录
 
+## 当前任务：DS-041 协同连接成功文案统一
+
+- 日期：2026-09-11
+- 分支：`codex/macos-connection-status-copy`
+- 基线：`91d5f00`；`origin/main@f12a224`
+- 手动检测成功和周期刷新此前分别生成“配置名：已连接”与“已连接”，导致同一次成功在界面中短暂跳变。
+- 新增单一轻量展示规则，两条路径现在都显示“已和对端（配置名）建立连接”；配置名仅为空白时回退“已和对端建立连接”。其他连接与失败状态继续使用既有文案。
+- 修改 `DS007SettingsModels.swift`、`SettingsWindowController.swift`、`DS007Tests.swift`、`macOS/DEVELOPMENT_CHECKLIST.md` 和本交接文件。
+- Windows 主机无法运行 Xcode；测试、构建和 macOS CI 由根任务继续。仍需真实设置页确认手动成功到周期刷新的文案不再跳变。未执行真实网络、DDC、USB、唤醒或输入源动作。
+
 ## 当前任务：DS-040 协同监听与发送失败终态诊断
 
 - 日期：2026-09-11

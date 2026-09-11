@@ -671,6 +671,27 @@ final class DS007Tests: XCTestCase {
         XCTAssertEqual(store.state(for: profile, displays: [display], nowMs: 8_000), .connected)
     }
 
+    func testConnectionStatusPresentationMatchesRuntimeCopyForManualAndPeriodicSuccess() {
+        XCTAssertEqual(
+            CollaborationConnectionStatusPresentation.text(
+                for: .available, profileName: "Windows"
+            ),
+            "已和对端（Windows）建立连接"
+        )
+        XCTAssertEqual(
+            CollaborationConnectionStatusPresentation.text(
+                for: .connected, profileName: "  "
+            ),
+            "已和对端建立连接"
+        )
+        XCTAssertEqual(
+            CollaborationConnectionStatusPresentation.text(
+                for: .noResponse, profileName: "Windows"
+            ),
+            "无响应"
+        )
+    }
+
     func testU021OneHundredRapidWritesCoalesceToInflightAndLatest() {
         let executor = ControlledWriteExecutor()
         let coordinator = DDCLatestWinsCoordinator(executor: executor)

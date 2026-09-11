@@ -378,9 +378,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     func refreshSelectedCollaborationStatus() {
         guard editingProfiles.indices.contains(selectedProfileIndex) else { return }
-        let state = collaborationStatus?(editingProfiles[selectedProfileIndex])
-            ?? (editingProfiles[selectedProfileIndex].coordinationEnabled ? .neverChecked : .disabled)
-        updatePeerConnectionStatus(state.text, connected: state.connected)
+        let profile = editingProfiles[selectedProfileIndex]
+        let state = collaborationStatus?(profile)
+            ?? (profile.coordinationEnabled ? .neverChecked : .disabled)
+        updatePeerConnectionStatus(
+            CollaborationConnectionStatusPresentation.text(
+                for: state, profileName: profile.name
+            ),
+            connected: state.connected
+        )
     }
 
     func reloadPersistedConfiguration() {
@@ -2234,7 +2240,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         switch result {
         case .v2:
             reloadValues()
-            peerStatusLabel.stringValue = "\(profile.name)：已连接"
+            peerStatusLabel.stringValue = CollaborationConnectionStatusPresentation.text(
+                for: .connected, profileName: profile.name
+            )
         case .authenticationFailed:
             peerStatusLabel.stringValue = "\(profile.name)：配对码不匹配"
         case .noResponse:

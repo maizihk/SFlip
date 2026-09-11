@@ -132,6 +132,17 @@ enum CollaborationConnectionState: Equatable {
     }
 }
 
+enum CollaborationConnectionStatusPresentation {
+    static func text(
+        for state: CollaborationConnectionState,
+        profileName: String
+    ) -> String {
+        guard state.connected else { return state.text }
+        let name = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "已和对端建立连接" : "已和对端（\(name)）建立连接"
+    }
+}
+
 final class CollaborationStatusStore {
     private struct RuntimeState {
         var checking = false
