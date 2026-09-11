@@ -11,12 +11,21 @@ namespace
 
 namespace DisplaySwitcher::Native
 {
+    bool ShouldRouteUnboundStatusProbe(V2Message const& message,
+        std::wstring const& localEndpointId, bool hasNormalBoundRoute)
+    {
+        if (message.type != L"status_probe") return false;
+        if (!message.targetEndpointId) return true;
+        return !hasNormalBoundRoute && EqualId(*message.targetEndpointId, localEndpointId);
+    }
+
     UnboundProbeMatch MatchUnboundStatusProbe(std::vector<CollaborationProfile> const& candidates,
         std::wstring const& localEndpointId, DatagramSource const& source, V2Message const& message,
         int64_t nowUnixSeconds, int64_t nowMilliseconds, ProbeHostMatcher const& hostMatches,
         V2ReplayCache* replayCache, ProbeKeyProvider const& keyProvider)
     {
-        if (message.type != L"status_probe" || message.targetEndpointId) return {};
+        if (message.type != L"status_probe" ||
+            (message.targetEndpointId && !EqualId(*message.targetEndpointId, localEndpointId))) return {};
         if (!IsValidDisplayId(localEndpointId) || EqualId(message.sourceEndpointId, localEndpointId))
             return { UnboundProbeMatchStatus::EndpointConflict };
 

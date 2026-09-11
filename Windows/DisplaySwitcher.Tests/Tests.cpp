@@ -3046,10 +3046,84 @@ auto offlineConfig = strongFirst.displays;
         Check(ValidateV2Message(directedProbe, receiverEndpoint, senderEndpoint,
             DeriveV2AuthenticationKey(probeSecret, senderEndpoint), 5000).accepted,
             L"双方已绑定：正常定向 status_probe 必须继续通过既有 v2 校验");
+        Check(ShouldRouteUnboundStatusProbe(probe, receiverEndpoint, true) &&
+            ShouldRouteUnboundStatusProbe(directedProbe, receiverEndpoint, false) &&
+            !ShouldRouteUnboundStatusProbe(directedProbe, receiverEndpoint, true),
+            L"非对称绑定：空目标继续bootstrap，指向本机仅在没有正常已绑定路由时回退");
+        auto wrongTargetProbe = directedProbe;
+        wrongTargetProbe.targetEndpointId = GenerateIdentifier();
+        wrongTargetProbe.nonce = GenerateV2Nonce();
+        wrongTargetProbe = SignV2Message(std::move(wrongTargetProbe),
+            DeriveV2AuthenticationKey(probeSecret, senderEndpoint));
+        Check(!ShouldRouteUnboundStatusProbe(wrongTargetProbe, receiverEndpoint, false) &&
+            MatchUnboundStatusProbe(bootstrapCandidates, receiverEndpoint, simulatedSource,
+                wrongTargetProbe, 5000, 1500, hostMatcher).status == UnboundProbeMatchStatus::NotApplicable,
+            L"非对称绑定：错误target不得进入bootstrap或获得回复");
+
+        auto enabledUnboundConfig = receiverConfig;
+        enabledUnboundConfig.collaborationProfiles[0].coordinationEnabled = true;
+        auto enabledUnboundCandidates = enabledUnboundConfig.UnboundBootstrapProfiles();
+        V2ReplayCache directedReplay;
+        auto directedUnbound = MatchUnboundStatusProbe(enabledUnboundCandidates, receiverEndpoint,
+            simulatedSource, directedProbe, 5000, 1525, hostMatcher, &directedReplay);
+        Check(directedUnbound.status == UnboundProbeMatchStatus::Matched &&
+            directedUnbound.profileIndex == 0 && !directedUnbound.duplicate &&
+            enabledUnboundConfig.collaborationProfiles[0].coordinationEnabled &&
+            enabledUnboundConfig.collaborationProfiles[0].peerEndpointId.empty(),
+            L"非对称绑定：Windows已启用但尚未绑定时，指向本机的合法探测必须匹配且不填身份");
+        auto repeatedDirected = MatchUnboundStatusProbe(enabledUnboundCandidates, receiverEndpoint,
+            simulatedSource, directedProbe, 5000, 1530, hostMatcher, &directedReplay);
+        Check(repeatedDirected.status == UnboundProbeMatchStatus::Matched && repeatedDirected.duplicate,
+            L"非对称绑定：完全相同的定向探测必须标记duplicate并允许重发缓存响应");
+        auto wrongHostSource = simulatedSource;
+        wrongHostSource.address = L"other-simulated-address";
+        auto directedWrongHost = MatchUnboundStatusProbe(enabledUnboundCandidates, receiverEndpoint,
+            wrongHostSource, directedProbe, 5000, 1535, hostMatcher);
+        auto directedWrongPort = MatchUnboundStatusProbe(enabledUnboundCandidates, receiverEndpoint,
+            wrongPortSource, directedProbe, 5000, 1535, hostMatcher);
+        Check(directedWrongHost.status == UnboundProbeMatchStatus::NoMatch &&
+            directedWrongPort.status == UnboundProbeMatchStatus::NoMatch,
+            L"非对称绑定：定向探测仍必须校验来源host和port");
+        auto directedWrongSignature = directedProbe;
+        directedWrongSignature.authTag[0] = directedWrongSignature.authTag[0] == L'A' ? L'B' : L'A';
+        Check(MatchUnboundStatusProbe(enabledUnboundCandidates, receiverEndpoint, simulatedSource,
+            directedWrongSignature, 5000, 1540, hostMatcher).status ==
+                UnboundProbeMatchStatus::AuthenticationFailed,
+            L"非对称绑定：定向探测的错误签名必须拒绝");
+        Check(MatchUnboundStatusProbe({ conflictingProfile }, receiverEndpoint, simulatedSource,
+            directedProbe, 5000, 1545, hostMatcher).status == UnboundProbeMatchStatus::EndpointConflict,
+            L"非对称绑定：同地址和凭据已绑定为另一身份时必须报告endpoint冲突");
+        auto directedResponse = CreateUnboundStatusResponse(directedProbe, receiverEndpoint, 5000,
+            GenerateV2Nonce(), receiverProfile.pairingCode);
+        Check(directedResponse.type == L"status_response" &&
+            directedResponse.eventId == directedProbe.eventId &&
+            directedResponse.targetEndpointId == senderEndpoint &&
+            ValidateV2Message(directedResponse, senderEndpoint, receiverEndpoint,
+                DeriveV2AuthenticationKey(probeSecret, receiverEndpoint), 5000).accepted &&
+            enabledUnboundConfig.collaborationProfiles[0].peerEndpointId.empty() &&
+            enabledUnboundConfig.collaborationProfiles[0].coordinationEnabled,
+            L"非对称绑定：生产响应只生成认证status_response，不写endpoint也不改变启用状态");
+
+        auto expiredDirected = directedProbe;
+        expiredDirected.timestamp = 4989;
+        expiredDirected.nonce = GenerateV2Nonce();
+        expiredDirected = SignV2Message(std::move(expiredDirected),
+            DeriveV2AuthenticationKey(probeSecret, senderEndpoint));
+        Check(MatchUnboundStatusProbe(bootstrapCandidates, receiverEndpoint, simulatedSource,
+            expiredDirected, 5000, 1550, hostMatcher).status != UnboundProbeMatchStatus::Matched,
+            L"非对称绑定：超出时间窗的定向探测必须拒绝");
+        auto nonceReuse = directedProbe;
+        nonceReuse.eventId = GenerateIdentifier();
+        nonceReuse = SignV2Message(std::move(nonceReuse),
+            DeriveV2AuthenticationKey(probeSecret, senderEndpoint));
+        Check(MatchUnboundStatusProbe(bootstrapCandidates, receiverEndpoint, simulatedSource,
+            nonceReuse, 5000, 1575, hostMatcher, &directedReplay).status == UnboundProbeMatchStatus::NoMatch,
+            L"非对称绑定：同nonce不同字段必须按重放冲突拒绝");
         auto bootstrapNetworkReplies = static_cast<int>(unbound.status == UnboundProbeMatchStatus::Matched) +
-            static_cast<int>(repeated.status == UnboundProbeMatchStatus::Matched);
+            static_cast<int>(repeated.status == UnboundProbeMatchStatus::Matched) +
+            static_cast<int>(directedUnbound.status == UnboundProbeMatchStatus::Matched);
         int bootstrapUsbCalls{}, bootstrapBluetoothCalls{}, bootstrapWakeCalls{}, bootstrapDdcCalls{};
-        Check(bootstrapNetworkReplies == 2 && bootstrapUsbCalls == 0 && bootstrapBluetoothCalls == 0 &&
+        Check(bootstrapNetworkReplies == 3 && bootstrapUsbCalls == 0 && bootstrapBluetoothCalls == 0 &&
             bootstrapWakeCalls == 0 && bootstrapDdcCalls == 0 && noHardware(first),
             L"首次 endpoint：匹配、拒绝和回复过程必须保持零硬件副作用");
     }
@@ -3173,6 +3247,21 @@ auto offlineConfig = strongFirst.displays;
         Check(injected.find("10.23.45.67") == std::string::npos && injected.find("TOP-SECRET") == std::string::npos &&
             injected.find("redacted=1") != std::string::npos,
             L"W-005：日志入口必须用字段白名单移除未知敏感内容");
+        for (auto const& event : {
+            "protocol.v2.status_probe_received",
+            "protocol.v2.bootstrap_matched",
+            "protocol.v2.bootstrap_no_match",
+            "protocol.v2.bootstrap_validation_rejected",
+            "protocol.v2.bootstrap_ambiguous",
+            "protocol.v2.bootstrap_endpoint_conflict",
+            "protocol.v2.bootstrap_response_sent success=1" })
+            Check(SanitizeDiagnosticEvent(event) == event,
+                L"W-038：探测诊断必须只保留固定白名单事件和数值发送结果");
+        auto redactedProbeDiagnostic = SanitizeDiagnosticEvent(
+            "protocol.v2.bootstrap_no_match endpoint=11111111-2222-3333-4444-555555555555 "
+            "host=10.23.45.67 nonce=TOP-SECRET");
+        Check(redactedProbeDiagnostic == "protocol.v2.bootstrap_no_match redacted=1",
+            L"W-038：探测诊断不得记录endpoint、来源地址、nonce或动态拒绝原因");
         auto secretEventName = SanitizeDiagnosticEvent("10.23.45.67 success=1");
         Check(secretEventName == "diagnostic.redacted redacted=1",
             L"W-005：日志事件名也必须使用白名单，不能把地址伪装成事件名");
