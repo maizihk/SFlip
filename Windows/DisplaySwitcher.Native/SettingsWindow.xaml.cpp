@@ -508,6 +508,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             if (!selectedProfileId_.empty()) DetectProfile(selectedProfileId_);
         });
         auto peerActions = StackPanel(); peerActions.Orientation(Orientation::Horizontal); peerActions.Spacing(8);
+        peerActions.HorizontalAlignment(HorizontalAlignment::Right);
         peerActions.Children().Append(checkNetwork); peerActions.Children().Append(detectProfileButton_);
         auto addProfile = Button(); addProfile.Content(box_value(L"添加配置"));
         addProfile.VerticalAlignment(VerticalAlignment::Bottom);
@@ -548,8 +549,9 @@ namespace winrt::DisplaySwitcher::Native::implementation
         profileConfigSection.Children().Append(CreateSubheading(L"配置详情"));
         auto peerLayout = ::DisplaySwitcher::Native::SettingsPageLayout(::DisplaySwitcher::Native::SettingsPage::Collaboration);
         peerTab.Content(CreatePage({
-            CreateSection(peerLayout.cards.at(0), { CreateTwoColumn(peerStatus, peerActions) }),
-            CreateSection(peerLayout.cards.at(1), { profileConfigSection, profileEditorsPanel_ }) }));
+            CreateSection(peerLayout.cards.at(0), { peerActions }),
+            CreateSection(peerLayout.cards.at(1), { profileConfigSection, profileEditorsPanel_ }),
+            peerStatus }));
 
         auto displayTab = TabViewItem(); displayTab.IsClosable(false); displayTab.HorizontalContentAlignment(HorizontalAlignment::Center);
         displayTab.Header(CreateTabHeader(L"\uE7F4", L"显示器"));
