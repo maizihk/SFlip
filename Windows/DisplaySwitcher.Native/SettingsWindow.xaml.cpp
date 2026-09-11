@@ -494,7 +494,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             {
                 if (auto self = weak.get(); self && !self->windowClosed_)
                 {
-                    self->SetOperationFeedback(message,
+                    self->SetOperationFeedback(ready ? L"" : message,
                         ::DisplaySwitcher::Native::NetworkAccessFeedbackSeverity(ready));
                     if (!ready) self->SetConnectionStatus(L"网络权限未就绪", false);
                 }
@@ -1606,7 +1606,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             SetOperationFeedback(message, true);
             return;
         }
-        SetOperationFeedback(L"正在连接…");
+        SetOperationFeedback({});
         SetConnectionStatus(L"正在检测…", false);
         detectingProfileId_ = id;
         auto generation = ++profileDetectionGeneration_;
@@ -1662,8 +1662,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
         ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*profile, result, false);
         if (auto saved = original_.FindCollaborationProfile(id))
             ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*saved, result, false);
-        SetConnectionStatus(L"已连接", true);
-        SetOperationFeedback(L"已连接。");
+        SetConnectionStatus(L"已和对端（" + profile->name + L"）建立连接", true);
+        SetOperationFeedback({});
     }
     void SettingsWindow::CancelProfileDetection()
     {

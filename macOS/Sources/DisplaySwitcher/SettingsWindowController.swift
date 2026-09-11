@@ -263,7 +263,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let peerPortField = NSTextField()
     private let pairingCodeField = NSSecureTextField()
     private let peerStatusLabel = NSTextField(wrappingLabelWithString: "协同未启用")
-    private let localNetworkPermissionStatusLabel = NSTextField(labelWithString: "")
     private let localNetworkPermissionDetailLabel = NSTextField(wrappingLabelWithString: "")
     private let profilePopup = NSPopUpButton()
     private let profileNameField = NSTextField()
@@ -641,7 +640,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         requestMediaKeyPermissionButton.setAccessibilityLabel("申请媒体快捷键输入监控权限")
         learnUSBButton.setAccessibilityLabel("学习 USB 设备")
         peerStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        localNetworkPermissionStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         localNetworkPermissionDetailLabel.font = .systemFont(ofSize: 11)
         localNetworkPermissionDetailLabel.textColor = .secondaryLabelColor
         saveStatusLabel.font = .systemFont(ofSize: 11)
@@ -736,7 +734,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 profileActions,
                 separator(),
                 peerStatusLabel,
-                localNetworkPermissionStatusLabel,
                 localNetworkPermissionDetailLabel
             ])
         ]))
@@ -2216,18 +2213,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             DispatchQueue.main.async {
                 self?.inspectProfileButton.isEnabled = true
                 self?.requestLocalNetworkPermissionButton.isEnabled = true
-                self?.updateLocalNetworkPermissionPresentation(permissionEvidence)
                 self?.showPeerInspectionResult(result, profileID: profile.id)
+                self?.updateLocalNetworkPermissionPresentation(permissionEvidence)
             }
         }
     }
 
     private func updateLocalNetworkPermissionPresentation(_ evidence: LocalNetworkPermissionEvidence) {
         let presentation = LocalNetworkPermissionPresentation.make(for: evidence)
-        localNetworkPermissionStatusLabel.stringValue = presentation.statusText
-        localNetworkPermissionStatusLabel.textColor = presentation.isFailure ? .systemRed : .labelColor
         localNetworkPermissionDetailLabel.stringValue = presentation.detailText
         localNetworkPermissionDetailLabel.isHidden = presentation.detailText.isEmpty
+        guard presentation.isExplicitlyDenied else { return }
+        updatePeerConnectionStatus(presentation.statusText, connected: false)
+        peerStatusLabel.textColor = .systemRed
     }
 
     private func showPeerInspectionResult(_ result: PeerCapabilityInspectionResult, profileID: String) {

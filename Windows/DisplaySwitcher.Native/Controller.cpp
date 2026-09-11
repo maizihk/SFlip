@@ -1303,7 +1303,7 @@ namespace DisplaySwitcher::Native
             auto ready = self && !self->disposed_ && self->EnsurePeerListening(port);
             if (ready) self->networkAccessPrepared_ = true;
             auto message = ready
-                ? L"网络检查完成，可以检测连接。"
+                ? L""
                 : L"无法启动网络服务，请检查端口占用或网络权限。";
             if (self && !self->disposed_)
                 self->Enqueue([completed = std::move(completed), ready, message = std::move(message)]() mutable
