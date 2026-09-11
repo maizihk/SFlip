@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import XCTest
 
 private final class ManualSettingsSaveFeedbackScheduler: SettingsSaveFeedbackScheduling {
@@ -149,7 +150,7 @@ final class PublicPresentationModelsTests: XCTestCase {
             let presentation = LocalNetworkPermissionPresentation.make(for: evidence)
             XCTAssertEqual(presentation.statusText, "连接失败，请检查权限、地址和防火墙")
             XCTAssertFalse(presentation.isExplicitlyDenied)
-            XCTAssertTrue(presentation.detailText.contains("未获得系统明确拒绝"))
+            XCTAssertEqual(presentation.detailText, "")
         }
     }
 
@@ -175,6 +176,26 @@ final class PublicPresentationModelsTests: XCTestCase {
         XCTAssertEqual(ddcCount, 0)
         XCTAssertEqual(wakeCount, 0)
         XCTAssertEqual(inputSwitchCount, 0)
+    }
+
+    func testTransportFailuresMapToOrdinaryNetworkFailureInsteadOfPermissionDenial() {
+        let failures: [PeerCapabilityInspectionResult] = [
+            .listenerFailed(.init(domain: .posix, code: EADDRINUSE)),
+            .sendFailed(.init(domain: .addressResolution, code: -2)),
+            .sendFailed(nil)
+        ]
+
+        for failure in failures {
+            var capturedEvidence: LocalNetworkPermissionEvidence?
+            LocalNetworkPermissionInspectionAction.perform(
+                using: { completion in completion(failure) },
+                completion: { _, evidence in capturedEvidence = evidence }
+            )
+            XCTAssertEqual(capturedEvidence, .ordinaryNetworkFailure)
+            XCTAssertFalse(
+                LocalNetworkPermissionPresentation.make(for: capturedEvidence!).isExplicitlyDenied
+            )
+        }
     }
 
     func testOnlyExplicitSettingsReadUsesHardware() {

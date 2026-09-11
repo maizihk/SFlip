@@ -384,14 +384,14 @@ namespace winrt::DisplaySwitcher::Native::implementation
         usbSwitchDisplaysOnArrival_.Toggled([this](auto const&, auto const&) { SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Usb); });
         linkAllDisplays_.Toggled([this](auto const&, auto const&)
         {
-            if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::None))
+            if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays))
             {
                 auto strong = get_strong();
                 DispatcherQueue().TryEnqueue([strong] { strong->RebuildDisplayEditors(); });
             }
         });
-        autoStart_.Toggled([this](auto const&, auto const&) { SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::None); });
-        detailedDiagnostics_.Toggled([this](auto const&, auto const&) { SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::None); });
+        autoStart_.Toggled([this](auto const&, auto const&) { SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::General); });
+        detailedDiagnostics_.Toggled([this](auto const&, auto const&) { SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::General); });
         usbDevices_.SelectionChanged([this](auto const&, auto const&)
         {
             if (loading_) return;
@@ -481,8 +481,6 @@ namespace winrt::DisplaySwitcher::Native::implementation
         connectionStatus_ = TextBlock(); connectionStatus_.VerticalAlignment(VerticalAlignment::Center);
         peerStatus.Children().Append(connectionDot_); peerStatus.Children().Append(connectionStatus_);
         SetConnectionStatus(L"协同未启用", false);
-        auto peerHint = TextBlock(); peerHint.Text(L"先检查网络权限，再检测连接。两项操作都不会执行 USB、唤醒或显示器操作。");
-        peerHint.TextWrapping(TextWrapping::Wrap); peerHint.Opacity(0.72);
         auto checkNetwork = Button(); checkNetwork.Content(box_value(L"检查网络权限"));
         ApplyStandardButtonGeometry(checkNetwork);
         checkNetwork.Click([this](auto const&, auto const&)
@@ -490,13 +488,13 @@ namespace winrt::DisplaySwitcher::Native::implementation
             if (!checkNetworkAccess_) { SetOperationFeedback(L"网络权限检查服务不可用。", true); return; }
             CaptureDisplayEditors(); CaptureProfileEditors();
             auto config = original_; config.displays = workingDisplays_; config.collaborationProfiles = workingProfiles_;
-            SetOperationFeedback(L"正在检查本机 UDP 监听；若 Windows 弹出提示，请允许专用网络访问。");
+            SetOperationFeedback(L"正在检查网络权限；如有系统提示，请允许专用网络访问。");
             auto weak = get_weak();
             checkNetworkAccess_(config, [weak](bool ready, std::wstring const& message)
             {
                 if (auto self = weak.get(); self && !self->windowClosed_)
                 {
-                    self->SetOperationFeedback(message,
+                    self->SetOperationFeedback(ready ? L"" : message,
                         ::DisplaySwitcher::Native::NetworkAccessFeedbackSeverity(ready));
                     if (!ready) self->SetConnectionStatus(L"网络权限未就绪", false);
                 }
@@ -510,6 +508,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             if (!selectedProfileId_.empty()) DetectProfile(selectedProfileId_);
         });
         auto peerActions = StackPanel(); peerActions.Orientation(Orientation::Horizontal); peerActions.Spacing(8);
+        peerActions.HorizontalAlignment(HorizontalAlignment::Right);
         peerActions.Children().Append(checkNetwork); peerActions.Children().Append(detectProfileButton_);
         auto addProfile = Button(); addProfile.Content(box_value(L"添加配置"));
         addProfile.VerticalAlignment(VerticalAlignment::Bottom);
@@ -550,8 +549,9 @@ namespace winrt::DisplaySwitcher::Native::implementation
         profileConfigSection.Children().Append(CreateSubheading(L"配置详情"));
         auto peerLayout = ::DisplaySwitcher::Native::SettingsPageLayout(::DisplaySwitcher::Native::SettingsPage::Collaboration);
         peerTab.Content(CreatePage({
-            CreateSection(peerLayout.cards.at(0), { CreateTwoColumn(peerStatus, peerActions), peerHint }),
-            CreateSection(peerLayout.cards.at(1), { profileConfigSection, profileEditorsPanel_ }) }));
+            CreateSection(peerLayout.cards.at(0), { peerActions }),
+            CreateSection(peerLayout.cards.at(1), { profileConfigSection, profileEditorsPanel_ }),
+            peerStatus }));
 
         auto displayTab = TabViewItem(); displayTab.IsClosable(false); displayTab.HorizontalContentAlignment(HorizontalAlignment::Center);
         displayTab.Header(CreateTabHeader(L"\uE7F4", L"显示器"));
@@ -570,9 +570,6 @@ namespace winrt::DisplaySwitcher::Native::implementation
         auto diagnosticTab = TabViewItem(); diagnosticTab.IsClosable(false);
         diagnosticTab.HorizontalContentAlignment(HorizontalAlignment::Center);
         diagnosticTab.Header(CreateTabHeader(L"\uE9D9", L"诊断"));
-        auto diagnosticHint = TextBlock();
-        diagnosticHint.Text(L"预览只读取当前配置快照和内存状态，不会发起网络检测、USB 或显示器操作。复制内容与下方可见文本完全一致。");
-        diagnosticHint.TextWrapping(TextWrapping::Wrap); diagnosticHint.Opacity(0.72);
         diagnosticPreview_ = TextBox();
         diagnosticPreview_.IsReadOnly(true); diagnosticPreview_.AcceptsReturn(true);
         diagnosticPreview_.TextWrapping(TextWrapping::NoWrap); diagnosticPreview_.MinHeight(390);
@@ -589,7 +586,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         auto diagnosticActions = StackPanel(); diagnosticActions.Orientation(Orientation::Horizontal);
         diagnosticActions.Spacing(8); diagnosticActions.Children().Append(refreshDiagnostic);
         diagnosticActions.Children().Append(copyDiagnostic);
-        diagnosticTab.Content(CreatePage({ CreateSection({}, { diagnosticHint, diagnosticActions, diagnosticPreview_ }) }));
+        diagnosticTab.Content(CreatePage({ CreateSection({}, { diagnosticActions, diagnosticPreview_ }) }));
         RefreshDiagnosticPreview();
 
         auto aboutTab = TabViewItem(); aboutTab.IsClosable(false); aboutTab.HorizontalContentAlignment(HorizontalAlignment::Center);
@@ -982,7 +979,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             RebuildDisplayEditors();
             RebuildUsbMappingEditors();
             RebuildProfileEditors();
-            if (reconciled.changed) SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::None);
+            if (reconciled.changed) SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays);
             if (ddcMonitors_.empty())
                 SetOperationFeedback(L"没有检测到支持 Windows 物理显示器接口的显示器。", true);
             else if (!enumeration.message.empty()) SetOperationFeedback(enumeration.message, true);
@@ -1256,7 +1253,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
                 {
                     auto on = sender.template as<ToggleSwitch>().IsOn(); slider.IsEnabled(on);
                     showInTray.IsEnabled(on); if (!on) showInTray.IsOn(false);
-                    if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::None))
+                    if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays))
                     {
                         auto strong = get_strong();
                         DispatcherQueue().TryEnqueue([strong] { strong->RebuildDisplayEditors(); });
@@ -1264,7 +1261,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
                 });
                 showInTray.Toggled([this](auto const&, auto const&)
                 {
-                    SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::None);
+                    SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays);
                 });
                 slider.ValueChanged([value](auto const& sender, auto const&) { value.Text(std::to_wstring(static_cast<int>(std::lround(sender.template as<Slider>().Value())))); });
                 slider.PointerCaptureLost(Microsoft::UI::Xaml::Input::PointerEventHandler(
@@ -1505,9 +1502,13 @@ namespace winrt::DisplaySwitcher::Native::implementation
             });
             fields.Children().Append(mappingGrid);
 
-            auto triggerSummary = TextBlock();
-            triggerSummary.Text(profile.triggerDevices.empty() ? L"未引用本机触发设备" : L"已引用 " + std::to_wstring(profile.triggerDevices.size()) + L" 个本机触发设备");
-            triggerSummary.Opacity(0.72); fields.Children().Append(triggerSummary);
+            controls.enablementStatus = TextBlock();
+            controls.enablementStatus.Text(::DisplaySwitcher::Native::CollaborationEnablementText(
+                profile.coordinationEnabled, profile.peerProtocolVersion == 2 &&
+                ::DisplaySwitcher::Native::IsValidDisplayId(profile.peerEndpointId)));
+            controls.enablementStatus.TextWrapping(TextWrapping::Wrap);
+            controls.enablementStatus.Opacity(0.72);
+            fields.Children().Append(controls.enablementStatus);
             auto remove = Button(); remove.Content(box_value(L"删除配置")); remove.IsEnabled(workingProfiles_.size() > 1);
             remove.Click([this, id = profile.id](auto const&, auto const&) { RemoveProfile(id); });
             ApplyStandardButtonGeometry(remove);
@@ -1575,8 +1576,11 @@ namespace winrt::DisplaySwitcher::Native::implementation
             if (item != workingProfiles_.end() && workingProfiles_.size() > 1) workingProfiles_.erase(item);
             if (_wcsicmp(usbSelectedProfileId_.c_str(), id.c_str()) == 0)
             {
+                auto wasLoading = loading_;
+                loading_ = true;
                 usbSelectedProfileId_.clear();
                 usbSwitchDisplaysOnArrival_.IsOn(false);
+                loading_ = wasLoading;
             }
             RebuildProfileEditors(); SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration);
         });
@@ -1593,7 +1597,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         if (profile && profile->peerProtocolVersion && *profile->peerProtocolVersion != 2)
             result.problems.push_back(L"协议版本无效");
         if (!::DisplaySwitcher::Native::IsValidDisplayId(config.localEndpointId) || config.listenPort < 1 || config.listenPort > 65535)
-            result.problems.push_back(L"本机身份或监听端口无效");
+            result.problems.push_back(L"本机连接设置无效");
         if (!result.problems.empty() || !detectProfile_)
         {
             SetConnectionStatus(L"本机配置不完整", false);
@@ -1602,7 +1606,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             SetOperationFeedback(message, true);
             return;
         }
-        SetOperationFeedback(L"正在检测；不会执行 USB、蓝牙、唤醒或显示器操作。");
+        SetOperationFeedback({});
         SetConnectionStatus(L"正在检测…", false);
         detectingProfileId_ = id;
         auto generation = ++profileDetectionGeneration_;
@@ -1627,73 +1631,40 @@ namespace winrt::DisplaySwitcher::Native::implementation
         if (result.outcome == Outcome::NetworkNotReady)
         {
             SetConnectionStatus(L"网络权限未就绪", false);
-            SetOperationFeedback(L"请先点击“检查网络权限”，确认本机 UDP 监听已就绪后再检测连接。", true); return;
+            SetOperationFeedback(L"请先点击“检查网络权限”，然后重试。", true); return;
         }
         if (result.outcome == Outcome::SendFailed)
         {
-            SetConnectionStatus(L"探测发送失败", false);
-            SetOperationFeedback(L"无法发送状态探测。请检查对端地址、端口和本机网络状态。", true); return;
+            SetConnectionStatus(L"连接请求发送失败", false);
+            SetOperationFeedback(L"无法发送连接请求，请检查地址、端口和网络。", true); return;
         }
         if (result.outcome == Outcome::LocalConfigurationIncomplete)
         {
-            SetConnectionStatus(L"本机配置不完整", false); SetOperationFeedback(L"本机配置不完整，未发送探测消息。", true); return;
+            SetConnectionStatus(L"本机配置不完整", false); SetOperationFeedback(L"请补全本机连接设置。", true); return;
         }
         if (result.outcome == Outcome::AuthenticationFailed)
         {
-            SetConnectionStatus(L"认证失败", false); SetOperationFeedback(L"v2 对端已响应，但认证失败。请检查配对密码。", true); return;
+            SetConnectionStatus(L"配对码不匹配", false); SetOperationFeedback(L"请确认两端填写的配对码相同。", true); return;
+        }
+        if (result.outcome == Outcome::RouteSaveFailed)
+        {
+            SetConnectionStatus(L"连接信息保存失败", false);
+            SetOperationFeedback(L"无法保存连接信息；原设置已保留，自动操作保持停用。", true); return;
         }
         if (result.outcome == Outcome::NoResponse)
         {
-            SetConnectionStatus(L"无响应", false); SetOperationFeedback(L"v2 状态探测无响应。", true); return;
+            SetConnectionStatus(L"无响应", false); SetOperationFeedback(L"对端无响应，请检查地址、网络和防火墙。", true); return;
         }
         auto profile = std::find_if(workingProfiles_.begin(), workingProfiles_.end(), [&](auto const& item)
         { return _wcsicmp(item.id.c_str(), id.c_str()) == 0; });
         if (profile == workingProfiles_.end()) return;
         if (result.outcome != Outcome::V2Available) return;
-        if (!result.endpointConfirmationRequired)
-        {
-            ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*profile, result, false);
-            if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration))
-            {
-                SetConnectionStatus(L"v2 可用", true);
-                SetOperationFeedback(L"v2 可用；检测结果已保存，未执行任何硬件操作。");
-            }
-            return;
-        }
-        auto title = result.endpointChanged ? L"对端身份已变化" : L"确认首次发现的对端";
-        auto message = result.endpointChanged
-            ? L"检测到的对端身份与已保存值不同。确认后将立即保存。"
-            : L"检测到新的对端身份。确认后将立即保存。";
-        auto dialog = ContentDialog(); dialog.Title(box_value(title)); dialog.Content(box_value(message));
-        dialog.PrimaryButtonText(L"确认对端"); dialog.CloseButtonText(L"保留原值"); dialog.DefaultButton(ContentDialogButton::Close);
-        dialog.XamlRoot(Content().XamlRoot());
-        auto observed = result.observedEndpointId;
-        auto generation = profileDetectionGeneration_;
-        auto weak = get_weak();
-        dialog.ShowAsync().Completed([weak, id, observed, dialog, generation](auto const& operation, auto const& status)
-        {
-            auto self = weak.get();
-            if (!self || self->windowClosed_ || self->profileDetectionGeneration_ != generation) return;
-            if (status != Windows::Foundation::AsyncStatus::Completed || operation.GetResults() != ContentDialogResult::Primary)
-            {
-                self->SetConnectionStatus(L"v2 可用，对端身份未确认", false);
-                self->SetOperationFeedback(L"未确认对端身份；原配置保持不变。"); return;
-            }
-            auto target = std::find_if(self->workingProfiles_.begin(), self->workingProfiles_.end(), [&](auto const& item)
-            { return _wcsicmp(item.id.c_str(), id.c_str()) == 0; });
-            if (target == self->workingProfiles_.end()) return;
-            ::DisplaySwitcher::Native::ProfileDetectionResult confirmed;
-            confirmed.outcome = ::DisplaySwitcher::Native::ProfileDetectionOutcome::V2Available;
-            confirmed.observedEndpointId = observed; confirmed.endpointConfirmationRequired = true;
-            ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*target, confirmed, true);
-            if (self->SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration))
-            {
-                self->SetConnectionStatus(L"v2 可用，对端身份已确认", true);
-                self->SetOperationFeedback(L"对端身份已确认并保存。");
-            }
-        });
+        ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*profile, result, false);
+        if (auto saved = original_.FindCollaborationProfile(id))
+            ::DisplaySwitcher::Native::ApplyProfileDetectionResult(*saved, result, false);
+        SetConnectionStatus(L"已和对端（" + profile->name + L"）建立连接", true);
+        SetOperationFeedback({});
     }
-
     void SettingsWindow::CancelProfileDetection()
     {
         if (detectingProfileId_.empty()) return;
@@ -1827,86 +1798,106 @@ namespace winrt::DisplaySwitcher::Native::implementation
             LoadValues(original_);
             SetOperationFeedback(message, true);
         };
-        CaptureProfileEditors();
-        std::set<std::wstring> profileNames;
-        for (auto& profile : workingProfiles_)
+
+        auto edited = original_;
+        if (scope == ::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration)
         {
-            auto normalizedName = profile.name; std::transform(normalizedName.begin(), normalizedName.end(), normalizedName.begin(), towlower);
-            if (profile.name.empty() || !profileNames.insert(normalizedName).second)
-            { reject(2, L"协同配置名称不能为空，且忽略大小写后必须唯一。"); return false; }
-            if (profile.peerPort < 1 || profile.peerPort > 65535)
-            { reject(2, profile.name + L"的对端端口必须为 1–65535。"); return false; }
-            if (!profile.pairingCode.empty() && !::DisplaySwitcher::Native::AppConfig::IsValidPairingCode(profile.pairingCode))
-            { reject(2, profile.name + L"的配对密码在 NFC 规范化后必须为 8–128 个 UTF-8 字节。"); return false; }
-            profile.pairingCode = ::DisplaySwitcher::Native::AppConfig::NormalizeNfc(profile.pairingCode);
-            for (auto const& mapping : profile.displayInputs)
-                if (!::DisplaySwitcher::Native::IsValidInputSourceValue(mapping.peerInput))
-                { reject(2, profile.name + L"包含无效的显示器输入源编号。"); return false; }
-            if (profile.coordinationEnabled)
+            CaptureProfileEditors();
+            std::set<std::wstring> profileNames;
+            for (auto& profile : workingProfiles_)
             {
-                auto candidate = original_; candidate.displays = workingDisplays_; candidate.collaborationProfiles = workingProfiles_;
-                auto inspection = candidate.InspectProfile(profile.id);
-                if (!inspection.complete || profile.peerProtocolVersion != 2 ||
-                    !::DisplaySwitcher::Native::IsValidDisplayId(profile.peerEndpointId))
-                { reject(2, profile.name + L"配置不完整，无法启用。"); return false; }
+                auto normalizedName = profile.name;
+                std::transform(normalizedName.begin(), normalizedName.end(), normalizedName.begin(), towlower);
+                if (profile.name.empty() || !profileNames.insert(normalizedName).second)
+                { reject(2, L"协同配置名称不能为空，且忽略大小写后必须唯一。"); return false; }
+                if (profile.peerPort < 1 || profile.peerPort > 65535)
+                { reject(2, profile.name + L"的对端端口必须为 1–65535。"); return false; }
+                if (!profile.pairingCode.empty() && !::DisplaySwitcher::Native::AppConfig::IsValidPairingCode(profile.pairingCode))
+                { reject(2, profile.name + L"的配对密码在 NFC 规范化后必须为 8–128 个 UTF-8 字节。"); return false; }
+                profile.pairingCode = ::DisplaySwitcher::Native::AppConfig::NormalizeNfc(profile.pairingCode);
+                for (auto const& mapping : profile.displayInputs)
+                    if (!::DisplaySwitcher::Native::IsValidInputSourceValue(mapping.peerInput))
+                    { reject(2, profile.name + L"包含无效的显示器输入源编号。"); return false; }
+                if (profile.coordinationEnabled)
+                {
+                    auto candidate = original_;
+                    candidate.collaborationProfiles = workingProfiles_;
+                    auto inspection = candidate.InspectProfile(profile.id);
+                    if (!inspection.complete)
+                    {
+                        auto message = profile.name + L"无法启用：";
+                        for (auto const& problem : inspection.problems) message += problem + L"；";
+                        reject(2, message);
+                        return false;
+                    }
+                }
             }
+            edited.collaborationProfiles = workingProfiles_;
         }
-        CaptureDisplayEditors();
-        if (usbAutomation_.IsOn() && workingDisplays_.empty())
-        { reject(1, L"启用 USB 自动切换前，请先完成显示器配置。"); return false; }
-        std::vector<::DisplaySwitcher::Native::VisibleDisplayInputEdit> visibleUsbEdits;
-        bool hasUsbMapping{};
-        for (auto const& editor : usbMappingEditors_)
+        else if (scope == ::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Usb)
         {
-            auto parsed = ::DisplaySwitcher::Native::ParseInputSourceText(editor.targetInput.Text().c_str());
-            if (parsed.status == ::DisplaySwitcher::Native::InputSourceTextStatus::Invalid)
-            { reject(1, L"USB 显示器输入源必须留空或填写 1–65535。"); return false; }
-            visibleUsbEdits.push_back({ editor.displayId, parsed.value });
-            if (parsed.value) hasUsbMapping = true;
-        }
-        auto usbMappings = ::DisplaySwitcher::Native::MergeVisibleUsbDisplayInputs(
-            original_.usbSwitch.displayInputs, visibleUsbEdits);
-        if (usbAutomation_.IsOn() && (selectedUsbLocalReference_.empty() || !hasUsbMapping))
-        { reject(1, L"启用 USB 自动切换前，必须选择一个设备并至少配置一台显示器输入源。"); return false; }
-        if (usbSwitchDisplaysOnArrival_.IsOn())
-        {
-            auto profile = std::find_if(workingProfiles_.begin(), workingProfiles_.end(), [&](auto const& item)
-                { return _wcsicmp(item.id.c_str(), usbSelectedProfileId_.c_str()) == 0; });
-            auto candidate = original_; candidate.displays = workingDisplays_; candidate.collaborationProfiles = workingProfiles_;
-            if (profile == workingProfiles_.end() || !profile->coordinationEnabled || !candidate.InspectProfile(profile->id).complete)
-            { reject(1, L"启用联动协同前，必须选择一个已开启且完整的协同配置。"); return false; }
-        }
-        std::set<std::wstring> hardwareIds;
-        for (auto const& display : workingDisplays_)
-        {
-            if (display.name.empty())
-            { reject(3, L"显示器信息不完整，已恢复最后有效配置。"); return false; }
-            std::wstring backend = L"native_ddc";
-            auto hardwareId = ::DisplaySwitcher::Native::CanonicalDdcMonitorId(display.nativeMonitorId);
-            if (hardwareId.empty())
+            if (usbAutomation_.IsOn() && original_.displays.empty())
+            { reject(1, L"启用 USB 自动切换前，请先完成显示器配置。"); return false; }
+            std::vector<::DisplaySwitcher::Native::VisibleDisplayInputEdit> visibleUsbEdits;
+            for (auto const& editor : usbMappingEditors_)
             {
-                reject(3, display.name + L"当前未关联可用显示器。");
-                return false;
+                auto parsed = ::DisplaySwitcher::Native::ParseInputSourceText(editor.targetInput.Text().c_str());
+                if (parsed.status == ::DisplaySwitcher::Native::InputSourceTextStatus::Invalid)
+                { reject(1, L"USB 显示器输入源必须留空或填写 1–65535。"); return false; }
+                visibleUsbEdits.push_back({ editor.displayId, parsed.value });
             }
-            hardwareId = backend + L":" + hardwareId;
-            std::transform(hardwareId.begin(), hardwareId.end(), hardwareId.begin(), towlower);
-            if (!hardwareIds.insert(hardwareId).second)
-            { reject(3, L"显示器关联发生冲突，已恢复最后有效配置。"); return false; }
+            auto usbMappings = ::DisplaySwitcher::Native::MergeVisibleUsbDisplayInputs(
+                original_.usbSwitch.displayInputs, visibleUsbEdits);
+            auto hasUsbMapping = std::any_of(usbMappings.begin(), usbMappings.end(), [](auto const& mapping)
+                { return mapping.targetInput && ::DisplaySwitcher::Native::IsValidInputSourceValue(*mapping.targetInput); });
+            if (usbAutomation_.IsOn() && (selectedUsbLocalReference_.empty() || !hasUsbMapping))
+            { reject(1, L"启用 USB 自动切换前，必须选择一个设备并至少配置一台显示器输入源。"); return false; }
+            auto pendingUsb = original_.usbSwitch;
+            pendingUsb.collaborationWakeEnabled = usbSwitchDisplaysOnArrival_.IsOn();
+            pendingUsb.collaborationProfileId = usbSelectedProfileId_;
+            if (::DisplaySwitcher::Native::RequiresCompleteCollaborationLink(original_.usbSwitch, pendingUsb))
+            {
+                auto profile = original_.FindCollaborationProfile(usbSelectedProfileId_);
+                if (!profile || !original_.InspectProfile(profile->id).complete)
+                { reject(1, L"启用联动协同前，必须选择一个完整的协同配置。"); return false; }
+            }
+            edited.usbSwitch.enabled = usbAutomation_.IsOn();
+            edited.usbSwitch.collaborationWakeEnabled = usbSwitchDisplaysOnArrival_.IsOn();
+            edited.usbSwitch.collaborationProfileId = usbSelectedProfileId_;
+            edited.usbSwitch.deviceLocalReference = selectedUsbLocalReference_;
+            edited.usbSwitch.deviceName = selectedUsbName_;
+            edited.usbSwitch.vendorId = selectedUsbVendorId_;
+            edited.usbSwitch.productId = selectedUsbProductId_;
+            edited.usbSwitch.displayInputs = std::move(usbMappings);
         }
-        auto result = original_;
-        result.usbSwitch.enabled = usbAutomation_.IsOn();
-        result.usbSwitch.collaborationWakeEnabled = usbSwitchDisplaysOnArrival_.IsOn();
-        result.usbSwitch.collaborationProfileId = usbSelectedProfileId_;
-        result.usbSwitch.deviceLocalReference = selectedUsbLocalReference_;
-        result.usbSwitch.deviceName = selectedUsbName_;
-        result.usbSwitch.vendorId = selectedUsbVendorId_; result.usbSwitch.productId = selectedUsbProductId_;
-        result.usbSwitch.displayInputs = std::move(usbMappings);
-        result.linkAllDisplays = linkAllDisplays_.IsOn();
-        result.displays = workingDisplays_;
-        result.collaborationProfiles = workingProfiles_;
-        for (auto& display : result.displays) display.macInput = -1;
-        result.displayConfigurationSafeMode = false; result.startWithWindows = autoStart_.IsOn();
-        result.detailedDiagnosticRecording = detailedDiagnostics_.IsOn();
+        else if (scope == ::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays)
+        {
+            CaptureDisplayEditors();
+            std::set<std::wstring> hardwareIds;
+            for (auto const& display : workingDisplays_)
+            {
+                if (display.name.empty())
+                { reject(3, L"显示器信息不完整，已恢复最后有效配置。"); return false; }
+                auto hardwareId = ::DisplaySwitcher::Native::CanonicalDdcMonitorId(display.nativeMonitorId);
+                if (hardwareId.empty())
+                { reject(3, display.name + L"当前未关联可用显示器。"); return false; }
+                hardwareId = L"native_ddc:" + hardwareId;
+                std::transform(hardwareId.begin(), hardwareId.end(), hardwareId.begin(), towlower);
+                if (!hardwareIds.insert(hardwareId).second)
+                { reject(3, L"显示器关联发生冲突，已恢复最后有效配置。"); return false; }
+            }
+            edited.linkAllDisplays = linkAllDisplays_.IsOn();
+            edited.displays = workingDisplays_;
+            for (auto& display : edited.displays) display.macInput = -1;
+            edited.displayConfigurationSafeMode = false;
+        }
+        else
+        {
+            edited.startWithWindows = autoStart_.IsOn();
+            edited.detailedDiagnosticRecording = detailedDiagnostics_.IsOn();
+        }
+
+        auto result = ::DisplaySwitcher::Native::MergeSettingsForScope(original_, edited, scope);
         if (AppConfigEquals(original_, result))
         {
             if (hideAfterSave) appWindow_.Hide();
@@ -1927,6 +1918,12 @@ namespace winrt::DisplaySwitcher::Native::implementation
             return false;
         }
         original_ = result;
+        for (auto const& controls : profileEditors_)
+            if (auto profile = original_.FindCollaborationProfile(controls.id))
+                controls.enablementStatus.Text(::DisplaySwitcher::Native::CollaborationEnablementText(
+                    profile->coordinationEnabled, profile->peerProtocolVersion == 2 &&
+                    ::DisplaySwitcher::Native::IsValidDisplayId(profile->peerEndpointId)));
+        if (scope == ::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration) SetOperationFeedback(L"");
         auto action = saveFeedback_.RecordSaveResult(scope, true, true, L"✓ 已保存", SteadyMs());
         if (action == ::DisplaySwitcher::Native::SettingsSaveFeedbackAction::ShowScopedFeedback)
         {
