@@ -414,20 +414,6 @@ final class USBLearningSafetyGate {
     }
 }
 
-enum PeerIdentityCheck: Equatable {
-    case unchanged
-    case firstConfirmationRequired(endpointID: String, protocolVersion: Int)
-    case changeConfirmationRequired(previousEndpointID: String, endpointID: String, protocolVersion: Int)
-    case invalid
-
-    var requiresConfirmation: Bool {
-        switch self {
-        case .firstConfirmationRequired, .changeConfirmationRequired: return true
-        case .unchanged, .invalid: return false
-        }
-    }
-}
-
 enum DisplayConfigurationStore {
     static let storageKey = "Displays.Configuration.v5"
     static let legacyV4StorageKey = "Displays.Configuration.v4"
@@ -652,16 +638,6 @@ enum DisplayConfigurationStore {
         }
     }
 
-    static func checkPeerIdentity(_ profile: CollaborationProfile, endpointID: String, protocolVersion: Int) -> PeerIdentityCheck {
-        guard let candidate = uuid(endpointID), protocolVersion == 2 else { return .invalid }
-        guard let previous = profile.peerEndpointID else {
-            return .firstConfirmationRequired(endpointID: candidate, protocolVersion: protocolVersion)
-        }
-        guard let old = uuid(previous) else { return .invalid }
-        if old.caseInsensitiveCompare(candidate) == .orderedSame && profile.peerProtocolVersion == protocolVersion { return .unchanged }
-        return .changeConfirmationRequired(previousEndpointID: old, endpointID: candidate, protocolVersion: protocolVersion)
-    }
-
     static func isCompleteUSBConfiguration(_ usbSwitch: USBSwitchConfiguration,
                                            displays: [DisplayConfigurationV4Display]) -> Bool {
         guard usbSwitch.triggerDevice?.kind.caseInsensitiveCompare("usb") == .orderedSame else { return false }
@@ -683,6 +659,25 @@ enum DisplayConfigurationStore {
         let known = Set(document.displays.map { $0.id.lowercased() })
         return inspectProfile(profile, displays: document.displays,
                               ddcAvailableDisplayIDs: known).issues.isEmpty
+    }
+
+    static func documentByCachingPeerEndpoint(
+        _ endpointID: String,
+        protocolVersion: Int = 2,
+        forProfileID profileID: String,
+        in document: DisplayConfigurationStoreV5Document
+    ) -> DisplayConfigurationStoreV5Document? {
+        guard let endpoint = uuid(endpointID), protocolVersion == 2,
+              let index = document.collaborationProfiles.firstIndex(where: {
+                  $0.id.caseInsensitiveCompare(profileID) == .orderedSame
+              }) else { return nil }
+        var updated = document
+        let profile = updated.collaborationProfiles[index]
+        if profile.peerEndpointID.flatMap(uuid) == endpoint,
+           profile.peerProtocolVersion == protocolVersion { return document }
+        updated.collaborationProfiles[index].peerEndpointID = endpoint
+        updated.collaborationProfiles[index].peerProtocolVersion = protocolVersion
+        return updated
     }
 
     private static func migrateV4Configuration(data: Data, storage: DisplayConfigurationStorage,

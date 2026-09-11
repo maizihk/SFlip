@@ -312,6 +312,27 @@ final class HandoffV2StateMachine {
         if self.coordinationEnabled == false { clearInternalEvent(finalState: .cancelled) }
     }
 
+    func handlePeerRouteChanged(
+        replacing oldEndpointID: String?,
+        enabledTargets: [V2HandoffTarget],
+        coordinationEnabled: Bool
+    ) {
+        self.enabledTargets = enabledTargets.map {
+            V2HandoffTarget(
+                endpointID: $0.endpointID.lowercased(),
+                capability: $0.capability,
+                reachable: $0.reachable
+            )
+        }
+        self.coordinationEnabled = coordinationEnabled
+        if let oldEndpointID,
+           lockedTargetEndpointID == oldEndpointID.lowercased(),
+           activeEventID != nil {
+            clearEvent(reason: .configurationChanged, finalState: .cancelled)
+        }
+        if !coordinationEnabled { clearInternalEvent(finalState: .cancelled) }
+    }
+
     func handleAdvanceTime() {}
 
     private func beginDirectedRequest(target: V2HandoffTarget, eventID: String, intent: V2HandoverIntent) {
