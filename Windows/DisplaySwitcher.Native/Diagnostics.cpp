@@ -38,6 +38,10 @@ namespace
             "profile_detection.response_received", "profile_detection.response_authenticated",
             "profile_detection.response_authentication_failed", "profile_detection.started",
             "profile_detection.response_timeout", "profile_detection.send_completed",
+            "protocol.v2.status_probe_received", "protocol.v2.bootstrap_matched",
+            "protocol.v2.bootstrap_no_match", "protocol.v2.bootstrap_validation_rejected",
+            "protocol.v2.bootstrap_ambiguous", "protocol.v2.bootstrap_endpoint_conflict",
+            "protocol.v2.bootstrap_response_sent",
             "udp.send", "display.switch_complete", "usb.target_notification", "usb.poll_change",
             "diagnostic.redacted"
         };

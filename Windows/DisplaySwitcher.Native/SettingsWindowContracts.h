@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <algorithm>
 #include <cstdint>
@@ -6,6 +6,8 @@
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "AppConfig.h"
 
 namespace DisplaySwitcher::Native
 {
@@ -27,13 +29,62 @@ namespace DisplaySwitcher::Native
         std::vector<SettingsCardContract> cards;
     };
 
+    inline std::wstring CollaborationEnablementText(bool enabled, bool peerConfirmed)
+    {
+        if (!enabled) return L"未开启。";
+        return peerConfirmed ? L"已开启；连接状态见上方。"
+            : L"已开启，正在等待对端上线并自动连接。";
+    }
+
     enum class SettingsSaveFeedbackScope
     {
         None,
+        General,
+        Displays,
         Usb,
         Collaboration,
     };
 
+    inline bool RequiresCompleteCollaborationLink(UsbSwitchConfig const& original,
+        UsbSwitchConfig const& edited)
+    {
+        return edited.collaborationWakeEnabled &&
+            (!original.collaborationWakeEnabled ||
+                _wcsicmp(original.collaborationProfileId.c_str(), edited.collaborationProfileId.c_str()) != 0);
+    }
+
+    inline AppConfig MergeSettingsForScope(AppConfig const& original, AppConfig const& edited,
+        SettingsSaveFeedbackScope scope)
+    {
+        auto result = original;
+        switch (scope)
+        {
+        case SettingsSaveFeedbackScope::Usb:
+            result.usbSwitch = edited.usbSwitch;
+            break;
+        case SettingsSaveFeedbackScope::Collaboration:
+            result.collaborationProfiles = edited.collaborationProfiles;
+            if (!result.usbSwitch.collaborationProfileId.empty() &&
+                !result.FindCollaborationProfile(result.usbSwitch.collaborationProfileId))
+            {
+                result.usbSwitch.collaborationWakeEnabled = false;
+                result.usbSwitch.collaborationProfileId.clear();
+            }
+            break;
+        case SettingsSaveFeedbackScope::General:
+            result.startWithWindows = edited.startWithWindows;
+            result.detailedDiagnosticRecording = edited.detailedDiagnosticRecording;
+            break;
+        case SettingsSaveFeedbackScope::Displays:
+            result.linkAllDisplays = edited.linkAllDisplays;
+            result.displays = edited.displays;
+            result.displayConfigurationSafeMode = edited.displayConfigurationSafeMode;
+            break;
+        case SettingsSaveFeedbackScope::None:
+            break;
+        }
+        return result;
+    }
     enum class SettingsPage
     {
         General,
@@ -189,7 +240,7 @@ namespace DisplaySwitcher::Native
             bool succeeded, std::wstring const& message, int64_t nowMs)
         {
             if (!changed) return SettingsSaveFeedbackAction::None;
-            if (scope == SettingsSaveFeedbackScope::None)
+            if (scope != SettingsSaveFeedbackScope::Usb && scope != SettingsSaveFeedbackScope::Collaboration)
                 return succeeded ? SettingsSaveFeedbackAction::None : SettingsSaveFeedbackAction::ShowOperationFailure;
             if (succeeded)
             {
@@ -218,7 +269,8 @@ namespace DisplaySwitcher::Native
 
         void ClearTransientSuccess(SettingsSaveFeedbackScope scope)
         {
-            if (scope != SettingsSaveFeedbackScope::None) FeedbackFor(scope).ClearTransientSuccess();
+            if (scope == SettingsSaveFeedbackScope::Usb || scope == SettingsSaveFeedbackScope::Collaboration)
+                FeedbackFor(scope).ClearTransientSuccess();
         }
 
         void ClearTransientSuccesses()

@@ -1,5 +1,37 @@
 # macOS 交接记录
 
+## 当前任务：DS-040 协同监听与发送失败终态诊断
+
+- 日期：2026-09-11
+- 分支：`codex/macos-send-failure-diagnostics`
+- 基线：`codex/windows-independent-settings@eb022c5`（PR #95 待合并）；`origin/main@f12a224`
+- 提交 / PR / CI：本轮按任务边界不提交、不推送，由根任务统一审查与运行 macOS CI。
+
+### 原因与实现
+
+- 最新实机诊断显示 listener 成功后发送完成为失败，最后却统一落到 timeout/no-response；原实现只记录粗分类，发送失败回调也没有结束对应 pending。
+- 传输结果现保留安全错误域和 `Int32` 系统码；BSD `sendto` 失败返回后立即捕获 `errno`。详细诊断输出数字域/码，不输出地址、配对码、authTag 或 endpoint 原值。
+- 监听启动失败在发送前立即完成为 `listenerFailed`；异步发送失败只按自己的 inspection ID 完成为 `sendFailed`。完成入口先移除 pending、取消 timeout 并登记 event 已结束，因此迟到回调、取消和计时器不能重复完成或误伤其他检测。
+- 手动检测的失败终态保存在连接状态存储中，周期刷新仍显示监听/发送失败和系统码；新检测开始或认证成功会清除。后台 `reportsStatus=false` 探测不写该状态。
+- 本地网络权限证据把监听和发送失败统一视为 ordinary network failure。现有 BSD UDP 路径没有公开可靠证据将任意 errno（包括 65）等价为 TCC 明确拒绝，因此不作该断言。
+
+### 修改范围与待验
+
+- 生产源码：`PeerTransport.swift`、`PeerProtocolV2.swift`、`main.swift`、`DS007SettingsModels.swift`、`PublicPresentationModels.swift`、`SettingsWindowController.swift`。
+- 测试源码由并行测试任务补充：`PeerTransportTests.swift`、`PeerProtocolV2Tests.swift`、`PublicPresentationModelsTests.swift`、`DS007Tests.swift`。
+- 文档：`macOS/DEVELOPMENT_CHECKLIST.md`、`handoffs/macos.md`。
+- Windows 主机无法运行 Xcode；自动测试、Release 构建、严格验签和 macOS CI 由根任务继续。仍需用户实机确认发送失败显示真实系统码、成功恢复状态，以及双向协同检测。未执行真实网络或硬件操作。
+
+## 当前任务：DS-039 配对码直接连接（2026-09-11）
+
+- 基线：共享分支 `codex/windows-pairing-code-connection`，已包含批准后的协议与 22 条公共消息向量；本任务只修改 macOS 源码、测试、清单和本交接文件，不改协议、schema、版本、工作流或 Windows 实现。
+- 原因：旧实现把随机 endpoint 同时作为探测 target、响应来源门和用户确认身份。首次连接或对端重装后，即使地址、端口和配对码正确，也会被旧缓存拒绝或要求人工确认。
+- 实现：主动人工与后台探测统一发送空 target；接收端按数据报实际地址、端口和配对码唯一验证，允许带旧合法 target 的已认证探测。DNS 配置由 transport 的可注入解析器映射到数值来源地址。非探测消息仍要求当前 endpoint 并校验来源地址、端口、HMAC、时间窗和重放。
+- 缓存与安全：有效状态交换自动缓存 endpoint，关闭配置保持关闭；相同缓存只刷新六秒在线状态。变化先原子保存，再用 `configuration_changed` 清理旧事件并发布新路由；保存失败进入既有安全状态且不连接、不回复。后台探测不改变手动检测状态，不会周期性闪烁或用一次超时覆盖在线窗口。
+- 界面：删除首次/变更身份确认框和旧身份检查模型；用户状态使用“未启用、正在连接、已连接、无响应”等产品文案。字段完整即可保存开启意愿，尚无路由时应用持续自动连接。
+- 自动测试源码：公共消息向量改为 22 条；覆盖任意合法旧 target、篡改 target 未重签拒绝、地址/端口/配对码唯一匹配、DNS 解析匹配、缓存替换、相同缓存幂等、关闭配置不自动开启和零硬件副作用。当前主机是 Windows，没有 Xcode，未声称运行 XCTest、构建或签名；结果待 macOS CI。
+- 待验：macOS CI 的完整 XCTest、Debug/Release、`build-app.sh` 与严格 codesign；双端升级后首次自动连接、单端重装自动恢复、错误地址/端口/配对码和重复配置，以及仅状态连接实机验证。未执行真实 UDP、DDC、USB、唤醒、切屏或系统设置修改。
+
 ## 当前任务：v2.3.0 正式发布（2026-09-07）
 
 - 用户确认已经实机测试，明确授权正式发布；基线 `main@28de478`，分支 `codex/macos-release-2-3-0`。

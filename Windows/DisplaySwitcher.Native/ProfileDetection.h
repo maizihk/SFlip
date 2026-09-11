@@ -19,6 +19,7 @@ namespace DisplaySwitcher::Native
         NoResponse,
         NetworkNotReady,
         SendFailed,
+        RouteSaveFailed,
         LocalConfigurationIncomplete,
     };
 
@@ -45,6 +46,7 @@ namespace DisplaySwitcher::Native
     {
     public:
         void Begin(std::wstring eventId, int64_t expiresAtMilliseconds);
+        bool Matches(std::wstring const& eventId, int64_t nowMilliseconds) const;
         bool MatchesAndConsume(std::wstring const& eventId, int64_t nowMilliseconds);
         bool Expired(int64_t nowMilliseconds) const noexcept;
         bool Active() const noexcept { return !eventId_.empty(); }
