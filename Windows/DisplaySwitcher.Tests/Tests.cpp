@@ -970,9 +970,11 @@ namespace
         Check(!inspection.complete && !profile.displayInputs.empty() && profile.displayInputs[0].displayId == removedId,
             L"C-005: 孤立映射应保留为不可用且不得重绑");
 
-        profile.peerEndpointId = GenerateIdentifier();
-        auto changed = config.InspectProfile(profile.id, GenerateIdentifier(), 2);
-        auto unknown = config.InspectProfile(profile.id, profile.peerEndpointId, 3);
+        auto completeConfig = ConfigWithDisplays(2);
+        auto& completeProfile = completeConfig.collaborationProfiles[0];
+        completeProfile.peerEndpointId = GenerateIdentifier();
+        auto changed = completeConfig.InspectProfile(completeProfile.id, GenerateIdentifier(), 2);
+        auto unknown = completeConfig.InspectProfile(completeProfile.id, completeProfile.peerEndpointId, 3);
         Check(!changed.endpointConfirmationRequired && changed.complete, L"DS-039: endpoint 变化不再阻塞完整配置");
         Check(!unknown.complete, L"C-007: 未知协议版本应由本机检查拒绝");
 
