@@ -1873,7 +1873,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             edited.usbSwitch.productId = selectedUsbProductId_;
             edited.usbSwitch.displayInputs = std::move(usbMappings);
         }
-        else
+        else if (scope == ::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays)
         {
             CaptureDisplayEditors();
             std::set<std::wstring> hardwareIds;
@@ -1893,6 +1893,9 @@ namespace winrt::DisplaySwitcher::Native::implementation
             edited.displays = workingDisplays_;
             for (auto& display : edited.displays) display.macInput = -1;
             edited.displayConfigurationSafeMode = false;
+        }
+        else
+        {
             edited.startWithWindows = autoStart_.IsOn();
             edited.detailedDiagnosticRecording = detailedDiagnostics_.IsOn();
         }
