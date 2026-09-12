@@ -4,148 +4,76 @@
 [![Windows CI](https://github.com/maizihk/SFlip/actions/workflows/windows.yml/badge.svg)](https://github.com/maizihk/SFlip/actions/workflows/windows.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-SFlip 是一个原生 macOS 菜单栏 / Windows 托盘工具，用于多台电脑共用显示器的场景。它通过 DDC/CI 调节亮度、对比度和音量，并在 USB 设备离开或用户手动选择目标时切换显示器输入源。
+SFlip 是 macOS 菜单栏和 Windows 托盘工具，适合多台电脑共用显示器。它可以调节外接显示器的亮度、对比度和音量，也能配合 USB 切换器切换显示器输入源。键鼠切换需配合 USB 切换器或 KVM。
 
-**键盘和鼠标的物理转接仍需 USB 切换器或 KVM 等硬件。** SFlip 监听本机 USB 设备的接入与离开，再控制显示器；它不传输键鼠输入，也不代替 USB 切换器。
+## 主要功能
+
+- **显示器调节**：分别调节多台显示器，或开启联动一起调节。
+- **USB 自动切换**：设备切走时切换显示器输入源，设备接入时唤醒本机显示器。
+- **双机协同**：从菜单中选择目标电脑，唤醒对端显示器并切换输入源。
+- **媒体快捷键**：使用键盘亮度、音量和静音键调节外接显示器。
 
 ## 下载与安装
 
-[查看最新发布](https://github.com/maizihk/SFlip/releases/latest) · [硬件兼容性](COMPATIBILITY.md)
+当前正式版：Windows **v2.3.2**，macOS **v2.3.0**。各版本的改动见 [发布说明](https://github.com/maizihk/SFlip/releases)。
 
-产品和 GitHub 仓库名称均为 **SFlip**。内部工程与兼容标识保留，避免影响已有配置。
-
-Windows 当前正式版为 **v2.3.2（build 23）**，修复资源管理器重启后托盘图标消失，并增加自动恢复与失败重试；macOS 保持 **v2.3.0（build 21）**。
-
-| 平台 | 运行要求 | 下载 |
+| 平台 | 系统要求 | 下载 |
 | --- | --- | --- |
-| macOS | Apple Silicon，macOS 12 或更高版本 | [DMG 安装包](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.zip) |
-| Windows | x64，Windows 10 1809 或更高版本；Windows App Runtime 2.4 x64 | [EXE 安装包](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-Setup.exe) · [绿色版 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-portable.zip) |
+| macOS | Apple Silicon，macOS 12 或更高版本 | [DMG](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.zip) |
+| Windows | x64，Windows 10 1809 或更高版本 | [安装版](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-Setup.exe) · [绿色版 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-portable.zip) |
 
-文件校验值见 [Windows v2.3.2](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SHA256SUMS.txt) 和 [macOS v2.3.0](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SHA256SUMS.txt)。Intel Mac 当前不支持原生 DDC；Windows 版不依赖 .NET。
+- **macOS**：打开 DMG，把 `SFlip.app` 拖入 `Applications`，再从“应用程序”启动；ZIP 解压后同样放入“应用程序”。
+- **Windows 安装版**：运行安装程序，按向导完成安装。若提示缺少运行库，安装后返回重试。
+- **Windows 绿色版**：安装 [Windows App Runtime 2.4 x64](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)，完整解压 ZIP，运行 `SFlip.exe`，保留旁边的 `runtime` 文件夹。
 
-- **macOS DMG**：双击打开 DMG，将 `SFlip.app` 拖到旁边的 `Applications` 文件夹。复制后推出磁盘映像，从“应用程序”启动。替换旧版前先退出旧应用，不要直接从 DMG 运行。
-- **macOS ZIP**：解压后将 `SFlip.app` 放到固定的 `/Applications` 目录，再启动应用。
-- **Windows 安装版**：运行下载的 Setup EXE，按向导安装后从开始菜单启动。支持简体中文/英文；不包含运行库，安装时检测依赖，缺少时提示从微软官网下载，装好后返回重试。升级前先退出应用。卸载保留配置与共享运行库，详见 [Windows 安装说明](Windows/README.md#安装与升级)。
-- **Windows 绿色版**：先安装 Microsoft Windows App Runtime 2.4 x64（[微软下载页](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)），再将 ZIP 完整解压到固定目录，运行顶层 `SFlip.exe`。必须保留旁边的 `runtime` 子目录，不能只复制一个 EXE。
+升级前先退出旧版。文件校验值：[Windows](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SHA256SUMS.txt) · [macOS](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SHA256SUMS.txt)。
 
-从旧名升级：先退出旧应用，再安装 SFlip。macOS 安装到 `/Applications/SFlip.app`，确认正常后可移除旧 `DisplaySwitcher.app`；Windows 从 `SFlip.exe` 启动并更新旧快捷方式。两端均保留原配置；应用路径变化后，如已启用登录启动，请在新应用中关闭再开启并验证，系统权限复用仍以系统实际提示为准。
+## 基础使用
 
-运行前还需确认：显示器已启用 DDC/CI，当前接口、线材、转接器、扩展坞或 KVM 能透传 DDC/CI。支持情况取决于完整连接链路，详见 [兼容性说明](COMPATIBILITY.md)。
+下面介绍当前源码的配置方式。配对码自动连接及近期设置改进尚未进入上述正式版，下载版请同时参考对应发布说明。
 
-## 首次配置
+### 显示器调节
 
-新安装默认关闭 USB 自动切换、协同和各项 DDC 控制，请按需要逐项配置。
+1. 打开“设置”，在“显示器”页检测显示器。
+2. 开启需要的亮度、对比度或音量功能，点击“读取 DDC 参数”确认读数。
+3. 使用滑杆调节；需要在菜单栏或托盘操作时，开启对应的托盘显示选项。
 
-### 1. 显示器调节
+媒体快捷键可在“常规”中开启。macOS 会申请输入监控权限；可选的 HDMI/DP 音量接管还需要辅助功能权限。
 
-1. 从菜单栏或托盘打开“设置…”，检测显示器并确认数量、名称和连接状态。
-2. 开启需要使用的亮度、对比度或音量功能，再点击“读取 DDC 参数”确认能否读取。关闭的项目不会读取或写入。
-3. 读数确认后再使用滑杆或媒体键调节；需要在菜单栏或托盘显示的项目，还需开启对应托盘开关。
+### USB 自动切换
 
-### 2. USB 自动切换（可选）
+1. 在“USB 切换”页选择或学习会随 USB 切换器切走的设备。
+2. 为参与切换的显示器填写目标输入源编号，不参与的留空。
+3. 开启 USB 自动切换。设备离开时切换输入源，接入时唤醒本机显示器。
 
-1. 在“USB 切换”页选择或学习一个会随 USB 切换器切走的 Hub、键盘等设备。
-2. 为参与切换的显示器填写“USB 离开后切到的输入源”。获取方法见 [输入源编号教程](docs/INPUT_SOURCES.md)；不参与切换的显示器留空，不要填写 `0`。
-3. 确认设备和映射后开启 USB 自动切换。设备离开时切换显示器输入源，接入时只唤醒本机显示器。
-4. 如需同时唤醒另一台电脑的显示器，先完成下方协同配置，再开启联动并明确选择该配置。
+输入源编号的获取方法见 [输入源教程](docs/INPUT_SOURCES.md)。首次测试前，先确认能通过显示器实体按键切回原输入源。
 
-USB 本机切换无需网络，也不等待对端回复。输入源切换可能立即导致黑屏，首次测试前应保留显示器实体按键等恢复输入源的方法。
+### 双机协同
 
-### 3. 双机协同（可选）
+1. 两台电脑都运行 SFlip，并连接到同一可信局域网。
+2. 在各自“协同”页填写配置名称、另一台电脑的地址、相同端口和相同配对码。默认端口是 `49731`，配对码建议使用 8–128 位字母或数字。
+3. 填写参与切换的显示器输入源编号，然后开启配置。字段完整即可开启，对端离线也能保存。
+4. 点击“检测连接”查看结果；连接成功后，从菜单栏或托盘选择“切换到 配置名称”。
 
-1. 在两台电脑上运行应用，确保双方位于可信局域网。
-2. 在各自“协同”页填写配置名称、**另一台电脑**的地址、相同 UDP 端口和相同配对码。默认端口为 `49731`；配对码经 NFC 规范化后须为 8 至 128 个 UTF-8 字节。
-3. 为需要切换的显示器填写对端输入源，即要切去的接口对应的十进制值；参见 [获取编号与双端填写示例](docs/INPUT_SOURCES.md)。不参与切换的显示器留空。
-4. 本机字段填完整后即可开启，对端离线也可保存；两端配对码相同且网络可达时会自动连接。也可点击“检测连接”查看结果，检测本身不会切屏或唤醒。
-5. 连接成功后，从菜单栏或托盘选择“切换到 {配置名称}”。
+USB 自动切换可独立使用，如需同时唤醒对端，在 USB 页开启联动并选择协同配置。
 
-不需要首次身份确认；对端重装后，地址和配对码正确即可自动恢复连接，保留已有映射。此自动连接行为需要双端升级到包含 DS-039 的版本。更完整的协议定义见 [PROTOCOL.md](PROTOCOL.md)。
+## 兼容性与问题反馈
 
-## 功能与限制
+显示器需要支持并开启 DDC/CI，线材、转接器、扩展坞或 KVM 也需要支持透传。部分显示器只支持亮度等部分参数，HDMI/DP 音量调节还取决于显示器能力。
 
-### 显示器与媒体键
+macOS 当前支持 Apple Silicon；Windows 需要 Windows App Runtime 2.4 x64。更多设备情况见 [硬件兼容性](COMPATIBILITY.md)。
 
-- **多显示器调节**：支持亮度、对比度和音量，可分别调节或显式开启联动。只有启用对应功能且符合操作条件的显示器参与。
-- **媒体键**：识别键盘实际发出的亮度、音量增减和静音动作，不猜测 Fn 或厂商自定义键码。Windows 亮度键需要设备提供标准 HID Consumer Control 事件。
-- **macOS 输入监控权限**：用于媒体键关联；未授权时该功能停用，普通显示器控制仍可使用。
-- **macOS HDMI/DP 音量接管**：可选且默认关闭，需要辅助功能权限。仅在默认音频输出为 HDMI/DisplayPort、系统无法调节其音量且 DDC 控制条件满足时接管音量媒体键。普通监听模式保留系统原生行为；Windows 版也不吞键。
-- **显示器管理**：保留暂时离线的配置；在可信检测后由用户手动删除，不按显示器名称或枚举顺序猜测目标。
-
-### 协同与输入源切换
-
-USB 切换与手动协同是独立路径。USB 离开时立即执行本机输入源切换，可选通知一个明确目标唤醒；网络失败不会阻断或回滚本机操作。
-
-当前 `main` 的手动协同先请求目标唤醒，再在收到确认后切屏；最近在线的目标在 600 ms 内未确认时允许对该目标降级切换，离线目标则提示不可用并取消。只联系用户选择的目标，不广播、不自动选择其他配置。现有 v2.2.0 包的差异见上方发布说明。
-
-### 兼容性与隐私
-
-- macOS 使用 CoreDisplay / IOAVService 原生 DDC，Windows 使用 Dxva2；原生控制失败时明确报错，不回退到外部工具或软件调光。
-- macOS 使用 Apple 私有显示接口，系统大版本更新后需重新验证。Windows 远程桌面、虚拟/镜像目标或不完整拓扑不能作为可信物理显示器执行 DDC。
-- 显示器可能只支持部分 DDC 控制项；单项失败不代表整条连接链路不可用。自动测试不能替代实机兼容性验证。
-- 协议 v2 使用 PBKDF2-HMAC-SHA256 认证，并校验消息方向、时间窗和重放；通信内容不加密，应仅在可信局域网使用。
-- USB 标识、显示器身份、地址和配对码等配置保留在本机，不作为跨端同步数据。详细诊断默认关闭，开启后记录脱敏信息。
-
-遇到问题请使用 [兼容性报告模板](COMPATIBILITY.md#anonymized-compatibility-report-template) 并删除个人信息；安全漏洞按 [安全策略](SECURITY.md) 私下报告。
+遇到问题可先查看 [支持说明](SUPPORT.md)，再提交兼容性报告或 [Issue](https://github.com/maizihk/SFlip/issues)。安全问题请按 [安全策略](SECURITY.md) 联系维护者。
 
 ## 源码构建
 
-以下是当前主线的构建要求，与上面的应用运行要求不同。先获取源码并进入仓库根目录：
+获取源码后，在仓库根目录执行：
 
-```bash
-git clone https://github.com/maizihk/SFlip.git
-cd SFlip
-```
+- **macOS**：需要完整 Xcode 27 和 Python 3，运行 `./macOS/scripts/build-app.sh`。
+- **Windows**：需要 Visual Studio 2026 的 C++ 桌面开发与 Windows App SDK 组件，运行 `.\Windows\build-windows.ps1`。
 
-### macOS
+Windows 安装包构建和详细依赖见 [Windows README](Windows/README.md)；参与开发见 [贡献指南](CONTRIBUTING.md)。
 
-正式实现为 Swift / AppKit。当前源码使用 macOS 27 SDK API，需使用包含该 SDK 的完整 **Xcode 27**；仅安装 Command Line Tools 不够。CI 使用 `xcode-27` 环境。
+## 许可证
 
-```bash
-xcode-select -p
-xcodebuild -version
-xcrun --sdk macosx --show-sdk-version
-./macOS/scripts/build-app.sh
-```
-
-如果使用 Xcode beta，可通过本次命令的 `DEVELOPER_DIR` 指定工具链，例如：
-
-```bash
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./macOS/scripts/build-app.sh
-```
-
-DMG 打包还需要 Python 3（含 venv/pip）。首次构建会下载固定版本的 dmgbuild 及其依赖，隔离安装到 `macOS/.build/dmg-tools`；后续构建复用该环境。背景由 AppKit 生成，布局配置随源码维护，无需 Finder 自动化权限。
-
-输出位于 `macOS/outputs/`：`SFlip.app`、拖拽安装包 `SFlip-macOS-<arch>.dmg` 和 `SFlip-macOS-<arch>.zip`。DMG 包含应用、指向 `/Applications` 的快捷方式和安装说明；构建脚本会校验映像、挂载后的应用及复制后的签名。
-
-### Windows
-
-正式实现为 C++ / WinUI 3。当前工程要求 **Visual Studio 2026（18.x）**、C++ 桌面开发与 Windows App SDK C++ 组件、**MSVC v145** 和 **Windows SDK 10.0.26100.0**；CI 使用 `windows-2025-vs2026` 环境。
-
-在仓库根目录的 PowerShell 中执行：
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\Windows\build-windows.ps1
-.\Windows\build-installer.ps1
-```
-
-脚本构建 x64 Release、运行原生自动测试并生成 `Windows\dist\SFlip.exe` 和 `Windows\dist\runtime\...`。绿色版分发时保留完整 `dist` 目录；第二条命令仅下载固定且校验哈希的 Inno Setup，生成 `Windows\outputs\SFlip-Setup-x64.exe` 和 SHA-256 校验文件。详细说明见 [Windows README](Windows/README.md)。
-
-正式源码位于 `macOS/` 和 `Windows/DisplaySwitcher.Native/`；`Windows/DisplaySwitcher.Launcher/` 是绿色版启动器。`Windows/DisplaySwitcher.Windows/` 仅为旧 C# 迁移参照，不参与正式构建。
-
-## 文档
-
-| 文档 | 内容 |
-| --- | --- |
-| [输入源编号教程](docs/INPUT_SOURCES.md) | Windows/macOS 获取方法、数值换算与双端填写示例 |
-| [COMPATIBILITY.md](COMPATIBILITY.md) | 硬件兼容性与验证方法 |
-| [Windows/README.md](Windows/README.md) | Windows 安装、配置与测试 |
-| [PROTOCOL.md](PROTOCOL.md) | 双端通信规范 |
-| [contracts/protocol-v2](contracts/protocol-v2/) | 协议 schema 与跨端测试向量 |
-| [contracts/usb-switch-v1](contracts/usb-switch-v1/) | USB 状态机公共测试合同 |
-| [SUPPORT.md](SUPPORT.md) | 获取支持与提交问题 |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 开发与贡献流程 |
-
-## License
-
-SFlip 使用 [MIT License](LICENSE)。macOS DDC 后端基于 MIT 许可的 [AppleSiliconDDC](https://github.com/waydabber/AppleSiliconDDC)，完整第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+SFlip 使用 [MIT License](LICENSE)。macOS DDC 后端基于 [AppleSiliconDDC](https://github.com/waydabber/AppleSiliconDDC)，第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
