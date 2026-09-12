@@ -1035,7 +1035,9 @@ namespace
         catch (...) { rejected = true; }
         Check(rejected && safe.displayConfigurationSafeMode && !safe.V2ListenerPort(),
             L"W-042: 保存失败不得提前解除运行安全状态");
-        auto failedUi = SettingsAfterFailedSave(ConfigWithDisplays(1));
+        auto pendingUi = ConfigWithDisplays(1);
+        pendingUi.collaborationProfiles[0].coordinationEnabled = true;
+        auto failedUi = SettingsAfterFailedSave(pendingUi);
         Check(RequiresSettingsPersistence(false, failedUi) &&
             failedUi.displayConfigurationSafeMode && !RequiresSettingsPersistence(false, ConfigWithDisplays(1)),
             L"W-042: 当前进程保存失败后同值重试也必须真正写盘，正常无变化保存仍跳过");
@@ -1043,10 +1045,26 @@ namespace
             [&](AppConfig const& candidate) { candidate.SaveToPath(path); });
         auto loaded = AppConfig::LoadFromPath(path);
         auto uiPublished = SettingsAfterSuccessfulSave(failedUi);
-        Check(!published.displayConfigurationSafeMode && published.V2ListenerPort() &&
-            !uiPublished.displayConfigurationSafeMode && !loaded.displayConfigurationSafeMode &&
-            loaded.collaborationProfiles[0].coordinationEnabled,
-            L"W-042: 合法保存成功后runtime、UI和重启配置同时解除安全状态并保留用户开启意愿");
+        Check(!published.displayConfigurationSafeMode && published.V2ListenerPort(),
+            L"W-042: 合法保存成功后runtime解除安全状态并可监听");
+        Check(!uiPublished.displayConfigurationSafeMode,
+            L"W-042: 合法保存成功后UI解除安全状态");
+        Check(!loaded.displayConfigurationSafeMode,
+            L"W-042: 合法保存成功后重启配置解除安全状态");
+        Check(loaded.collaborationProfiles[0].coordinationEnabled,
+            L"W-042: 同值重试必须保留用户原有的开启意愿");
+        auto disabledUi = SettingsAfterFailedSave(ConfigWithDisplays(1));
+        auto disabledPath = root / L"disabled-save-recovery.json";
+        auto disabledPublished = PersistSettingsForPublication(disabledUi,
+            [&](AppConfig const& candidate) { candidate.SaveToPath(disabledPath); });
+        auto disabledLoaded = AppConfig::LoadFromPath(disabledPath);
+        auto disabledUiPublished = SettingsAfterSuccessfulSave(disabledUi);
+        Check(!disabledPublished.displayConfigurationSafeMode && !disabledLoaded.displayConfigurationSafeMode &&
+            !disabledUiPublished.displayConfigurationSafeMode &&
+            !disabledPublished.collaborationProfiles[0].coordinationEnabled &&
+            !disabledLoaded.collaborationProfiles[0].coordinationEnabled &&
+            !disabledUiPublished.collaborationProfiles[0].coordinationEnabled,
+            L"W-042: 保存恢复只能解除安全状态，不得自动开启用户已关闭的协同配置");
 
         auto original = ConfigWithDisplays(1);
         auto working = original.collaborationProfiles;

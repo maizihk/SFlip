@@ -8,8 +8,9 @@
 - 产品审查确认：切换配置未立即刷新状态，旧配置检测回调仍能写入新配置界面；认证失败与无响应被粗化完成，旧认证时间使周期刷新继续显示已连接或断开。
 - 切换配置现在刷新当前状态并清空旧权限详情；轻量 presentation predicate 检查返回配置仍是当前配置，异步主状态与详情写入共用该限制。
 - 新增认证失败连接状态；手动认证失败和无响应复用现有 inspectionFailure 保存，优先于旧在线证据。新检测与实际认证成功清除失败，不修改网络发送或协议。
-- 生产修改：`DS007SettingsModels.swift`、`SettingsWindowController.swift`、`main.swift`；测试由并行测试任务补充。清单与本交接记录同步更新。
-- Windows 主机无法运行 Xcode；模拟测试、macOS CI 与真实配置切换/迟到回调/失败恢复界面仍待验证。未执行真实网络、USB、DDC、唤醒、输入源或系统设置操作。
+- 生产修改：`DS007SettingsModels.swift`、`SettingsWindowController.swift`、`main.swift`；`DS007Tests.swift` 新增 2 项模拟测试，覆盖失败终态优先旧在线证据、配置隔离、恢复和迟到结果展示限制。清单与本交接记录同步更新。
+- 提交 `5f3892a494a5e70e82cf81d9815d17b8edabfb7a` 的 macOS CI run `34680288128`、job `103517589810` 全部通过：286 项 XCTest（零失败）、Debug/Release 构建打包及严格签名验证。
+- 真实配置切换、迟到回调和失败恢复界面仍待实机验证。自动验证未执行真实网络、USB、DDC、唤醒、输入源或系统设置操作。
 
 ## 当前任务：DS-042 设置页说明文案清理
 
