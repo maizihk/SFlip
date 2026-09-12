@@ -623,6 +623,60 @@ final class DS007Tests: XCTestCase {
         XCTAssertEqual(store.state(for: second, displays: [display], nowMs: 8_001), .incomplete)
     }
 
+    func testExplicitInspectionFailuresOverrideRecentSuccessAndRemainIsolatedUntilRecovery() {
+        let display = configuredDisplay()
+        let first = completeProfile(name: "First", displayID: display.id)
+        let second = completeProfile(name: "Second", displayID: display.id)
+        let failures: [CollaborationConnectionState] = [.noResponse, .authenticationFailed]
+
+        for failure in failures {
+            let store = CollaborationStatusStore()
+            store.recordAuthenticatedMessage(profileID: first.id, nowMs: 1_000)
+            store.recordAuthenticatedMessage(profileID: second.id, nowMs: 1_000)
+            store.beginCheck(profileID: first.id)
+            store.finishCheck(profileID: first.id, failure: failure)
+
+            let observationTimes: [Int64] = [2_000, 7_000, 7_001]
+            for now in observationTimes {
+                XCTAssertEqual(store.state(for: first, displays: [display], nowMs: now), failure)
+            }
+            XCTAssertEqual(store.state(for: second, displays: [display], nowMs: 2_000), .connected)
+            XCTAssertFalse(failure.connected)
+            XCTAssertEqual(
+                CollaborationConnectionStatusPresentation.text(for: failure, profileName: first.name),
+                failure == .authenticationFailed ? "配对码不匹配" : "无响应"
+            )
+
+            store.beginCheck(profileID: first.id)
+            XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 8_000), .checking)
+            store.recordAuthenticatedMessage(profileID: first.id, nowMs: 8_100)
+            XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 14_100), .connected)
+            XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 14_101), .disconnected)
+        }
+    }
+
+    func testSwitchingSelectedProfileRejectsLateInspectionResultAndAcceptsCurrentResult() {
+        let firstID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        let secondID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        var selectedID: String? = firstID
+        XCTAssertTrue(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: firstID, selectedProfileID: selectedID
+        ))
+
+        selectedID = secondID
+        XCTAssertFalse(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: firstID, selectedProfileID: selectedID
+        ), "the previous profile's async result must not replace the selected profile's status or details")
+        XCTAssertTrue(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: secondID.uppercased(), selectedProfileID: selectedID
+        ))
+
+        selectedID = nil
+        XCTAssertFalse(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: secondID, selectedProfileID: selectedID
+        ), "a result for a removed selection must not update the presentation")
+    }
+
     func testInspectionSendFailureRemainsVisiblePastTimeoutAndSuccessfulCheckRecovers() {
         let display = configuredDisplay()
         let profile = completeProfile(name: "Peer", displayID: display.id)

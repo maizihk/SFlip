@@ -2137,6 +2137,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         selectedProfileIndex = max(0, sender.indexOfSelectedItem)
         reloadProfilePopup()
         loadSelectedProfileFields()
+        updateLocalNetworkPermissionPresentation(.notChecked)
+        refreshSelectedCollaborationStatus()
     }
 
     @objc private func addProfile() {
@@ -2206,6 +2208,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
         inspectProfileButton.isEnabled = false
         requestLocalNetworkPermissionButton.isEnabled = false
+        updateLocalNetworkPermissionPresentation(.notChecked)
         peerStatusLabel.stringValue = "正在检测 \(profile.name)…"
         LocalNetworkPermissionInspectionAction.perform(using: { completion in
             onInspectPeer(profile, completion)
@@ -2213,8 +2216,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             DispatchQueue.main.async {
                 self?.inspectProfileButton.isEnabled = true
                 self?.requestLocalNetworkPermissionButton.isEnabled = true
-                self?.showPeerInspectionResult(result, profileID: profile.id)
-                self?.updateLocalNetworkPermissionPresentation(permissionEvidence)
+                guard let self, self.editingProfiles.indices.contains(self.selectedProfileIndex),
+                      PeerInspectionPresentationPolicy.shouldPresent(
+                        resultProfileID: profile.id,
+                        selectedProfileID: self.editingProfiles[self.selectedProfileIndex].id
+                      ) else { return }
+                self.showPeerInspectionResult(result, profileID: profile.id)
+                self.updateLocalNetworkPermissionPresentation(permissionEvidence)
             }
         }
     }
@@ -2229,11 +2237,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func showPeerInspectionResult(_ result: PeerCapabilityInspectionResult, profileID: String) {
-        guard let index = editingProfiles.firstIndex(where: { $0.id == profileID }) else { return }
+        guard editingProfiles.indices.contains(selectedProfileIndex),
+              PeerInspectionPresentationPolicy.shouldPresent(
+                resultProfileID: profileID,
+                selectedProfileID: editingProfiles[selectedProfileIndex].id
+              ),
+              let index = editingProfiles.firstIndex(where: { $0.id == profileID }) else { return }
         let profile = editingProfiles[index]
+        peerStatusLabel.textColor = .secondaryLabelColor
         switch result {
         case .v2:
             reloadValues()
+            peerStatusLabel.textColor = .systemGreen
             peerStatusLabel.stringValue = CollaborationConnectionStatusPresentation.text(
                 for: .connected, profileName: profile.name
             )

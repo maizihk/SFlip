@@ -1451,8 +1451,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                 collaborationStatusStore.finishCheck(
                     profileID: pending.profile.id, failure: .sendFailed(error)
                 )
-            case .authenticationFailed, .noResponse:
-                collaborationStatusStore.finishCheck(profileID: pending.profile.id, responded: false)
+            case .authenticationFailed:
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .authenticationFailed
+                )
+            case .noResponse:
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .noResponse
+                )
             }
         }
         let diagnosticResult: String

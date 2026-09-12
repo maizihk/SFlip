@@ -101,6 +101,7 @@ enum CollaborationConnectionState: Equatable {
     case neverChecked
     case checking
     case noResponse
+    case authenticationFailed
     case listenerFailed(PeerTransportSystemError?)
     case sendFailed(PeerTransportSystemError?)
     case available
@@ -114,6 +115,7 @@ enum CollaborationConnectionState: Equatable {
         case .neverChecked: return "正在连接"
         case .checking: return "正在检测"
         case .noResponse: return "无响应"
+        case .authenticationFailed: return "配对码不匹配"
         case .listenerFailed(let error):
             return "监听失败（系统码：\(Self.errorCode(error))）"
         case .sendFailed(let error):
@@ -140,6 +142,13 @@ enum CollaborationConnectionStatusPresentation {
         guard state.connected else { return state.text }
         let name = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? "已和对端建立连接" : "已和对端（\(name)）建立连接"
+    }
+}
+
+enum PeerInspectionPresentationPolicy {
+    static func shouldPresent(resultProfileID: String, selectedProfileID: String?) -> Bool {
+        guard let selectedProfileID else { return false }
+        return resultProfileID.caseInsensitiveCompare(selectedProfileID) == .orderedSame
     }
 }
 
