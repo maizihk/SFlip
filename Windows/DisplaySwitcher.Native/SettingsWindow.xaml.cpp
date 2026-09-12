@@ -750,6 +750,12 @@ namespace winrt::DisplaySwitcher::Native::implementation
             connected ? Colors::Green() : Colors::Gray()));
     }
 
+    void SettingsWindow::SynchronizePeerRoutes(::DisplaySwitcher::Native::AppConfig const& config)
+    {
+        CaptureProfileEditors();
+        ::DisplaySwitcher::Native::SynchronizePeerRouteCaches(original_, workingProfiles_, config);
+    }
+
     void SettingsWindow::LoadValues(::DisplaySwitcher::Native::AppConfig const& config)
     {
         saveFeedback_.ClearTransientSuccesses();
@@ -1433,11 +1439,13 @@ namespace winrt::DisplaySwitcher::Native::implementation
             auto profile = std::find_if(workingProfiles_.begin(), workingProfiles_.end(), [&](auto const& item)
             { return _wcsicmp(item.id.c_str(), controls.id.c_str()) == 0; });
             if (profile == workingProfiles_.end()) continue;
+            auto previous = *profile;
             profile->name = Trim(controls.name.Text().c_str());
             profile->coordinationEnabled = controls.enabled.IsOn();
             profile->peerHost = Trim(controls.peerHost.Text().c_str());
             profile->peerPort = ParseInteger(controls.peerPort.Text().c_str(), 10, 1, 65535).value_or(-1);
             profile->pairingCode = controls.pairingCode.Password().c_str();
+            ::DisplaySwitcher::Native::InvalidateChangedPeerRoute(*profile, previous);
             std::vector<::DisplaySwitcher::Native::VisibleDisplayInputEdit> visibleEdits;
             for (auto const& mapping : controls.mappings)
             {
@@ -1898,7 +1906,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         }
 
         auto result = ::DisplaySwitcher::Native::MergeSettingsForScope(original_, edited, scope);
-        if (AppConfigEquals(original_, result))
+        if (!::DisplaySwitcher::Native::RequiresSettingsPersistence(!AppConfigEquals(original_, result), original_))
         {
             if (hideAfterSave) appWindow_.Hide();
             return true;
@@ -1914,10 +1922,11 @@ namespace winrt::DisplaySwitcher::Native::implementation
                 ResetSaveFeedbackTimer();
                 ApplySaveFeedback(std::chrono::milliseconds{});
             }
+            original_ = ::DisplaySwitcher::Native::SettingsAfterFailedSave(original_);
             LoadValues(original_);
             return false;
         }
-        original_ = result;
+        original_ = ::DisplaySwitcher::Native::SettingsAfterSuccessfulSave(result);
         for (auto const& controls : profileEditors_)
             if (auto profile = original_.FindCollaborationProfile(controls.id))
                 controls.enablementStatus.Text(::DisplaySwitcher::Native::CollaborationEnablementText(

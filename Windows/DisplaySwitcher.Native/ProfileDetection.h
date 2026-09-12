@@ -46,6 +46,7 @@ namespace DisplaySwitcher::Native
     {
     public:
         void Begin(std::wstring eventId, int64_t expiresAtMilliseconds);
+        bool BeginIfNeeded(std::wstring eventId, int64_t nowMilliseconds, int64_t timeoutMilliseconds);
         bool Matches(std::wstring const& eventId, int64_t nowMilliseconds) const;
         bool MatchesAndConsume(std::wstring const& eventId, int64_t nowMilliseconds);
         bool Expired(int64_t nowMilliseconds) const noexcept;

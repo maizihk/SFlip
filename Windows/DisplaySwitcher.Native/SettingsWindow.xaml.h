@@ -36,6 +36,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             std::function<void()> closed);
         void SetConnectionStatus(std::wstring const& status, bool connected);
         void ReloadConfiguration(::DisplaySwitcher::Native::AppConfig const& config);
+        void SynchronizePeerRoutes(::DisplaySwitcher::Native::AppConfig const& config);
         void ShowWindow();
         void CloseForExit();
 

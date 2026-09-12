@@ -894,6 +894,12 @@ namespace DisplaySwitcher::Native
             config_ = config;
         }
 
+        if (settingsWindow_)
+        {
+            auto projected = settingsWindow_.as<::winrt::DisplaySwitcher::Native::SettingsWindow>();
+            get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->SynchronizePeerRoutes(config);
+        }
+
         auto completeProfiles = config.EnabledCompleteProfiles();
         std::vector<V2Target> targets;
         for (auto const& profile : completeProfiles)
@@ -930,7 +936,7 @@ namespace DisplaySwitcher::Native
         if (!std::any_of(probeProfiles.begin(), probeProfiles.end(), [&](auto const& candidate)
             { return EqualId(candidate.id, profile.id); })) return;
         auto eventId = NewEventId();
-        v2HealthProbes_[profile.id].Begin(eventId, NowMilliseconds() + 10000);
+        if (!v2HealthProbes_[profile.id].BeginIfNeeded(eventId, NowMilliseconds(), 10000)) return;
         auto configurationGeneration = configurationGeneration_.load();
         auto sideEffectGeneration = sideEffectGeneration_.load();
         std::weak_ptr<Controller> weak = shared_from_this();
@@ -1481,14 +1487,19 @@ namespace DisplaySwitcher::Native
             {
                 if (auto self = weak.lock())
                 {
-                    try { config.Save(); }
+                    auto published = config;
+                    try
+                    {
+                        published = PersistSettingsForPublication(config,
+                            [](AppConfig const& candidate) { candidate.Save(); });
+                    }
                     catch (...)
                     {
                         self->EnterSafeStateAfterSaveFailure();
                         self->ShowError(L"保存设置失败", L"无法写入设置文件；自动协同和硬件操作已安全停用。");
                         return false;
                     }
-                    { std::scoped_lock lock(self->configMutex_); self->config_ = config; }
+                    { std::scoped_lock lock(self->configMutex_); self->config_ = published; }
                     if (!self->usbLearningActive_) self->ApplyConfiguration();
                     return true;
                 }

@@ -54,6 +54,14 @@ namespace DisplaySwitcher::Native
         expiresAtMilliseconds_ = expiresAtMilliseconds;
     }
 
+    bool PendingStatusProbe::BeginIfNeeded(std::wstring eventId, int64_t nowMilliseconds,
+        int64_t timeoutMilliseconds)
+    {
+        if (Active() && !Expired(nowMilliseconds)) return false;
+        Begin(std::move(eventId), nowMilliseconds + timeoutMilliseconds);
+        return true;
+    }
+
     bool PendingStatusProbe::Matches(std::wstring const& eventId, int64_t nowMilliseconds) const
     {
         return !eventId_.empty() && nowMilliseconds <= expiresAtMilliseconds_ && EqualId(eventId_, eventId);

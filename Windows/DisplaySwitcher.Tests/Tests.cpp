@@ -1001,6 +1001,109 @@ namespace
             { return action.kind == UsbSwitchAction::Kind::SendWakeDisplay; }),
             L"W-040: 保留联动意愿但协同关闭时运行时不得发送唤醒消息");
     }
+    void TestConnectionAndSaveRecovery(std::filesystem::path const& root)
+    {
+        PendingStatusProbe probe;
+        auto firstEvent = GenerateIdentifier();
+        auto secondEvent = GenerateIdentifier();
+        Check(probe.BeginIfNeeded(firstEvent, 0, 10000) &&
+            !probe.BeginIfNeeded(secondEvent, 2000, 10000) &&
+            probe.MatchesAndConsume(firstEvent, 2100),
+            L"W-042: 2.1秒内返回的合法响应必须保留并消费原周期探测event");
+        Check(probe.BeginIfNeeded(secondEvent, 4000, 10000),
+            L"W-042: 成功消费探测后下一个周期可发送新event");
+        Check(!probe.BeginIfNeeded(firstEvent, 14000, 10000) &&
+            probe.BeginIfNeeded(firstEvent, 14001, 10000) &&
+            !probe.MatchesAndConsume(secondEvent, 14002) &&
+            probe.MatchesAndConsume(firstEvent, 14003),
+            L"W-042: 探测包含超时边界且仅过期后替换event，旧回复仍拒绝");
+
+        auto safe = ConfigWithDisplays(1);
+        safe.EnterSafeState();
+        safe.collaborationProfiles[0].coordinationEnabled = true;
+        auto path = root / L"connection-save-recovery.json";
+        bool rejected{};
+        try
+        {
+            static_cast<void>(PersistSettingsForPublication(safe, [&](AppConfig const& candidate)
+            {
+                Check(candidate.displayConfigurationSafeMode,
+                    L"W-042: 写盘完成之前发布配置仍必须处于安全状态");
+                candidate.SaveToPath(path, AppConfigSaveFaultForTesting::AtomicReplace);
+            }));
+        }
+        catch (...) { rejected = true; }
+        Check(rejected && safe.displayConfigurationSafeMode && !safe.V2ListenerPort(),
+            L"W-042: 保存失败不得提前解除运行安全状态");
+        auto failedUi = SettingsAfterFailedSave(ConfigWithDisplays(1));
+        Check(RequiresSettingsPersistence(false, failedUi) &&
+            failedUi.displayConfigurationSafeMode && !RequiresSettingsPersistence(false, ConfigWithDisplays(1)),
+            L"W-042: 当前进程保存失败后同值重试也必须真正写盘，正常无变化保存仍跳过");
+        auto published = PersistSettingsForPublication(failedUi,
+            [&](AppConfig const& candidate) { candidate.SaveToPath(path); });
+        auto loaded = AppConfig::LoadFromPath(path);
+        auto uiPublished = SettingsAfterSuccessfulSave(failedUi);
+        Check(!published.displayConfigurationSafeMode && published.V2ListenerPort() &&
+            !uiPublished.displayConfigurationSafeMode && !loaded.displayConfigurationSafeMode &&
+            loaded.collaborationProfiles[0].coordinationEnabled,
+            L"W-042: 合法保存成功后runtime、UI和重启配置同时解除安全状态并保留用户开启意愿");
+
+        auto original = ConfigWithDisplays(1);
+        auto working = original.collaborationProfiles;
+        working[0].name = L"尚未提交的名称";
+        working[0].coordinationEnabled = false;
+        auto runtime = original;
+        auto endpoint = GenerateIdentifier();
+        Check(runtime.UpdateAuthenticatedPeerRoute(working[0].id, endpoint) == PeerRouteCacheUpdate::Changed,
+            L"W-042: 后台首次缓存更新必须经过生产认证路由入口");
+        SynchronizePeerRouteCaches(original, working, runtime);
+        auto generalEdit = original;
+        generalEdit.detailedDiagnosticRecording = true;
+        auto general = MergeSettingsForScope(original, generalEdit, SettingsSaveFeedbackScope::General);
+        auto usbEdit = original;
+        usbEdit.usbSwitch.deviceName = L"独立USB编辑";
+        auto usb = MergeSettingsForScope(original, usbEdit, SettingsSaveFeedbackScope::Usb);
+        Check(general.collaborationProfiles[0].peerEndpointId == endpoint &&
+            usb.collaborationProfiles[0].peerEndpointId == endpoint &&
+            working[0].peerEndpointId == endpoint && working[0].name == L"尚未提交的名称" &&
+            !working[0].coordinationEnabled,
+            L"W-042: 后台缓存同步使General/USB保存保留新路由且不覆盖名称和启用草稿");
+
+        auto previous = working[0];
+        working[0].peerHost = L"changed-peer.example";
+        InvalidateChangedPeerRoute(working[0], previous);
+        SynchronizePeerRouteCaches(original, working, runtime);
+        Check(working[0].peerEndpointId.empty() && !working[0].peerProtocolVersion &&
+            working[0].peerHost == L"changed-peer.example" &&
+            original.collaborationProfiles[0].peerEndpointId == endpoint,
+            L"W-042: 地址草稿变更失效旧缓存，后台同步不得注入原地址的路由");
+        working[0] = previous;
+        working[0].peerPort += 1;
+        InvalidateChangedPeerRoute(working[0], previous);
+        SynchronizePeerRouteCaches(original, working, runtime);
+        Check(working[0].peerEndpointId.empty() && !working[0].peerProtocolVersion,
+            L"W-042: 端口变更不得保留或再次注入旧路由");
+        working[0] = previous;
+        working[0].pairingCode = L"TEST-CODE-CHANGED";
+        InvalidateChangedPeerRoute(working[0], previous);
+        SynchronizePeerRouteCaches(original, working, runtime);
+        Check(working[0].peerEndpointId.empty() && !working[0].peerProtocolVersion,
+            L"W-042: 配对码草稿变更失效缓存并拒绝旧凭据同步");
+        working[0] = previous;
+        working[0].pairingCode = L"TEST-Caf\u00e9-0001";
+        auto equivalent = working[0];
+        equivalent.pairingCode = L"TEST-Cafe\u0301-0001";
+        InvalidateChangedPeerRoute(equivalent, working[0]);
+        Check(equivalent.peerEndpointId == endpoint && equivalent.peerProtocolVersion == 2,
+            L"W-042: NFC等价配对码编辑不得失效同一路由");
+        runtime.collaborationProfiles[0].pairingCode = working[0].pairingCode;
+        runtime.collaborationProfiles[0].peerEndpointId = GenerateIdentifier();
+        working[0] = equivalent;
+        SynchronizePeerRouteCaches(original, working, runtime);
+        Check(working[0].peerEndpointId == runtime.collaborationProfiles[0].peerEndpointId,
+            L"W-042: 缓存同步按NFC等价凭据匹配");
+    }
+
     void TestValidationAndNfc(std::filesystem::path const& root)
     {
         auto path = root / L"validation.json";
@@ -3658,6 +3761,7 @@ int wmain()
         TestProfileManagementAndReorder(root);
         TestOfflineCollaborationEnablement(root);
         TestIndependentSettingsSave(root);
+        TestConnectionAndSaveRecovery(root);
         TestValidationAndNfc(root);
         TestInputSourceNullSafetyAndMigration(root);
         TestImmediateCommitSafety(root);

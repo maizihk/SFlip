@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cwctype>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -85,6 +86,61 @@ namespace DisplaySwitcher::Native
         }
         return result;
     }
+    inline bool SameProfileConnectionSettings(CollaborationProfile const& left,
+        CollaborationProfile const& right)
+    {
+        if (_wcsicmp(left.id.c_str(), right.id.c_str()) != 0 ||
+            left.peerHost != right.peerHost || left.peerPort != right.peerPort) return false;
+        try { return AppConfig::NormalizeNfc(left.pairingCode) == AppConfig::NormalizeNfc(right.pairingCode); }
+        catch (...) { return false; }
+    }
+
+    inline void InvalidateChangedPeerRoute(CollaborationProfile& edited,
+        CollaborationProfile const& previous)
+    {
+        if (SameProfileConnectionSettings(edited, previous)) return;
+        edited.peerEndpointId.clear();
+        edited.peerProtocolVersion.reset();
+    }
+
+    inline void SynchronizePeerRouteCaches(AppConfig& original,
+        std::vector<CollaborationProfile>& workingProfiles, AppConfig const& runtime)
+    {
+        auto synchronize = [&](CollaborationProfile& profile)
+        {
+            auto current = runtime.FindCollaborationProfile(profile.id);
+            if (!current || !SameProfileConnectionSettings(profile, *current)) return;
+            profile.peerEndpointId = current->peerEndpointId;
+            profile.peerProtocolVersion = current->peerProtocolVersion;
+        };
+        for (auto& profile : original.collaborationProfiles) synchronize(profile);
+        for (auto& profile : workingProfiles) synchronize(profile);
+    }
+
+    inline AppConfig SettingsAfterFailedSave(AppConfig config)
+    {
+        config.displayConfigurationSafeMode = true;
+        return config;
+    }
+
+    inline bool RequiresSettingsPersistence(bool configChanged, AppConfig const& original)
+    {
+        return configChanged || original.displayConfigurationSafeMode;
+    }
+
+    inline AppConfig SettingsAfterSuccessfulSave(AppConfig config)
+    {
+        config.displayConfigurationSafeMode = false;
+        return config;
+    }
+
+    inline AppConfig PersistSettingsForPublication(AppConfig config,
+        std::function<void(AppConfig const&)> const& persist)
+    {
+        persist(config);
+        return SettingsAfterSuccessfulSave(std::move(config));
+    }
+
     enum class SettingsPage
     {
         General,
