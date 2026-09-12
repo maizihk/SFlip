@@ -2296,6 +2296,97 @@ auto offlineConfig = strongFirst.displays;
             L"W-032: 用户动作强刷新相同拓扑时替换 DXVA2 句柄租约但不伪造拓扑 generation");
     }
 
+    void TestLinkedDisplayPreferences(std::filesystem::path const& root)
+    {
+        auto config = ConfigWithDisplays(3);
+        auto preferences = BuildLinkedDdcPreferenceControls(config.displays);
+        Check(preferences.size() == 3 && std::all_of(preferences.begin(), preferences.end(), [](auto const& item)
+            { return item.featureState == DdcPreferenceState::Off && !item.trayEnabled; }),
+            L"W-044: 功能全关闭仍显示三个联动开关行，托盘开关不可用");
+        Check(BuildLinkedDdcPreferenceControls({}).size() == 3,
+            L"W-044: 无显示器时仍保留三个联动行模型");
+        config.displays[0].brightnessEnabled = true;
+        config.displays[0].brightnessShowInTray = true;
+        config.displays[1].brightnessEnabled = true;
+        config.displays[2].bindingStatus = DisplayBindingStatus::Offline;
+        preferences = BuildLinkedDdcPreferenceControls(config.displays);
+        Check(preferences[0].featureState == DdcPreferenceState::Partial &&
+            preferences[0].trayState == DdcPreferenceState::Partial && preferences[0].trayEnabled,
+            L"W-044: 功能和托盘混合状态明确为部分开启，不等同全部开启");
+        auto modeEdit = config;
+        modeEdit.linkAllDisplays = true;
+        auto linked = MergeSettingsForScope(config, modeEdit, SettingsSaveFeedbackScope::Displays);
+        auto path = root / L"linked-display-preferences.json";
+        linked.SaveToPath(path);
+        auto loaded = AppConfig::LoadFromPath(path);
+        Check(loaded.linkAllDisplays && loaded.displays[0].brightnessEnabled &&
+            loaded.displays[1].brightnessEnabled && !loaded.displays[2].brightnessEnabled &&
+            loaded.displays[0].brightnessShowInTray && !loaded.displays[1].brightnessShowInTray,
+            L"W-044: 从单台转联动只保存展示模式，不批改功能或托盘偏好");
+        Check(ShowPerDisplayDdcControls(config.linkAllDisplays) &&
+            !ShowPerDisplayDdcControls(linked.linkAllDisplays),
+            L"W-044: off转on捕获旧单台控件，联动后单台控制网格不挂载");
+        SetLinkedDdcTray(linked.displays, DdcVcpCode::Brightness, true);
+        Check(linked.displays[0].brightnessShowInTray && linked.displays[1].brightnessShowInTray &&
+            !linked.displays[2].brightnessShowInTray,
+            L"W-044: 统一托盘开关只作用功能已开启的显示器");
+        SetLinkedDdcFeature(linked.displays, DdcVcpCode::Brightness, true);
+        Check(std::all_of(linked.displays.begin(), linked.displays.end(), [](auto const& display)
+            { return display.brightnessEnabled; }) && !linked.displays[2].brightnessShowInTray,
+            L"W-044: 统一功能开关包含离线显示器偏好，不顺带开启其托盘项");
+        SetLinkedDdcFeature(linked.displays, DdcVcpCode::Brightness, false);
+        Check(std::all_of(linked.displays.begin(), linked.displays.end(), [](auto const& display)
+            { return !display.brightnessEnabled && !display.brightnessShowInTray; }),
+            L"W-044: 统一关闭功能同时清除全部托盘偏好");
+        SetLinkedDdcFeature(linked.displays, DdcVcpCode::Contrast, true);
+        SetLinkedDdcTray(linked.displays, DdcVcpCode::Contrast, true);
+        SetLinkedDdcFeature(linked.displays, DdcVcpCode::Volume, true);
+        auto invalidCodePreferences = linked.displays;
+        SetLinkedDdcFeature(invalidCodePreferences, static_cast<DdcVcpCode>(0x60), false);
+        SetLinkedDdcTray(invalidCodePreferences, static_cast<DdcVcpCode>(0x60), true);
+        Check(invalidCodePreferences[0].volumeEnabled && !invalidCodePreferences[0].volumeShowInTray &&
+            invalidCodePreferences[2].contrastEnabled && invalidCodePreferences[2].contrastShowInTray,
+            L"W-044: 非控制VCP不得被统一开关当作音量或其他偏好修改");
+        auto unlinkedEdit = linked;
+        unlinkedEdit.linkAllDisplays = false;
+        auto unlinked = MergeSettingsForScope(linked, unlinkedEdit, SettingsSaveFeedbackScope::Displays);
+        unlinked.SaveToPath(path);
+        loaded = AppConfig::LoadFromPath(path);
+        Check(!loaded.linkAllDisplays && !loaded.displays[0].brightnessEnabled &&
+            loaded.displays[2].contrastEnabled && loaded.displays[2].contrastShowInTray &&
+            loaded.displays[2].volumeEnabled && !loaded.displays[2].volumeShowInTray &&
+            !ShowPerDisplayDdcControls(linked.linkAllDisplays) && ShowPerDisplayDdcControls(loaded.linkAllDisplays),
+            L"W-044: on转off跳过隐藏控件并恢复当前逐台偏好，不恢复历史快照");
+        auto candidate = loaded;
+        SetLinkedDdcFeature(candidate.displays, DdcVcpCode::Volume, false);
+        bool rejected{};
+        try { candidate.SaveToPath(path, AppConfigSaveFaultForTesting::AtomicReplace); }
+        catch (...) { rejected = true; }
+        auto preserved = ReadObject(path).GetNamedArray(L"Displays").GetObjectAt(2);
+        Check(rejected && preserved.GetNamedBoolean(L"VolumeEnabled") && loaded.displays[2].volumeEnabled,
+            L"W-044: 统一偏好保存失败不替换磁盘或已保存逐台偏好");
+
+        auto hardware = ConfigWithDisplays(2);
+        for (auto& display : hardware.displays) EnableDdcControls(display);
+        hardware.linkAllDisplays = true;
+        hardware.displays[1].bindingStatus = DisplayBindingStatus::Offline;
+        FakeDdcBackend native;
+        auto service = FakeService(native);
+        DdcCancellationSource cancellation;
+        auto projection = BuildDdcControlProjection(hardware, DisplayTopologyTrust::LocalPhysicalAuthoritative, false);
+        Check(projection[0].targetDisplayIds.size() == 1,
+            L"W-044: 公共滑杆目标继续排除离线显示器");
+        static_cast<void>(service.Write(hardware, hardware.displays[0].id,
+            DdcVcpCode::Brightness, 35, true, cancellation.Begin()));
+        Check(native.writes.size() == 1 && std::get<0>(native.writes[0]) == hardware.displays[0].nativeMonitorId,
+            L"W-044: 联动滑杆实际写入只调用在线合格显示器");
+        native.writes.clear();
+        native.status.availability = DdcAvailability::Unsupported;
+        static_cast<void>(service.Write(hardware, hardware.displays[0].id,
+            DdcVcpCode::Brightness, 35, true, cancellation.Begin()));
+        Check(native.writes.empty(), L"W-044: 不支持DDC的后端继续保持零硬件写入");
+    }
+
     void TestDdcControls()
     {
         auto config = ConfigWithDisplays(2);
@@ -3795,6 +3886,7 @@ int wmain()
         TestUsbTriggerStability();
         TestUsbColdStartRehydration();
         TestInputSourceColdStartTopologyRefresh();
+        TestLinkedDisplayPreferences(root);
         TestDdcControls();
         TestMediaKeyRouting();
         TestUsbLearningAndAbout();
