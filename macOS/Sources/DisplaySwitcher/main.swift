@@ -325,8 +325,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                 nowMs: self.currentTimeMs()
             )
         }
-        controller.onReadDDC = { [weak self] stableID in
-            self?.readDDCForSettings(stableID: stableID)
+        controller.onReadDDC = { [weak self] stableIDs, completion in
+            guard let self else { completion(false); return }
+            self.readDDCForSettings(stableIDs: stableIDs, completion: completion)
         }
         controller.cachedDDCValue = { [weak self] stableID, command in
             self?.ddcController.cachedValue(stableID: stableID, command: command)
@@ -1089,31 +1090,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         }
     }
 
-    private func readDDCForSettings(stableID: String) {
-        guard DDCValuePresentationPolicy.source(for: .settingsReadButton) == .hardware else { return }
-        guard configurationSafetyGate.allows(.ddc), usbLearningSafetyGate.allows(.ddc),
-              let configuration = configurations.values.first(where: {
-                  ($0.id ?? $0.selector).caseInsensitiveCompare(stableID) == .orderedSame
-              }) else { return }
-        let target = Self.ddcTarget(for: configuration, document: AppPreferences.localConfiguration)
+    private func readDDCForSettings(stableIDs: [String], completion: @escaping (Bool) -> Void) {
+        guard DDCValuePresentationPolicy.source(for: .settingsReadButton) == .hardware,
+              configurationSafetyGate.allows(.ddc), usbLearningSafetyGate.allows(.ddc) else {
+            completion(false)
+            return
+        }
+        let targets = configurations.values.sorted { $0.index < $1.index }.filter { configuration in
+            stableIDs.contains {
+                $0.caseInsensitiveCompare(configuration.id ?? configuration.selector) == .orderedSame
+            }
+        }.map { Self.ddcTarget(for: $0, document: AppPreferences.localConfiguration) }
+        guard !targets.isEmpty else { completion(false); return }
         workerQueue.async { [weak self] in
-            guard let self else { return }
-            let batch = self.ddcController.read(targets: [target])
-            let result = batch[target.stableID] ?? [:]
-            let skipReason = batch.skipped[target.stableID]
+            guard let self else { DispatchQueue.main.async { completion(false) }; return }
+            let batch = self.ddcController.read(targets: targets)
             DispatchQueue.main.async {
+                defer { completion(true) }
                 guard self.settingsWindowController.isSettingsVisible else { return }
-                for (command, resolved) in result {
-                    self.ddcValueSamples[target.stableID.lowercased(), default: [:]][command] = DDCControlValueSample(
-                        value: resolved.reading.current,
-                        maximum: resolved.reading.maximum,
-                        estimated: resolved.estimated
+                for target in targets {
+                    let result = batch[target.stableID] ?? [:]
+                    for (command, resolved) in result {
+                        self.ddcValueSamples[target.stableID.lowercased(), default: [:]][command] = DDCControlValueSample(
+                            value: resolved.reading.current,
+                            maximum: resolved.reading.maximum,
+                            estimated: resolved.estimated
+                        )
+                    }
+                    self.settingsWindowController.updateDDCValues(
+                        stableID: target.stableID, values: result, skipReason: batch.skipped[target.stableID]
                     )
                 }
                 self.refreshLinkedTrayControlRows()
-                self.settingsWindowController.updateDDCValues(
-                    stableID: target.stableID, values: result, skipReason: skipReason
-                )
             }
         }
     }

@@ -1,5 +1,14 @@
 # macOS 交接记录
 
+## 当前任务：DS-046 联动控制列对齐与集中读取
+
+- 日期：2026-09-12；分支：`codex/windows-linked-controls-alignment`；基线：`36b3b5a`，主任务已确认 `origin/main@f12a224`。
+- Mac 联动行五列已有 required 固定宽度和 centerY，混合文本也固定宽度，因此没有 Windows 自适应列宽根因；实际发现联动表头默认右对齐而开关/数值靠左，最小修复为表头左对齐，列宽和一次表头保持。
+- 用户本轮新增要求将联动读取集中成一个入口：联动时公共标题旁显示一个读取按钮，单台卡仅保留结果及离线删除，关闭联动恢复单台读取。目标来自 `resolvedDisplayConfigurations` 的已解析在线配置；未猜测离线目标或新增读取码。
+- 原 `onReadDDC` / `readDDCForSettings` 收敛为多 ID 与完成回调，单台同路调用；一次串行队列 `read(targets:)` 保留安全门、原 enabledCommands、每目标 skipReason/失败和可信样本刷新。共享 pending 禁用读取按钮，完成回调在安全门拒绝、零目标、正常/取消批次返回及窗口隐藏时均释放；完成布尔值表示批次已返回，逐台成功/失败继续显示原结果。
+- 修改：`SettingsWindowController.swift`、`main.swift`、`DDCBackendTests.swift`、Mac 清单及本交接文件。新增一个模拟多目标读取测试，覆盖首台失败不阻塞另一台、启用码过滤、空码跳过及零写入。未修改协议、配置格式、USB、网络或滑杆绘制。
+- 静态审查与 `git diff --check` 通过；当前 Windows 主机没有 Xcode，未声称执行 XCTest/Release/codesign，完整 CI 由主任务继续。真实 Mac 列对齐、浅/深主题已知/未知轨道端点、集中读取/取消与切换联动的 GUI 仍待验证。未启动真实 DDC、USB、网络、唤醒或 App；不单独提交推送。
+
 ## 当前任务：DS-045 协同状态移至顶部
 
 - 日期：2026-09-12

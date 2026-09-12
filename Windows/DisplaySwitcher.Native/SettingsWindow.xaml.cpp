@@ -36,6 +36,27 @@ namespace
         AutomationProperties::SetName(toggle, automationName);
     }
 
+    FrameworkElement FindSliderPart(DependencyObject const& root, wchar_t const* name)
+    {
+        if (auto element = root.try_as<FrameworkElement>(); element && element.Name() == name) return element;
+        for (int index = 0; index < VisualTreeHelper::GetChildrenCount(root); ++index)
+            if (auto found = FindSliderPart(VisualTreeHelper::GetChild(root, index), name)) return found;
+        return nullptr;
+    }
+
+    void RefreshLinkedSliderAppearance(Slider const& slider)
+    {
+        auto known = unbox_value<bool>(slider.Tag());
+        auto thumb = FindSliderPart(slider, L"HorizontalThumb");
+        auto decrease = FindSliderPart(slider, L"HorizontalDecreaseRect");
+        auto track = FindSliderPart(slider, L"HorizontalTrackRect");
+        // Preserve native track geometry, theme, and transparent thumb hit testing.
+        // A missing part must never expose a fabricated zero value.
+        slider.Opacity(known || (thumb && decrease && track) ? 1.0 : 0.0);
+        if (thumb) thumb.Opacity(known ? 1.0 : 0.0);
+        if (decrease) decrease.Opacity(known ? 1.0 : 0.0);
+    }
+
     Grid LabeledToggleRow(std::wstring const& text, ToggleSwitch const& toggle)
     {
         ConfigureCompactToggle(toggle, text);
@@ -1095,6 +1116,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         if (!displayEditorsPanel_) return;
         displayEditorsPanel_.Children().Clear();
         displayEditors_.clear();
+        ddcReadButtons_.clear();
         if (linkedDdcControlsPanel_) linkedDdcControlsPanel_.Children().Clear();
 
         auto linked = linkAllDisplays_ && linkAllDisplays_.IsOn();
@@ -1111,7 +1133,37 @@ namespace winrt::DisplaySwitcher::Native::implementation
                 auto shared = StackPanel(); shared.Spacing(10);
                 auto heading = TextBlock(); heading.Text(L"联动调节");
                 heading.FontSize(18); heading.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
-                shared.Children().Append(heading);
+                auto sharedHeader = Grid(); sharedHeader.ColumnSpacing(16);
+                auto headingColumn = ColumnDefinition(); headingColumn.Width(GridLength{ 1, GridUnitType::Star });
+                auto readColumn = ColumnDefinition(); readColumn.Width(GridLengthHelper::Auto());
+                sharedHeader.ColumnDefinitions().Append(headingColumn); sharedHeader.ColumnDefinitions().Append(readColumn);
+                heading.VerticalAlignment(VerticalAlignment::Center); sharedHeader.Children().Append(heading);
+                auto readAll = Button(); readAll.Content(box_value(L"读取 DDC 参数"));
+                std::vector<std::wstring> readTargets;
+                for (auto const& display : workingDisplays_)
+                    if (::DisplaySwitcher::Native::IsDisplayDdcResolved(display)) readTargets.push_back(display.id);
+                readAll.IsEnabled(!ddcReadPending_ && !readTargets.empty());
+                ddcReadButtons_.push_back({ readAll, !readTargets.empty() });
+                AutomationProperties::SetName(readAll, L"读取所有联动显示器的 DDC 参数");
+                readAll.Click([this, readTargets](auto const&, auto const&) { ReadDdc(readTargets); });
+                Grid::SetColumn(readAll, 1); sharedHeader.Children().Append(readAll);
+                shared.Children().Append(sharedHeader);
+                auto rows = Grid(); rows.ColumnSpacing(8); rows.RowSpacing(10);
+                for (auto width : { 60.0, 120.0, 120.0 })
+                {
+                    auto column = ColumnDefinition(); column.Width(GridLength{ width, GridUnitType::Pixel });
+                    rows.ColumnDefinitions().Append(column);
+                }
+                auto sliderColumn = ColumnDefinition(); sliderColumn.Width(GridLength{ 1, GridUnitType::Star });
+                auto valueColumn = ColumnDefinition(); valueColumn.Width(GridLength{ 44, GridUnitType::Pixel });
+                rows.ColumnDefinitions().Append(sliderColumn); rows.ColumnDefinitions().Append(valueColumn);
+                auto headerRow = RowDefinition(); headerRow.Height(GridLengthHelper::Auto());
+                rows.RowDefinitions().Append(headerRow);
+                auto featureHeader = TextBlock(); featureHeader.Text(L"功能"); featureHeader.Opacity(0.66);
+                auto trayHeader = TextBlock(); trayHeader.Text(L"托盘"); trayHeader.Opacity(0.66);
+                Grid::SetColumn(featureHeader, 1); Grid::SetColumn(trayHeader, 2);
+                rows.Children().Append(featureHeader); rows.Children().Append(trayHeader);
+                int rowIndex = 1;
                 for (auto const& preference : preferences)
                 {
                     auto found = std::find_if(projections.begin(), projections.end(), [&](auto const& item)
@@ -1119,30 +1171,29 @@ namespace winrt::DisplaySwitcher::Native::implementation
                     auto projection = found == projections.end()
                         ? ::DisplaySwitcher::Native::DdcProjectedControl{} : *found;
                     projection.code = preference.code; projection.label = preference.label;
-                    auto row = Grid(); row.ColumnSpacing(8);
-                    auto labelColumn = ColumnDefinition(); labelColumn.Width(GridLength{ 60 });
-                    auto sliderColumn = ColumnDefinition(); sliderColumn.Width(GridLength{ 1, GridUnitType::Star });
-                    auto valueColumn = ColumnDefinition(); valueColumn.Width(GridLength{ 44 });
-                    auto featureColumn = ColumnDefinition(); featureColumn.Width(GridLength{ 96 });
-                    auto trayColumn = ColumnDefinition(); trayColumn.Width(GridLength{ 96 });
-                    row.ColumnDefinitions().Append(labelColumn); row.ColumnDefinitions().Append(featureColumn);
-                    row.ColumnDefinitions().Append(trayColumn); row.ColumnDefinitions().Append(sliderColumn);
-                    row.ColumnDefinitions().Append(valueColumn);
+                    auto row = RowDefinition(); row.Height(GridLengthHelper::Auto());
+                    rows.RowDefinitions().Append(row);
                     auto label = TextBlock(); label.Text(projection.label); label.VerticalAlignment(VerticalAlignment::Center);
-                    auto enabled = ToggleSwitch(); enabled.MinWidth(0);
-                    enabled.OnContent(box_value(L"")); enabled.OffContent(box_value(L""));
-                    enabled.Header(box_value(preference.featureState == ::DisplaySwitcher::Native::DdcPreferenceState::Partial
-                        ? L"部分开启" : L"功能"));
+                    auto enabled = ToggleSwitch(); ConfigureCompactToggle(enabled, L"联动" + preference.label + L"功能开关");
+                    enabled.HorizontalAlignment(HorizontalAlignment::Left);
                     enabled.IsOn(preference.featureState == ::DisplaySwitcher::Native::DdcPreferenceState::On);
                     enabled.IsEnabled(preference.hasDisplays);
-                    auto tray = ToggleSwitch(); tray.MinWidth(0);
-                    tray.OnContent(box_value(L"")); tray.OffContent(box_value(L""));
-                    tray.Header(box_value(preference.trayState == ::DisplaySwitcher::Native::DdcPreferenceState::Partial
-                        ? L"部分开启" : L"托盘"));
+                    auto tray = ToggleSwitch(); ConfigureCompactToggle(tray, L"联动" + preference.label + L"在托盘显示");
+                    tray.HorizontalAlignment(HorizontalAlignment::Left);
                     tray.IsOn(preference.trayState == ::DisplaySwitcher::Native::DdcPreferenceState::On);
                     tray.IsEnabled(preference.trayEnabled);
-                    AutomationProperties::SetName(enabled, L"联动" + preference.label + L"功能开关");
-                    AutomationProperties::SetName(tray, L"联动" + preference.label + L"在托盘显示");
+                    auto toggleCell = [](ToggleSwitch const& toggle, ::DisplaySwitcher::Native::DdcPreferenceState state)
+                    {
+                        auto cell = StackPanel(); cell.Orientation(Orientation::Horizontal); cell.Spacing(8);
+                        cell.VerticalAlignment(VerticalAlignment::Center); cell.Children().Append(toggle);
+                        auto mixed = TextBlock(); mixed.Text(L"部分开启"); mixed.FontSize(12);
+                        mixed.VerticalAlignment(VerticalAlignment::Center);
+                        mixed.Visibility(state == ::DisplaySwitcher::Native::DdcPreferenceState::Partial
+                            ? Visibility::Visible : Visibility::Collapsed);
+                        cell.Children().Append(mixed); return cell;
+                    };
+                    auto featureCell = toggleCell(enabled, preference.featureState);
+                    auto trayCell = toggleCell(tray, preference.trayState);
                     enabled.Toggled([this, code = preference.code](auto const& sender, auto const&)
                     {
                         if (loading_) return;
@@ -1171,14 +1222,13 @@ namespace winrt::DisplaySwitcher::Native::implementation
                     slider.Value(projection.value); slider.StepFrequency(1); slider.SmallChange(1); slider.LargeChange(10);
                     slider.HorizontalAlignment(HorizontalAlignment::Stretch);
                     slider.IsEnabled(!projection.targetDisplayIds.empty());
-                    auto sliderHost = Grid();
-                    auto neutralTrack = Border(); neutralTrack.Height(4); neutralTrack.CornerRadius(CornerRadius{ 2, 2, 2, 2 });
-                    neutralTrack.VerticalAlignment(VerticalAlignment::Center);
-                    neutralTrack.Background(ThemeBrush(L"ControlStrongStrokeColorDefaultBrush", Colors::Gray()));
-                    neutralTrack.Visibility(projection.valueState == ::DisplaySwitcher::Native::DdcProjectedValueState::Value
-                        ? Visibility::Collapsed : Visibility::Visible);
+                    slider.VerticalAlignment(VerticalAlignment::Center);
                     slider.Opacity(projection.valueState == ::DisplaySwitcher::Native::DdcProjectedValueState::Value ? 1.0 : 0.0);
-                    sliderHost.Children().Append(neutralTrack); sliderHost.Children().Append(slider);
+                    slider.Tag(box_value(projection.valueState == ::DisplaySwitcher::Native::DdcProjectedValueState::Value));
+                    slider.Loaded([](auto const& sender, auto const&)
+                        { RefreshLinkedSliderAppearance(sender.template as<Slider>()); });
+                    slider.ActualThemeChanged([](auto const& sender, auto const&)
+                        { RefreshLinkedSliderAppearance(sender.template as<Slider>()); });
                     auto value = TextBlock(); value.VerticalAlignment(VerticalAlignment::Center);
                     value.HorizontalAlignment(HorizontalAlignment::Right);
                     value.Text(projection.valueState == ::DisplaySwitcher::Native::DdcProjectedValueState::Mixed
@@ -1186,11 +1236,11 @@ namespace winrt::DisplaySwitcher::Native::implementation
                         ? L"—" : std::to_wstring(projection.value));
                     auto accessibleValue = value.Text();
                     AutomationProperties::SetName(slider, L"联动" + projection.label + L"，当前" + std::wstring(accessibleValue.c_str()));
-                    slider.ValueChanged([value, neutralTrack, labelText = projection.label](auto const& sender, auto const&)
+                    slider.ValueChanged([value, labelText = projection.label](auto const& sender, auto const&)
                     {
                         auto currentSlider = sender.template as<Slider>();
                         auto current = static_cast<int>(std::lround(currentSlider.Value()));
-                        currentSlider.Opacity(1); neutralTrack.Visibility(Visibility::Collapsed);
+                        currentSlider.Tag(box_value(true)); RefreshLinkedSliderAppearance(currentSlider);
                         value.Text(std::to_wstring(current));
                         AutomationProperties::SetName(currentSlider,
                             L"联动" + labelText + L"，当前" + std::to_wstring(current));
@@ -1208,12 +1258,16 @@ namespace winrt::DisplaySwitcher::Native::implementation
                             if (!id.empty() && args.Key() == Windows::System::VirtualKey::Enter)
                                 WriteDdc(id, code, static_cast<int>(std::lround(slider.Value())));
                         }));
-                    Grid::SetColumn(enabled, 1); Grid::SetColumn(tray, 2);
-                    Grid::SetColumn(sliderHost, 3); Grid::SetColumn(value, 4);
-                    row.Children().Append(enabled); row.Children().Append(tray);
-                    row.Children().Append(label); row.Children().Append(sliderHost); row.Children().Append(value);
-                    shared.Children().Append(row);
+                    Grid::SetColumn(featureCell, 1); Grid::SetColumn(trayCell, 2);
+                    Grid::SetColumn(slider, 3); Grid::SetColumn(value, 4);
+                    for (auto const& element : { label.as<FrameworkElement>(), featureCell.as<FrameworkElement>(),
+                        trayCell.as<FrameworkElement>(), slider.as<FrameworkElement>(), value.as<FrameworkElement>() })
+                    {
+                        Grid::SetRow(element, rowIndex); rows.Children().Append(element);
+                    }
+                    ++rowIndex;
                 }
+                shared.Children().Append(rows);
                 linkedDdcControlsPanel_.Children().Append(CreateCard(shared));
             }
         }
@@ -1253,9 +1307,11 @@ namespace winrt::DisplaySwitcher::Native::implementation
             controls.status.TextWrapping(TextWrapping::Wrap);
 
             auto read = Button(); read.Content(box_value(L"读取 DDC 参数"));
-            read.IsEnabled(::DisplaySwitcher::Native::IsDisplayDdcResolved(display));
+            auto canRead = ::DisplaySwitcher::Native::IsDisplayDdcResolved(display);
+            read.IsEnabled(!ddcReadPending_ && canRead);
+            if (!linked) ddcReadButtons_.push_back({ read, canRead });
             AutomationProperties::SetName(read, L"读取 " + display.name + L" 的 DDC 参数");
-            read.Click([this, id = display.id](auto const&, auto const&) { ReadDdc(id); });
+            read.Click([this, id = display.id](auto const&, auto const&) { ReadDdc(std::vector<std::wstring>{ id }); });
             auto rebind = Button(); rebind.Content(box_value(L"重新绑定"));
             AutomationProperties::SetName(rebind, L"重新绑定 " + display.name);
             rebind.Click([this, id = display.id](auto const&, auto const&) { RebindDisplay(id); });
@@ -1363,7 +1419,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
             displayTitle.VerticalAlignment(VerticalAlignment::Center);
             read.VerticalAlignment(VerticalAlignment::Center);
             auto actions = StackPanel(); actions.Orientation(Orientation::Horizontal); actions.Spacing(8);
-            actions.Children().Append(read); actions.Children().Append(rebind); actions.Children().Append(remove);
+            if (!linked) actions.Children().Append(read);
+            actions.Children().Append(rebind); actions.Children().Append(remove);
             actions.VerticalAlignment(VerticalAlignment::Center);
             Grid::SetColumn(actions, 1);
             header.Children().Append(displayTitle);
@@ -1759,24 +1816,36 @@ namespace winrt::DisplaySwitcher::Native::implementation
         return config;
     }
 
-    void SettingsWindow::ReadDdc(std::wstring const& displayId)
+    void SettingsWindow::ReadDdc(std::vector<std::wstring> const& displayIds)
     {
+        if (ddcReadPending_) return;
+        if (displayIds.empty()) { SetOperationFeedback(L"没有可读取的显示器。", true); return; }
         if (!readDdc_) { SetOperationFeedback(L"硬件 DDC 读取服务不可用。", true); return; }
+        ddcReadPending_ = true;
+        for (auto const& item : ddcReadButtons_) item.first.IsEnabled(false);
         auto config = WorkingDdcConfig();
         auto token = ddcCancellation_.Begin();
         auto operation = readDdc_;
         auto dispatcher = DispatcherQueue();
         auto strong = get_strong();
         SetOperationFeedback(L"正在读取硬件 DDC 状态…");
-        std::thread([strong, dispatcher, operation, config = std::move(config), displayId, token]() mutable
+        std::thread([strong, dispatcher, operation, config = std::move(config), displayIds, token]() mutable
         {
             ::DisplaySwitcher::Native::DdcControlBatchResult result;
-            try { result = operation(config, { displayId }, token); }
-            catch (...) { result.items.push_back({ displayId, {}, false, false, false, false, {}, {},
-                ::DisplaySwitcher::Native::DdcAvailability::TemporarilyUnavailable,
-                ::DisplaySwitcher::Native::DdcErrorKind::ReadFailed, L"读取硬件 DDC 状态时发生异常" }); }
+            try { result = operation(config, displayIds, token); }
+            catch (...)
+            {
+                for (auto const& displayId : displayIds)
+                    result.items.push_back({ displayId, {}, false, false, false, false, {}, {},
+                        ::DisplaySwitcher::Native::DdcAvailability::TemporarilyUnavailable,
+                        ::DisplaySwitcher::Native::DdcErrorKind::ReadFailed, L"读取硬件 DDC 状态时发生异常" });
+            }
             dispatcher.TryEnqueue([strong, config = std::move(config), result = std::move(result), token]()
-            { strong->CompleteDdcOperation(config, result, token, false); });
+            {
+                strong->ddcReadPending_ = false;
+                for (auto const& item : strong->ddcReadButtons_) item.first.IsEnabled(item.second);
+                strong->CompleteDdcOperation(config, result, token, false);
+            });
         }).detach();
     }
 
