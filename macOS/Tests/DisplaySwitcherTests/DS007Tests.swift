@@ -99,7 +99,7 @@ final class DS007Tests: XCTestCase {
             DisplaySettingsControlProjection(
                 showsLinkedControls: true,
                 showsIndividualSliders: false,
-                linkedCommands: [.luminance]
+                linkedCommands: [.luminance, .contrast, .volume]
             )
         )
         XCTAssertEqual(
@@ -112,6 +112,67 @@ final class DS007Tests: XCTestCase {
                 linkedCommands: []
             )
         )
+    }
+
+    func testLinkedLayoutKeepsAllThreeRowsWhenFeaturesAreOffWithoutChangingPreferences() {
+        let displays = [configuredDisplay(id: "online"), configuredDisplay(id: "offline")]
+        let original = displays
+        let entries = LinkedDDCControlProjection.entries(
+            configurations: [], displays: displays, visibility: .settings, sample: { _, _ in nil }
+        )
+        let linked = DisplaySettingsControlProjection.make(linkAllDisplays: true, linkedEntries: entries)
+        XCTAssertTrue(linked.showsLinkedControls)
+        XCTAssertFalse(linked.showsIndividualSliders)
+        XCTAssertEqual(linked.linkedCommands, [.luminance, .contrast, .volume])
+        XCTAssertEqual(displays, original)
+        let unlinked = DisplaySettingsControlProjection.make(linkAllDisplays: false, linkedEntries: entries)
+        XCTAssertFalse(unlinked.showsLinkedControls)
+        XCTAssertTrue(unlinked.showsIndividualSliders)
+        XCTAssertEqual(displays, original)
+    }
+
+    func testLinkedFeatureMutationsIncludeOfflinePreferencesAndClearTrayWhenDisabled() {
+        let displays = [configuredDisplay(id: "online"), configuredDisplay(id: "offline")]
+        for command in [DDCCommand.luminance, .contrast, .volume] {
+            let enabled = LinkedDisplaySettingsPolicy.settingFeatureEnabled(true, command: command, displays: displays)
+            XCTAssertTrue(enabled.allSatisfy { DisplaySettingsSemantics.enabledCommands(for: $0).contains(command) })
+            let visible = LinkedDisplaySettingsPolicy.settingTrayVisible(true, command: command, displays: enabled)
+            XCTAssertTrue(visible.allSatisfy { DisplaySettingsSemantics.trayCommands(for: $0).contains(command) })
+            let disabled = LinkedDisplaySettingsPolicy.settingFeatureEnabled(false, command: command, displays: visible)
+            XCTAssertTrue(disabled.allSatisfy { DisplaySettingsSemantics.enabledCommands(for: $0).isEmpty })
+            XCTAssertTrue(disabled.allSatisfy { DisplaySettingsSemantics.trayCommands(for: $0).isEmpty })
+            XCTAssertEqual(disabled, displays)
+        }
+    }
+
+    func testLinkedTrayEligibilityAndMixedStatesKeepDisabledDisplayOutOfWrites() {
+        var online = configuredDisplay(id: "online")
+        var offline = configuredDisplay(id: "offline")
+        let disabled = configuredDisplay(id: "disabled")
+        online.brightnessEnabled = true
+        online.brightnessShowInTray = true
+        offline.brightnessEnabled = true
+        let displays = [online, offline, disabled]
+        let state = LinkedDisplaySettingsPolicy.state(command: .luminance, displays: displays)
+        XCTAssertEqual(state.feature, .mixed)
+        XCTAssertEqual(state.tray, .mixed)
+        XCTAssertTrue(state.trayEnabled)
+        let visible = LinkedDisplaySettingsPolicy.settingTrayVisible(true, command: .luminance, displays: displays)
+        XCTAssertTrue(visible[0].brightnessShowInTray)
+        XCTAssertTrue(visible[1].brightnessShowInTray)
+        XCTAssertEqual(visible[2], disabled)
+        let entry = LinkedDDCControlProjection.entries(
+            configurations: [runtimeDisplay(id: online.id, index: 1, name: online.name),
+                             runtimeDisplay(id: disabled.id, index: 2, name: disabled.name)],
+            displays: visible, visibility: .settings, sample: { _, _ in nil }
+        )[0]
+        XCTAssertEqual(entry.targets.map(\.stableID), [online.id])
+        XCTAssertEqual(LinkedDDCControlProjection.writeRequests(command: .luminance, value: 25, entry: entry).map(\.key.stableID), [online.id])
+        let off = LinkedDisplaySettingsPolicy.state(command: .contrast, displays: displays)
+        XCTAssertEqual(off.feature, .off)
+        XCTAssertEqual(off.tray, .off)
+        XCTAssertFalse(off.trayEnabled)
+        XCTAssertEqual(LinkedDisplaySettingsPolicy.settingTrayVisible(true, command: .contrast, displays: displays), displays)
     }
 
     func testLinkedValuesAreUniformMixedOrUnknownAndUseSafeMaximumIntersection() {

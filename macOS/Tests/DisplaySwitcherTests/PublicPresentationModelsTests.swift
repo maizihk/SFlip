@@ -231,6 +231,13 @@ final class PublicPresentationModelsTests: XCTestCase {
         ])
     }
 
+    func testLinkedDisplayReadLayoutRemovesIndividualControlsAndRestoresThemWhenUnlinked() {
+        XCTAssertEqual(DisplayReadModuleContent.items(showsIndividualControls: false), [.displayReadStatus])
+        XCTAssertEqual(DisplayReadModuleContent.items(showsIndividualControls: true), [
+            .displayReadStatus, .separator, .displayControls
+        ])
+    }
+
     func testC023AboutPageUsesOnlyPublicMetadataAndHasNoRuntimeSideEffectDependencies() {
         let metadata = RecordingAboutMetadata(values: [
             "CFBundleName": "SFlip",

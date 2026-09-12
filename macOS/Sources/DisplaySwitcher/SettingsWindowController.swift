@@ -306,6 +306,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private var profileMappingRows: [String: DisplayInputMappingRowView] = [:]
     private var displayFeatureSwitches: [Int: [DDCCommand: NSSwitch]] = [:]
     private var displayTraySwitches: [Int: [DDCCommand: NSSwitch]] = [:]
+    private var linkedFeatureSwitches: [DDCCommand: NSSwitch] = [:]
+    private var linkedTraySwitches: [DDCCommand: NSSwitch] = [:]
     private var displaySliders: [Int: [DDCCommand: NSSlider]] = [:]
     private var displayValueLabels: [Int: [DDCCommand: NSTextField]] = [:]
     private var displayStatusLabels: [Int: NSTextField] = [:]
@@ -1021,6 +1023,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         inputFields.removeAll()
         displayFeatureSwitches.removeAll()
         displayTraySwitches.removeAll()
+        linkedFeatureSwitches.removeAll()
+        linkedTraySwitches.removeAll()
         displaySliders.removeAll()
         displayValueLabels.removeAll()
         displayStatusLabels.removeAll()
@@ -1143,7 +1147,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func displayReadModuleViews(index: Int, status: NSView) -> [NSView] {
-        DisplayReadModuleContent.items.compactMap { item in
+        DisplayReadModuleContent.items(
+            showsIndividualControls: displayControlLayoutProjection().showsIndividualSliders
+        ).compactMap { item in
             switch item {
             case .displayReadStatus:
                 return status
@@ -1380,13 +1386,25 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     private func linkedDisplayControlForm() -> NSView {
         let headings = NSStackView(views: [
-            fixedLabel("统一调节", width: 76), fixedLabel("", width: 424),
+            fixedLabel("", width: 64), fixedLabel("功能", width: 90),
+            fixedLabel("在托盘显示", width: 90), fixedLabel("", width: 230),
             fixedLabel("数值", width: 74)
         ])
         headings.orientation = .horizontal
         headings.spacing = 8
 
-        let rows = linkedDisplayControlEntries().map { entry -> NSView in
+        let displays = configurationDocument?.displays ?? []
+        let rows = LinkedDDCControlProjection.orderedCommands.map { command -> NSView in
+            let entry = linkedDisplaySettingsEntry(for: command)
+            let preferences = LinkedDisplaySettingsPolicy.state(command: command, displays: displays)
+            let feature = linkedPreferenceControl(
+                command: command, state: preferences.feature, isTray: false,
+                enabled: !displays.isEmpty
+            )
+            let tray = linkedPreferenceControl(
+                command: command, state: preferences.tray, isTray: true,
+                enabled: preferences.trayEnabled
+            )
             let slider = LinkedDDCSlider(frame: .zero)
             slider.minValue = 0
             slider.maxValue = Double(entry.maximum)
@@ -1394,14 +1412,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             slider.action = #selector(linkedDisplaySliderChanged(_:))
             slider.tag = Int(entry.command.rawValue)
             slider.isContinuous = true
-            slider.widthAnchor.constraint(equalToConstant: 424).isActive = true
+            slider.widthAnchor.constraint(equalToConstant: 230).isActive = true
             slider.setAccessibilityLabel("统一\(entry.command.userFacingName)")
             let value = fixedLabel(entry.value.displayText, width: 74)
             value.alignment = .left
             linkedDisplaySliders[entry.command] = slider
             linkedDisplayValueLabels[entry.command] = value
             let row = NSStackView(views: [
-                fixedLabel(entry.command.userFacingName, width: 76), slider, value
+                fixedLabel(entry.command.userFacingName, width: 64), feature, tray, slider, value
             ])
             row.orientation = .horizontal
             row.alignment = .centerY
@@ -1415,6 +1433,33 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         form.alignment = .leading
         form.spacing = 8
         return form
+    }
+
+    private func linkedPreferenceControl(
+        command: DDCCommand,
+        state: LinkedDisplayPreferenceToggleState,
+        isTray: Bool,
+        enabled: Bool
+    ) -> NSView {
+        let toggle = NSSwitch()
+        toggle.state = state == .on ? .on : .off
+        toggle.isEnabled = enabled
+        toggle.tag = Int(command.rawValue)
+        toggle.target = self
+        toggle.action = #selector(linkedDisplaySettingChanged(_:))
+        toggle.setAccessibilityLabel("统一\(command.userFacingName)\(isTray ? "在托盘显示" : "功能")")
+        toggle.setAccessibilityValue(state == .mixed ? "部分开启" : (state == .on ? "开启" : "关闭"))
+        if isTray { linkedTraySwitches[command] = toggle }
+        else { linkedFeatureSwitches[command] = toggle }
+        let partial = fixedLabel(state == .mixed ? "部分开启" : "", width: 48)
+        partial.font = .systemFont(ofSize: 11)
+        partial.alignment = .left
+        let row = NSStackView(views: [toggle, partial])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 2
+        row.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        return row
     }
 
     private func fixedLabel(_ title: String, width: CGFloat) -> NSTextField {
@@ -1586,6 +1631,25 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             case (.input, _): return
             }
             document.displays[index - 1] = display
+        }
+    }
+
+    @objc private func linkedDisplaySettingChanged(_ sender: NSSwitch) {
+        guard let command = DDCCommand(rawValue: UInt8(sender.tag)),
+              LinkedDDCControlProjection.orderedCommands.contains(command),
+              configurationDocument?.linkAllDisplays == true,
+              linkedFeatureSwitches[command] === sender
+                || linkedTraySwitches[command] === sender else { return }
+        let enabled = sender.state == .on
+        let isFeature = linkedFeatureSwitches[command] === sender
+        persistDocument(rebuildDisplayFormsAfterSave: true) { document in
+            document.displays = isFeature
+                ? LinkedDisplaySettingsPolicy.settingFeatureEnabled(
+                    enabled, command: command, displays: document.displays
+                )
+                : LinkedDisplaySettingsPolicy.settingTrayVisible(
+                    enabled, command: command, displays: document.displays
+                )
         }
     }
 
@@ -1974,11 +2038,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func refreshLinkedDisplayControls() {
-        for entry in linkedDisplayControlEntries() {
+        for command in LinkedDDCControlProjection.orderedCommands {
+            let entry = linkedDisplaySettingsEntry(for: command)
             guard let slider = linkedDisplaySliders[entry.command],
                   let valueLabel = linkedDisplayValueLabels[entry.command] else { continue }
             applyLinkedDisplayEntry(entry, to: slider, valueLabel: valueLabel)
         }
+    }
+
+    private func linkedDisplaySettingsEntry(for command: DDCCommand) -> LinkedDDCControlProjection.Entry {
+        linkedDisplayControlEntries().first { $0.command == command }
+            ?? LinkedDDCControlProjection.Entry(
+                command: command, targets: [], value: .unknown,
+                maximum: LinkedDDCControlProjection.safeDefaultMaximum
+            )
     }
 
     private func applyLinkedDisplayEntry(
