@@ -7,7 +7,7 @@
 - 修复：共享固定 Pixel 列和 Star 滑杆列；功能/托盘只显示一次表头，40 宽无 Header 开关及部分开启文本与其余控件同中心。未知/混合直接使用原生 `HorizontalTrackRect`，仅以 Opacity 隐藏 `HorizontalThumb`/`HorizontalDecreaseRect`；Loaded 前隐藏未知 Slider，加载、主题变化和用户调节刷新显示。模板 part 缺失时保持隐藏，防止伪造零值。
 - 原生模板依据：[微软 Slider 主题模板](https://github.com/microsoft/microsoft-ui-xaml/blob/main/controls/dev/CommonStyles/Slider_themeresources.xaml)，默认横向控件高度 32、轨道高度 4，高对比度轨道高度 2；本修复不复制这些几何常数。
 - 联动公共标题右侧一个读取按钮按既有 `IsDisplayDdcResolved` 选目标，一次 vector 批调用只 Begin 一次，沿用服务的顺序读取、安全过滤、取消、缓存提交及逐台结果路径。空目标禁用并在入口拒绝；异常为每个目标产生失败结果。读取期间所有读取按钮禁用且入口拒绝重入，后台返回先恢复按钮，再沿用完成路径（包括被写入取消的读取）；只更新按钮，不为此重建滑杆。关闭联动恢复逐台按钮，重新绑定及逐台状态始终保留。
-- 自动验证和 x64 Release/CI 结果由本次交付记录补齐；现有模拟读取测试覆盖批读取、单台失败隔离、取消和零写入。未知/混合、高对比度、DPI、窄窗口及公共读取仍需实机视觉验收；未启动真实应用或执行硬件、网络及系统设置动作。
+- 提交 `e33a4e6` 已通过 [Windows CI run 34685595093](https://github.com/maizihk/SFlip/actions/runs/34685595093) / job `103531923705`：516 项原生检查、61 项安装器检查、x64 Release 和绿色版上传全部成功；artifact `10295881497`。PR [#103](https://github.com/maizihk/SFlip/pull/103) 目标为 `codex/windows-collaboration-status-top`。现有模拟读取测试覆盖批读取、单台失败隔离、取消和零写入。未知/混合、高对比度、DPI、窄窗口及公共读取仍需实机视觉验收；未启动真实应用或执行硬件、网络及系统设置动作。
 
 ## 当前任务：W-045 协同页顶部唯一连接状态（2026-09-12）
 

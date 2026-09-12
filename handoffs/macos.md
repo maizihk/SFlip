@@ -7,7 +7,7 @@
 - 用户本轮新增要求将联动读取集中成一个入口：联动时公共标题旁显示一个读取按钮，单台卡仅保留结果及离线删除，关闭联动恢复单台读取。目标来自 `resolvedDisplayConfigurations` 的已解析在线配置；未猜测离线目标或新增读取码。
 - 原 `onReadDDC` / `readDDCForSettings` 收敛为多 ID 与完成回调，单台同路调用；一次串行队列 `read(targets:)` 保留安全门、原 enabledCommands、每目标 skipReason/失败和可信样本刷新。共享 pending 禁用读取按钮，完成回调在安全门拒绝、零目标、正常/取消批次返回及窗口隐藏时均释放；完成布尔值表示批次已返回，逐台成功/失败继续显示原结果。
 - 修改：`SettingsWindowController.swift`、`main.swift`、`DDCBackendTests.swift`、Mac 清单及本交接文件。新增一个模拟多目标读取测试，覆盖首台失败不阻塞另一台、启用码过滤、空码跳过及零写入。未修改协议、配置格式、USB、网络或滑杆绘制。
-- 静态审查与 `git diff --check` 通过；当前 Windows 主机没有 Xcode，未声称执行 XCTest/Release/codesign，完整 CI 由主任务继续。真实 Mac 列对齐、浅/深主题已知/未知轨道端点、集中读取/取消与切换联动的 GUI 仍待验证。未启动真实 DDC、USB、网络、唤醒或 App；不单独提交推送。
+- 静态审查与 `git diff --check` 通过；提交 `e33a4e6`、PR [#103](https://github.com/maizihk/SFlip/pull/103)（base：`codex/windows-collaboration-status-top`）的 macOS CI run `34685593717`、job `103531920510` 通过 291 项 XCTest（零失败）、Debug/Release 构建、严格签名验证和打包。真实 Mac 列对齐、浅/深主题已知/未知轨道端点、集中读取/取消与切换联动的 GUI 和实际统一读取仍待验证。未启动真实 DDC、USB、网络、唤醒或 App；不单独提交推送。
 
 ## 当前任务：DS-045 协同状态移至顶部
 
