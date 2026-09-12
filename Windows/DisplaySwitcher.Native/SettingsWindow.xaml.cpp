@@ -476,9 +476,15 @@ namespace winrt::DisplaySwitcher::Native::implementation
 
         auto peerTab = TabViewItem(); peerTab.IsClosable(false); peerTab.HorizontalContentAlignment(HorizontalAlignment::Center);
         peerTab.Header(CreateTabHeader(L"\uE968", L"协同"));
-        auto peerStatus = StackPanel(); peerStatus.Orientation(Orientation::Horizontal); peerStatus.Spacing(8);
+        auto peerStatus = Grid(); peerStatus.ColumnSpacing(8);
+        auto peerDotColumn = ColumnDefinition(); peerDotColumn.Width(GridLengthHelper::Auto());
+        auto peerTextColumn = ColumnDefinition(); peerTextColumn.Width(GridLength{ 1, GridUnitType::Star });
+        peerStatus.ColumnDefinitions().Append(peerDotColumn); peerStatus.ColumnDefinitions().Append(peerTextColumn);
         connectionDot_ = TextBlock(); connectionDot_.Text(L"●"); connectionDot_.FontSize(16);
+        connectionDot_.VerticalAlignment(VerticalAlignment::Center);
         connectionStatus_ = TextBlock(); connectionStatus_.VerticalAlignment(VerticalAlignment::Center);
+        connectionStatus_.TextWrapping(TextWrapping::Wrap);
+        Grid::SetColumn(connectionStatus_, 1);
         peerStatus.Children().Append(connectionDot_); peerStatus.Children().Append(connectionStatus_);
         SetConnectionStatus(L"协同未启用", false);
         auto checkNetwork = Button(); checkNetwork.Content(box_value(L"检查网络权限"));
@@ -510,6 +516,12 @@ namespace winrt::DisplaySwitcher::Native::implementation
         auto peerActions = StackPanel(); peerActions.Orientation(Orientation::Horizontal); peerActions.Spacing(8);
         peerActions.HorizontalAlignment(HorizontalAlignment::Right);
         peerActions.Children().Append(checkNetwork); peerActions.Children().Append(detectProfileButton_);
+        auto peerStatusActions = Grid(); peerStatusActions.ColumnSpacing(16);
+        auto peerStatusColumn = ColumnDefinition(); peerStatusColumn.Width(GridLength{ 1, GridUnitType::Star });
+        auto peerActionsColumn = ColumnDefinition(); peerActionsColumn.Width(GridLengthHelper::Auto());
+        peerStatusActions.ColumnDefinitions().Append(peerStatusColumn); peerStatusActions.ColumnDefinitions().Append(peerActionsColumn);
+        Grid::SetColumn(peerActions, 1);
+        peerStatusActions.Children().Append(peerStatus); peerStatusActions.Children().Append(peerActions);
         auto addProfile = Button(); addProfile.Content(box_value(L"添加配置"));
         addProfile.VerticalAlignment(VerticalAlignment::Bottom);
         ApplyStandardButtonGeometry(addProfile);
@@ -527,7 +539,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
             RebuildProfileEditors();
             SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration);
         });
-        profileSelector_ = ComboBox(); Header(profileSelector_, L"当前配置"); profileSelector_.HorizontalAlignment(HorizontalAlignment::Stretch);
+        profileSelector_ = ComboBox(); profileSelector_.HorizontalAlignment(HorizontalAlignment::Stretch);
+        AutomationProperties::SetName(profileSelector_, L"当前配置");
         profileSelector_.SelectionChanged([this](auto const&, auto const&)
         {
             if (loading_) return;
@@ -549,9 +562,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
         profileConfigSection.Children().Append(CreateSubheading(L"配置详情"));
         auto peerLayout = ::DisplaySwitcher::Native::SettingsPageLayout(::DisplaySwitcher::Native::SettingsPage::Collaboration);
         peerTab.Content(CreatePage({
-            CreateSection(peerLayout.cards.at(0), { peerActions }),
-            CreateSection(peerLayout.cards.at(1), { profileConfigSection, profileEditorsPanel_ }),
-            peerStatus }));
+            CreateSection(peerLayout.cards.at(0), { peerStatusActions }),
+            CreateSection(peerLayout.cards.at(1), { profileConfigSection, profileEditorsPanel_ }) }));
 
         auto displayTab = TabViewItem(); displayTab.IsClosable(false); displayTab.HorizontalContentAlignment(HorizontalAlignment::Center);
         displayTab.Header(CreateTabHeader(L"\uE7F4", L"显示器"));
@@ -1564,13 +1576,6 @@ namespace winrt::DisplaySwitcher::Native::implementation
             });
             fields.Children().Append(mappingGrid);
 
-            controls.enablementStatus = TextBlock();
-            controls.enablementStatus.Text(::DisplaySwitcher::Native::CollaborationEnablementText(
-                profile.coordinationEnabled, profile.peerProtocolVersion == 2 &&
-                ::DisplaySwitcher::Native::IsValidDisplayId(profile.peerEndpointId)));
-            controls.enablementStatus.TextWrapping(TextWrapping::Wrap);
-            controls.enablementStatus.Opacity(0.72);
-            fields.Children().Append(controls.enablementStatus);
             auto remove = Button(); remove.Content(box_value(L"删除配置")); remove.IsEnabled(workingProfiles_.size() > 1);
             remove.Click([this, id = profile.id](auto const&, auto const&) { RemoveProfile(id); });
             ApplyStandardButtonGeometry(remove);
@@ -1981,11 +1986,6 @@ namespace winrt::DisplaySwitcher::Native::implementation
             return false;
         }
         original_ = ::DisplaySwitcher::Native::SettingsAfterSuccessfulSave(result);
-        for (auto const& controls : profileEditors_)
-            if (auto profile = original_.FindCollaborationProfile(controls.id))
-                controls.enablementStatus.Text(::DisplaySwitcher::Native::CollaborationEnablementText(
-                    profile->coordinationEnabled, profile->peerProtocolVersion == 2 &&
-                    ::DisplaySwitcher::Native::IsValidDisplayId(profile->peerEndpointId)));
         if (scope == ::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Collaboration) SetOperationFeedback(L"");
         auto action = saveFeedback_.RecordSaveResult(scope, true, true, L"✓ 已保存", SteadyMs());
         if (action == ::DisplaySwitcher::Native::SettingsSaveFeedbackAction::ShowScopedFeedback)

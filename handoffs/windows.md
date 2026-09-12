@@ -1,5 +1,15 @@
 # Windows 交接记录
 
+## 当前任务：W-045 协同页顶部唯一连接状态（2026-09-12）
+
+- 分支 `codex/windows-collaboration-status-top`，基线 `7a107af`；远端主线 `f12a224` 已由本次主任务检查，仅作 UI 调整。
+- 根因：状态灯与连接结果在页面底部，配置详情仍叠加启用/等待连接提示；选择器 Header 与子标题重复显示“当前配置”。
+- 修复：既有状态控件移入顶部卡左侧 Star 列，按钮组保持右侧 Auto 列；状态灯居中、文字换行。删除重复启用状态控件、文案 helper 和旧文案断言，配置标题只留子标题，选择器保留辅助功能名称。
+- 实际状态更新、网络权限失败、配置校验错误与保存失败反馈沿用原路径；协议、runtime、USB、DDC 与配置行为未改。
+- 本机执行 `Windows/build-windows.ps1 -Architecture x64 -Configuration Release`，因缺少 64 位 MSBuild 未能运行构建与原生测试。提交 `fd780a6` 已通过 [Windows CI run 34684158731](https://github.com/maizihk/SFlip/actions/runs/34684158731) / job `103528082352`：516 项原生检查、61 项安装器检查、x64 Release 与绿色版打包全部成功；原生检查数从 517 减至 516 对应删除的旧冗余文案检查。`git diff --check` 通过。
+- PR [#102](https://github.com/maizihk/SFlip/pull/102) 目标分支为 `codex/windows-linked-display-controls`。
+- 设置页长状态、窄窗口及高 DPI 视觉验收待完成；未执行真实网络、USB、DDC、输入源、唤醒或权限变更。
+
 ## 当前任务：W-044 联动显示器统一控制（2026-09-12）
 
 - 分支 `codex/windows-linked-display-controls`，基线 `1634bb7`；不改协议、schema 或版本。
