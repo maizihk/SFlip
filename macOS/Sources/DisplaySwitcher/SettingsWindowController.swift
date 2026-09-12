@@ -215,7 +215,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     var onCancelUSBLearning: (() -> Void)?
     var onUSBLearningFinished: (() -> Void)?
     var onInspectPeer: ((CollaborationProfile, @escaping (PeerCapabilityInspectionResult) -> Void) -> Void)?
-    var onReadDDC: ((String) -> Void)?
+    var onReadDDC: (([String], @escaping (Bool) -> Void) -> Void)?
     var onWriteDDC: ((String, DDCCommand, Int) -> Void)?
     var onWriteLinkedDDC: ((DDCCommand, Int) -> Void)?
     var onRefreshDisplays: (() -> Void)?
@@ -317,6 +317,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private var displayValueSamples: [String: [DDCCommand: DDCControlValueSample]] = [:]
     private var runtimeDisplayConfigurations: [DisplayConfiguration] = []
     private let displayStack = NSStackView()
+    private var displayReadButtons: [Int: NSButton] = [:]
+    private var displayReadPending = false
+    private lazy var linkedReadDDCButton = NSButton(
+        title: "读取 DDC 参数", target: self, action: #selector(readLinkedDisplayDDC)
+    )
     private var usbLearningPending = false
     private var usbInputFields: [String: NSTextField] = [:]
     private var usbMappingRows: [String: DisplayInputMappingRowView] = [:]
@@ -865,7 +870,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         scrollView.documentView = documentView
         displayStack.addArrangedSubview(module(
             title: "显示器控制",
-            headerAccessory: refreshDisplaysButton,
+            headerAccessory: displayControlHeaderActions(),
             views: displayControlModuleViews()
         ))
         NSLayoutConstraint.activate([
@@ -1027,16 +1032,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         displaySliders.removeAll()
         displayValueLabels.removeAll()
         displayStatusLabels.removeAll()
+        displayReadButtons.removeAll()
         deleteDisplayIDsByTag.removeAll()
         linkedDisplaySliders.removeAll()
         linkedDisplayValueLabels.removeAll()
 
         displayStack.addArrangedSubview(module(
             title: "显示器控制",
-            headerAccessory: refreshDisplaysButton,
+            headerAccessory: displayControlHeaderActions(),
             views: displayControlModuleViews()
         ))
 
+        let linked = displayControlLayoutProjection().showsLinkedControls
         for configuration in configurations.sorted(by: { $0.index < $1.index }) {
             let readControls = displayReadControls(index: configuration.index, name: configuration.name)
             let stableID = configuration.id ?? configuration.selector
@@ -1045,7 +1052,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 readControls.button.isEnabled = false
                 readControls.status.stringValue = "离线（已由连续两次可信检测确认）"
             }
-            let accessory: NSView
+            let accessory: NSView?
             if canDelete {
                 let deleteButton = NSButton(
                     title: "删除",
@@ -1057,13 +1064,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 deleteButton.tag = configuration.index
                 deleteButton.setAccessibilityLabel("删除离线显示器\(configuration.name)")
                 deleteDisplayIDsByTag[configuration.index] = stableID
-                let actions = NSStackView(views: [readControls.button, deleteButton])
+                let actions = NSStackView(views: linked ? [deleteButton] : [readControls.button, deleteButton])
                 actions.orientation = .horizontal
                 actions.alignment = .centerY
                 actions.spacing = 8
                 accessory = actions
             } else {
-                accessory = readControls.button
+                accessory = linked ? nil : readControls.button
             }
             displayStack.addArrangedSubview(module(
                 title: configuration.name,
@@ -1120,6 +1127,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         wrapper.alignment = .leading
         wrapper.spacing = 8
         return wrapper
+    }
+
+    private func displayControlHeaderActions() -> NSView {
+        let linked = displayControlLayoutProjection().showsLinkedControls
+        let actions = NSStackView(views: linked
+            ? [linkedReadDDCButton, refreshDisplaysButton] : [refreshDisplaysButton])
+        actions.orientation = .horizontal
+        actions.alignment = .centerY
+        actions.spacing = 8
+        SettingsActionButtonStyle.apply(to: linkedReadDDCButton)
+        linkedReadDDCButton.isEnabled = !displayReadPending && !runtimeDisplayConfigurations.isEmpty
+        return actions
     }
 
     private func displayControlModuleViews() -> [NSView] {
@@ -1314,6 +1333,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let readButton = NSButton(title: "读取 DDC 参数", target: self, action: #selector(readDisplayDDC(_:)))
         SettingsActionButtonStyle.apply(to: readButton)
         readButton.tag = index
+        readButton.isEnabled = !displayReadPending
+        displayReadButtons[index] = readButton
         readButton.setAccessibilityLabel("读取\(name) DDC 参数")
         let status = NSTextField(wrappingLabelWithString: "尚未读取")
         status.textColor = .secondaryLabelColor
@@ -1384,11 +1405,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func linkedDisplayControlForm() -> NSView {
-        let headings = NSStackView(views: [
+        let headingLabels = [
             fixedLabel("", width: 64), fixedLabel("功能", width: 90),
             fixedLabel("在托盘显示", width: 90), fixedLabel("", width: 230),
             fixedLabel("数值", width: 74)
-        ])
+        ]
+        headingLabels.forEach { $0.alignment = .left }
+        let headings = NSStackView(views: headingLabels)
         headings.orientation = .horizontal
         headings.spacing = 8
 
@@ -1680,8 +1703,36 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     @objc private func readDisplayDDC(_ sender: NSButton) {
         guard let display = configurationDocument?.displays[safe: sender.tag - 1] else { return }
-        displayStatusLabels[sender.tag]?.stringValue = "正在读取"
-        onReadDDC?(display.id)
+        beginDisplayDDCRead(stableIDs: [display.id])
+    }
+
+    @objc private func readLinkedDisplayDDC() {
+        beginDisplayDDCRead(stableIDs: runtimeDisplayConfigurations.map { $0.id ?? $0.selector })
+    }
+
+    private func beginDisplayDDCRead(stableIDs: [String]) {
+        guard !displayReadPending, !stableIDs.isEmpty, let onReadDDC else { return }
+        displayReadPending = true
+        linkedReadDDCButton.isEnabled = false
+        displayReadButtons.values.forEach { $0.isEnabled = false }
+        for (offset, display) in (configurationDocument?.displays ?? []).enumerated()
+            where stableIDs.contains(where: { $0.caseInsensitiveCompare(display.id) == .orderedSame }) {
+            displayStatusLabels[offset + 1]?.stringValue = "正在读取"
+        }
+        onReadDDC(stableIDs) { [weak self] completed in
+            guard let self else { return }
+            self.displayReadPending = false
+            self.linkedReadDDCButton.isEnabled = !self.runtimeDisplayConfigurations.isEmpty
+            for (index, button) in self.displayReadButtons {
+                button.isEnabled = self.deleteDisplayIDsByTag[index] == nil
+            }
+            if !completed {
+                for (offset, display) in (self.configurationDocument?.displays ?? []).enumerated()
+                    where stableIDs.contains(where: { $0.caseInsensitiveCompare(display.id) == .orderedSame }) {
+                    self.displayStatusLabels[offset + 1]?.stringValue = "当前无法读取"
+                }
+            }
+        }
     }
 
     @objc private func refreshDisplays() {
