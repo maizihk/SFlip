@@ -9,7 +9,8 @@
 - 新增纯偏好聚合/修改策略，功能点击覆盖全部已配置显示器含离线，关闭清托盘；托盘点击仅开启该功能的显示器，禁用功能托盘保持关闭。混合显示“部分开启”，零显示器禁用开关。
 - 联动主开关不批改偏好或读写 DDC；硬件滑杆仍使用原已启用/可用目标投影，缺目标显示 unknown 且禁用。共享行列宽合计 580 点，适配现有 602 点卡内容宽；保存沿用原子写盘与失败回退。
 - 生产文件：`DS007SettingsModels.swift`、`SettingsWindowController.swift`；测试由并行代理修改 `DS007Tests.swift` 和 `PublicPresentationModelsTests.swift`。清单和本交接记录同步更新。
-- Windows 主机无法运行 Xcode，自动测试、macOS CI 和真实混合状态/窗口布局仍待验证。未执行真实 DDC、USB、网络、唤醒或系统设置操作。
+- 提交 `5699eaa` 已推送；PR [#101](https://github.com/maizihk/SFlip/pull/101) 的 base 为 `docs-refresh`。macOS CI run `34682847024`、job `103524550707` 全部通过：290 项 XCTest（零失败）、Debug/Release 构建、严格签名验证与打包。
+- 真实混合状态、窗口布局、联动切换和显示器调节仍待 GUI/实机验证。自动验证未执行真实 DDC、USB、网络、唤醒或系统设置操作。
 
 ## 当前任务：DS-043 配置检测状态一致性
 
