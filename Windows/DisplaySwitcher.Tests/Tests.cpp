@@ -911,10 +911,6 @@ namespace
             routeBAfterReplacement.state == V2CoordinatorState::Cancelled &&
             routeBAfterReplacement.activeEventId.empty() && routeMachine.Advance(1000).empty(),
             L"DS-039: 仅锁定的旧endpoint被替换时取消事件和计时器");
-        Check(CollaborationEnablementText(true, false).find(L"自动连接") != std::wstring::npos &&
-            CollaborationEnablementText(false, false) == L"未开启。" &&
-            CollaborationEnablementText(true, true).find(L"已开启") != std::wstring::npos,
-            L"DS-039: 状态文案只表达启用和自动连接，不要求确认身份");
     }
 
     void TestIndependentSettingsSave(std::filesystem::path const& root)

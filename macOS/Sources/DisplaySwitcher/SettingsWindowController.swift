@@ -675,8 +675,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         )
 
         let peerStatusActions = horizontalActionRow(
-            primary: NSView(),
-            actions: [requestLocalNetworkPermissionButton, inspectProfileButton]
+            primary: peerStatusLabel,
+            actions: [requestLocalNetworkPermissionButton, inspectProfileButton],
+            expandsPrimary: true
         )
         let profileSelectionRow = labeledTrailingAccessoryControlRow(
             title: "当前配置",
@@ -718,7 +719,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         tabView.addTabViewItem(makeScrollablePage(label: "协同", views: [
             module(title: SettingsPageLayoutProjection.GroupID.collaborationStatus.title, views: [
-                peerStatusActions
+                peerStatusActions,
+                localNetworkPermissionDetailLabel
             ]),
             module(title: SettingsPageLayoutProjection.GroupID.collaborationConfiguration.title, views: [
                 profileSelectionRow,
@@ -733,10 +735,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 ),
                 peerTriggerDeviceStatusLabel,
                 separator(),
-                profileActions,
-                separator(),
-                peerStatusLabel,
-                localNetworkPermissionDetailLabel
+                profileActions
             ])
         ]))
 

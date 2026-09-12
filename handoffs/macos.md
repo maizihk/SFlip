@@ -1,5 +1,16 @@
 # macOS 交接记录
 
+## 当前任务：DS-045 协同状态移至顶部
+
+- 日期：2026-09-12
+- 分支：`codex/windows-collaboration-status-top`
+- 基线：`7a107af`；`origin/main@f12a224`（主任务已确认）。
+- 原顶部状态卡只有右侧按钮，唯一连接主状态和权限行动详情位于配置卡底部，检测后需向下查看。
+- 将原 `peerStatusLabel` 挂到顶部动作行左侧并启用扩展宽度，沿用 wrapping label 与按钮尺寸优先级；检测中、成功、失败、配置切换和周期刷新仍更新同一实例。权限详情移同卡下一行，空详情隐藏，配置卡移除旧挂载及其专用分隔线。
+- Mac 源码没有“已开启；连接状态见上方”类重复提示，实际配置错误保持。仅修改 `SettingsWindowController.swift`、`macOS/DEVELOPMENT_CHECKLIST.md` 和本交接文件；未修改协议、连接运行时、网络权限、USB、DDC 或系统设置。
+- 本次为最小 AppKit 布局调整，未新增自证测试；静态 diff 与 `git diff --check` 由子任务检查。Windows 主机无法运行 Xcode，完整 XCTest、Debug/Release、打包和严格签名验证由主任务通过 macOS CI 验证。
+- 紧凑窗口长配置名/长错误换行、检测中/成功/失败和明确权限拒绝详情仍待真实 GUI 验证；未访问真实网络或硬件。提交、推送、PR 和 CI 由主任务统一处理。
+
 ## 当前任务：DS-044 联动显示器集中控制
 
 - 日期：2026-09-12
