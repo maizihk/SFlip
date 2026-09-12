@@ -996,7 +996,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
 
     void SettingsWindow::CaptureDisplayEditors()
     {
-        if (displayEditors_.size() != workingDisplays_.size()) return;
+        if (!::DisplaySwitcher::Native::ShowPerDisplayDdcControls(original_.linkAllDisplays) ||
+            displayEditors_.size() != workingDisplays_.size()) return;
         for (size_t index = 0; index < displayEditors_.size(); ++index)
         {
             auto& display = workingDisplays_[index];
@@ -1092,21 +1093,68 @@ namespace winrt::DisplaySwitcher::Native::implementation
             projectionConfig.displays = workingDisplays_;
             auto projections = ::DisplaySwitcher::Native::BuildDdcControlProjection(
                 projectionConfig, ddcTopologyTrust_, false);
-            if (!projections.empty())
+            auto preferences = ::DisplaySwitcher::Native::BuildLinkedDdcPreferenceControls(workingDisplays_);
+            if (!preferences.empty())
             {
                 auto shared = StackPanel(); shared.Spacing(10);
                 auto heading = TextBlock(); heading.Text(L"联动调节");
                 heading.FontSize(18); heading.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
                 shared.Children().Append(heading);
-                for (auto const& projection : projections)
+                for (auto const& preference : preferences)
                 {
-                    auto row = Grid(); row.ColumnSpacing(12);
-                    auto labelColumn = ColumnDefinition(); labelColumn.Width(GridLength{ 96 });
+                    auto found = std::find_if(projections.begin(), projections.end(), [&](auto const& item)
+                        { return item.code == preference.code; });
+                    auto projection = found == projections.end()
+                        ? ::DisplaySwitcher::Native::DdcProjectedControl{} : *found;
+                    projection.code = preference.code; projection.label = preference.label;
+                    auto row = Grid(); row.ColumnSpacing(8);
+                    auto labelColumn = ColumnDefinition(); labelColumn.Width(GridLength{ 60 });
                     auto sliderColumn = ColumnDefinition(); sliderColumn.Width(GridLength{ 1, GridUnitType::Star });
-                    auto valueColumn = ColumnDefinition(); valueColumn.Width(GridLength{ 56 });
-                    row.ColumnDefinitions().Append(labelColumn); row.ColumnDefinitions().Append(sliderColumn);
+                    auto valueColumn = ColumnDefinition(); valueColumn.Width(GridLength{ 44 });
+                    auto featureColumn = ColumnDefinition(); featureColumn.Width(GridLength{ 96 });
+                    auto trayColumn = ColumnDefinition(); trayColumn.Width(GridLength{ 96 });
+                    row.ColumnDefinitions().Append(labelColumn); row.ColumnDefinitions().Append(featureColumn);
+                    row.ColumnDefinitions().Append(trayColumn); row.ColumnDefinitions().Append(sliderColumn);
                     row.ColumnDefinitions().Append(valueColumn);
                     auto label = TextBlock(); label.Text(projection.label); label.VerticalAlignment(VerticalAlignment::Center);
+                    auto enabled = ToggleSwitch(); enabled.MinWidth(0);
+                    enabled.OnContent(box_value(L"")); enabled.OffContent(box_value(L""));
+                    enabled.Header(box_value(preference.featureState == ::DisplaySwitcher::Native::DdcPreferenceState::Partial
+                        ? L"部分开启" : L"功能"));
+                    enabled.IsOn(preference.featureState == ::DisplaySwitcher::Native::DdcPreferenceState::On);
+                    enabled.IsEnabled(preference.hasDisplays);
+                    auto tray = ToggleSwitch(); tray.MinWidth(0);
+                    tray.OnContent(box_value(L"")); tray.OffContent(box_value(L""));
+                    tray.Header(box_value(preference.trayState == ::DisplaySwitcher::Native::DdcPreferenceState::Partial
+                        ? L"部分开启" : L"托盘"));
+                    tray.IsOn(preference.trayState == ::DisplaySwitcher::Native::DdcPreferenceState::On);
+                    tray.IsEnabled(preference.trayEnabled);
+                    AutomationProperties::SetName(enabled, L"联动" + preference.label + L"功能开关");
+                    AutomationProperties::SetName(tray, L"联动" + preference.label + L"在托盘显示");
+                    enabled.Toggled([this, code = preference.code](auto const& sender, auto const&)
+                    {
+                        if (loading_) return;
+                        CaptureDisplayEditors();
+                        ::DisplaySwitcher::Native::SetLinkedDdcFeature(workingDisplays_, code,
+                            sender.template as<ToggleSwitch>().IsOn());
+                        if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays))
+                        {
+                            auto strong = get_strong();
+                            DispatcherQueue().TryEnqueue([strong] { strong->RebuildDisplayEditors(); });
+                        }
+                    });
+                    tray.Toggled([this, code = preference.code](auto const& sender, auto const&)
+                    {
+                        if (loading_) return;
+                        CaptureDisplayEditors();
+                        ::DisplaySwitcher::Native::SetLinkedDdcTray(workingDisplays_, code,
+                            sender.template as<ToggleSwitch>().IsOn());
+                        if (SaveImmediately(::DisplaySwitcher::Native::SettingsSaveFeedbackScope::Displays))
+                        {
+                            auto strong = get_strong();
+                            DispatcherQueue().TryEnqueue([strong] { strong->RebuildDisplayEditors(); });
+                        }
+                    });
                     auto slider = Slider(); slider.Minimum(0); slider.Maximum(projection.maximum);
                     slider.Value(projection.value); slider.StepFrequency(1); slider.SmallChange(1); slider.LargeChange(10);
                     slider.HorizontalAlignment(HorizontalAlignment::Stretch);
@@ -1148,7 +1196,9 @@ namespace winrt::DisplaySwitcher::Native::implementation
                             if (!id.empty() && args.Key() == Windows::System::VirtualKey::Enter)
                                 WriteDdc(id, code, static_cast<int>(std::lround(slider.Value())));
                         }));
-                    Grid::SetColumn(sliderHost, 1); Grid::SetColumn(value, 2);
+                    Grid::SetColumn(enabled, 1); Grid::SetColumn(tray, 2);
+                    Grid::SetColumn(sliderHost, 3); Grid::SetColumn(value, 4);
+                    row.Children().Append(enabled); row.Children().Append(tray);
                     row.Children().Append(label); row.Children().Append(sliderHost); row.Children().Append(value);
                     shared.Children().Append(row);
                 }
@@ -1278,12 +1328,15 @@ namespace winrt::DisplaySwitcher::Native::implementation
                     { if (args.Key() == Windows::System::VirtualKey::Enter) WriteDdc(id, code, static_cast<int>(std::lround(slider.Value()))); }));
                 slider.IsEnabled(enabled.IsOn()); showInTray.IsEnabled(enabled.IsOn());
             };
-            controlRow(L"亮度", ::DisplaySwitcher::Native::DdcVcpCode::Brightness,
-                controls.brightness, controls.brightnessEnabled, controls.brightnessShowInTray, 1);
-            controlRow(L"对比度", ::DisplaySwitcher::Native::DdcVcpCode::Contrast,
-                controls.contrast, controls.contrastEnabled, controls.contrastShowInTray, 2);
-            controlRow(L"音量", ::DisplaySwitcher::Native::DdcVcpCode::Volume,
-                controls.volume, controls.volumeEnabled, controls.volumeShowInTray, 3);
+            if (::DisplaySwitcher::Native::ShowPerDisplayDdcControls(linked))
+            {
+                controlRow(L"亮度", ::DisplaySwitcher::Native::DdcVcpCode::Brightness,
+                    controls.brightness, controls.brightnessEnabled, controls.brightnessShowInTray, 1);
+                controlRow(L"对比度", ::DisplaySwitcher::Native::DdcVcpCode::Contrast,
+                    controls.contrast, controls.contrastEnabled, controls.contrastShowInTray, 2);
+                controlRow(L"音量", ::DisplaySwitcher::Native::DdcVcpCode::Volume,
+                    controls.volume, controls.volumeEnabled, controls.volumeShowInTray, 3);
+            }
 
             auto fields = StackPanel(); fields.Spacing(10);
             auto header = Grid();
@@ -1303,7 +1356,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
             Grid::SetColumn(actions, 1);
             header.Children().Append(displayTitle);
             header.Children().Append(actions);
-            fields.Children().Append(header); fields.Children().Append(controlsGrid);
+            fields.Children().Append(header);
+            if (::DisplaySwitcher::Native::ShowPerDisplayDdcControls(linked)) fields.Children().Append(controlsGrid);
             fields.Children().Append(controls.status);
             displayEditorsPanel_.Children().Append(CreateCard(fields));
             displayEditors_.push_back(std::move(controls));

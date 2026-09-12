@@ -972,10 +972,81 @@ struct DisplaySettingsControlProjection: Equatable {
         linkedEntries: [LinkedDDCControlProjection.Entry]
     ) -> DisplaySettingsControlProjection {
         DisplaySettingsControlProjection(
-            showsLinkedControls: linkAllDisplays && !linkedEntries.isEmpty,
+            showsLinkedControls: linkAllDisplays,
             showsIndividualSliders: !linkAllDisplays,
-            linkedCommands: linkAllDisplays ? linkedEntries.map(\.command) : []
+            linkedCommands: linkAllDisplays ? LinkedDDCControlProjection.orderedCommands : []
         )
+    }
+}
+
+enum LinkedDisplayPreferenceToggleState: Equatable {
+    case off, on, mixed
+
+    static func aggregate(_ values: [Bool]) -> Self {
+        guard values.contains(true) else { return .off }
+        return values.allSatisfy { $0 } ? .on : .mixed
+    }
+}
+
+struct LinkedDisplayPreferenceState: Equatable {
+    let feature: LinkedDisplayPreferenceToggleState
+    let tray: LinkedDisplayPreferenceToggleState
+    let trayEnabled: Bool
+}
+
+enum LinkedDisplaySettingsPolicy {
+    static func state(
+        command: DDCCommand, displays: [DisplayConfigurationV4Display]
+    ) -> LinkedDisplayPreferenceState {
+        let eligible = displays.filter {
+            DisplaySettingsSemantics.enabledCommands(for: $0).contains(command)
+        }
+        return LinkedDisplayPreferenceState(
+            feature: .aggregate(displays.map {
+                DisplaySettingsSemantics.enabledCommands(for: $0).contains(command)
+            }),
+            tray: .aggregate(eligible.map {
+                DisplaySettingsSemantics.trayCommands(for: $0).contains(command)
+            }),
+            trayEnabled: !eligible.isEmpty
+        )
+    }
+
+    static func settingFeatureEnabled(
+        _ enabled: Bool, command: DDCCommand, displays: [DisplayConfigurationV4Display]
+    ) -> [DisplayConfigurationV4Display] {
+        displays.map { display in
+            var value = display
+            switch command {
+            case .luminance:
+                value.brightnessEnabled = enabled
+                if !enabled { value.brightnessShowInTray = false }
+            case .contrast:
+                value.contrastEnabled = enabled
+                if !enabled { value.contrastShowInTray = false }
+            case .volume:
+                value.volumeEnabled = enabled
+                if !enabled { value.volumeShowInTray = false }
+            case .input: break
+            }
+            return value
+        }
+    }
+
+    static func settingTrayVisible(
+        _ visible: Bool, command: DDCCommand, displays: [DisplayConfigurationV4Display]
+    ) -> [DisplayConfigurationV4Display] {
+        displays.map { display in
+            var value = display
+            let enabled = DisplaySettingsSemantics.enabledCommands(for: display).contains(command)
+            switch command {
+            case .luminance: value.brightnessShowInTray = visible && enabled
+            case .contrast: value.contrastShowInTray = visible && enabled
+            case .volume: value.volumeShowInTray = visible && enabled
+            case .input: break
+            }
+            return value
+        }
     }
 }
 
@@ -1038,6 +1109,10 @@ enum DisplayControlModuleContent {
 
 enum DisplayReadModuleContent {
     static let items: [SettingsModuleContentItem] = [.displayReadStatus, .separator, .displayControls]
+
+    static func items(showsIndividualControls: Bool) -> [SettingsModuleContentItem] {
+        showsIndividualControls ? items : [.displayReadStatus]
+    }
 }
 
 enum SettingsPageLayoutAction: String, Equatable {
