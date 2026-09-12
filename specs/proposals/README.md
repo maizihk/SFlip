@@ -16,3 +16,5 @@
 ## 已批准提案
 
 - [DS-026：输入源空值与零值安全约束](DS-026-input-source-null-safety.md)（2026-09-02）：输入源映射使用 `null` 或 `1...65535`，双端缺失映射统一报告 `missing_mapping`。
+
+- [DS-039：配对码直接连接](DS-039-pairing-code-connections.md)（2026-09-11）：取消人工身份绑定，状态交换自动更新路由缓存。

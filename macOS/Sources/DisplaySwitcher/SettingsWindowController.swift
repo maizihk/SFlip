@@ -263,7 +263,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let peerPortField = NSTextField()
     private let pairingCodeField = NSSecureTextField()
     private let peerStatusLabel = NSTextField(wrappingLabelWithString: "协同未启用")
-    private let localNetworkPermissionStatusLabel = NSTextField(labelWithString: "")
     private let localNetworkPermissionDetailLabel = NSTextField(wrappingLabelWithString: "")
     private let profilePopup = NSPopUpButton()
     private let profileNameField = NSTextField()
@@ -378,9 +377,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     func refreshSelectedCollaborationStatus() {
         guard editingProfiles.indices.contains(selectedProfileIndex) else { return }
-        let state = collaborationStatus?(editingProfiles[selectedProfileIndex])
-            ?? (editingProfiles[selectedProfileIndex].coordinationEnabled ? .neverChecked : .disabled)
-        updatePeerConnectionStatus(state.text, connected: state.connected)
+        let profile = editingProfiles[selectedProfileIndex]
+        let state = collaborationStatus?(profile)
+            ?? (profile.coordinationEnabled ? .neverChecked : .disabled)
+        updatePeerConnectionStatus(
+            CollaborationConnectionStatusPresentation.text(
+                for: state, profileName: profile.name
+            ),
+            connected: state.connected
+        )
+    }
+
+    func reloadPersistedConfiguration() {
+        reloadValues()
     }
 
     func updateDDCValues(stableID: String, values: [DDCCommand: DDCResolvedReading],
@@ -631,12 +640,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         requestMediaKeyPermissionButton.setAccessibilityLabel("申请媒体快捷键输入监控权限")
         learnUSBButton.setAccessibilityLabel("学习 USB 设备")
         peerStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        let peerHint = NSTextField(wrappingLabelWithString:
-            "检查网络权限和检测连接都只验证协同，不执行 USB、唤醒、DDC 或输入源切换。")
-        peerHint.textColor = .secondaryLabelColor
-        peerHint.font = .systemFont(ofSize: 11)
-        peerHint.maximumNumberOfLines = 2
-        localNetworkPermissionStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         localNetworkPermissionDetailLabel.font = .systemFont(ofSize: 11)
         localNetworkPermissionDetailLabel.textColor = .secondaryLabelColor
         saveStatusLabel.font = .systemFont(ofSize: 11)
@@ -670,7 +673,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         )
 
         let peerStatusActions = horizontalActionRow(
-            primary: peerStatusLabel,
+            primary: NSView(),
             actions: [requestLocalNetworkPermissionButton, inspectProfileButton]
         )
         let profileSelectionRow = labeledTrailingAccessoryControlRow(
@@ -713,11 +716,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         tabView.addTabViewItem(makeScrollablePage(label: "协同", views: [
             module(title: SettingsPageLayoutProjection.GroupID.collaborationStatus.title, views: [
-                peerStatusActions,
-                localNetworkPermissionStatusLabel,
-                localNetworkPermissionDetailLabel,
-                separator(),
-                peerHint
+                peerStatusActions
             ]),
             module(title: SettingsPageLayoutProjection.GroupID.collaborationConfiguration.title, views: [
                 profileSelectionRow,
@@ -732,7 +731,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 ),
                 peerTriggerDeviceStatusLabel,
                 separator(),
-                profileActions
+                profileActions,
+                separator(),
+                peerStatusLabel,
+                localNetworkPermissionDetailLabel
             ])
         ]))
 
@@ -906,7 +908,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         actions.spacing = 10
 
         let explanation = NSTextField(wrappingLabelWithString:
-            "预览只读取当前内存与配置状态，不执行网络检测、USB、唤醒、DDC 或输入源切换。需要详细轨迹时，请先在“常规”中开启记录并复现问题。")
+            "需要详细轨迹时，请先在“常规”中开启记录并复现问题。")
         explanation.font = .systemFont(ofSize: 11)
         explanation.textColor = .secondaryLabelColor
         explanation.maximumNumberOfLines = 2
@@ -1534,7 +1536,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if sender === usbArrivalSwitchCheckbox {
             if sender.state == .on, !selectedCollaborationWakeProfileIsValid() {
                 sender.state = .off
-                showValidationError("请选择一个已开启、完整且已确认对端身份的协同配置。")
+                showValidationError("请选择一个已开启、完整且已建立连接的协同配置。")
                 return
             }
             persistDocument(feedbackScope: .usb) { $0.usbSwitch.collaborationWakeEnabled = sender.state == .on }
@@ -2135,6 +2137,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         selectedProfileIndex = max(0, sender.indexOfSelectedItem)
         reloadProfilePopup()
         loadSelectedProfileFields()
+        updateLocalNetworkPermissionPresentation(.notChecked)
+        refreshSelectedCollaborationStatus()
     }
 
     @objc private func addProfile() {
@@ -2204,6 +2208,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
         inspectProfileButton.isEnabled = false
         requestLocalNetworkPermissionButton.isEnabled = false
+        updateLocalNetworkPermissionPresentation(.notChecked)
         peerStatusLabel.stringValue = "正在检测 \(profile.name)…"
         LocalNetworkPermissionInspectionAction.perform(using: { completion in
             onInspectPeer(profile, completion)
@@ -2211,49 +2216,56 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             DispatchQueue.main.async {
                 self?.inspectProfileButton.isEnabled = true
                 self?.requestLocalNetworkPermissionButton.isEnabled = true
-                self?.updateLocalNetworkPermissionPresentation(permissionEvidence)
-                self?.showPeerInspectionResult(result, profileID: profile.id)
+                guard let self, self.editingProfiles.indices.contains(self.selectedProfileIndex),
+                      PeerInspectionPresentationPolicy.shouldPresent(
+                        resultProfileID: profile.id,
+                        selectedProfileID: self.editingProfiles[self.selectedProfileIndex].id
+                      ) else { return }
+                self.showPeerInspectionResult(result, profileID: profile.id)
+                self.updateLocalNetworkPermissionPresentation(permissionEvidence)
             }
         }
     }
 
     private func updateLocalNetworkPermissionPresentation(_ evidence: LocalNetworkPermissionEvidence) {
         let presentation = LocalNetworkPermissionPresentation.make(for: evidence)
-        localNetworkPermissionStatusLabel.stringValue = presentation.statusText
-        localNetworkPermissionStatusLabel.textColor = presentation.isFailure ? .systemRed : .labelColor
         localNetworkPermissionDetailLabel.stringValue = presentation.detailText
+        localNetworkPermissionDetailLabel.isHidden = presentation.detailText.isEmpty
+        guard presentation.isExplicitlyDenied else { return }
+        updatePeerConnectionStatus(presentation.statusText, connected: false)
+        peerStatusLabel.textColor = .systemRed
     }
 
     private func showPeerInspectionResult(_ result: PeerCapabilityInspectionResult, profileID: String) {
-        guard let index = editingProfiles.firstIndex(where: { $0.id == profileID }) else { return }
+        guard editingProfiles.indices.contains(selectedProfileIndex),
+              PeerInspectionPresentationPolicy.shouldPresent(
+                resultProfileID: profileID,
+                selectedProfileID: editingProfiles[selectedProfileIndex].id
+              ),
+              let index = editingProfiles.firstIndex(where: { $0.id == profileID }) else { return }
         let profile = editingProfiles[index]
+        peerStatusLabel.textColor = .secondaryLabelColor
         switch result {
-        case .v2(let endpointID):
-            let identity = DisplayConfigurationStore.checkPeerIdentity(profile, endpointID: endpointID, protocolVersion: 2)
-            if identity == .unchanged {
-                peerStatusLabel.stringValue = "\(profile.name)：v2 可用"
-                return
-            }
-            let alert = NSAlert()
-            alert.alertStyle = .informational
-            alert.messageText = identity.requiresConfirmation ? "确认对端逻辑身份" : "检测结果无效"
-            alert.informativeText = "\(profile.name) 返回了新的逻辑身份。只有确认这是预期对端后才会用于协同。"
-            alert.addButton(withTitle: "确认")
-            alert.addButton(withTitle: "取消")
-            alert.beginSheetModal(for: window!) { [weak self] response in
-                guard let self, response == .alertFirstButtonReturn,
-                      let current = self.editingProfiles.firstIndex(where: { $0.id == profileID }) else { return }
-                self.editingProfiles[current].peerEndpointID = endpointID.lowercased()
-                self.editingProfiles[current].peerProtocolVersion = 2
-                self.persistDocument(feedbackScope: .collaboration) {
-                    $0.collaborationProfiles = self.editingProfiles
-                }
-            }
+        case .v2:
+            reloadValues()
+            peerStatusLabel.textColor = .systemGreen
+            peerStatusLabel.stringValue = CollaborationConnectionStatusPresentation.text(
+                for: .connected, profileName: profile.name
+            )
         case .authenticationFailed:
-            peerStatusLabel.stringValue = "\(profile.name)：认证失败"
+            peerStatusLabel.stringValue = "\(profile.name)：配对码不匹配"
         case .noResponse:
             peerStatusLabel.stringValue = "\(profile.name)：无响应"
+        case .listenerFailed(let error):
+            peerStatusLabel.stringValue = "\(profile.name)：监听失败（系统码：\(systemErrorCode(error))）"
+        case .sendFailed(let error):
+            peerStatusLabel.stringValue = "\(profile.name)：发送失败（系统码：\(systemErrorCode(error))）"
         }
+    }
+
+    private func systemErrorCode(_ error: PeerTransportSystemError?) -> String {
+        guard let error else { return "unknown" }
+        return "\(error.domain.rawValue) \(error.code)"
     }
 
     @available(macOS 13.0, *)

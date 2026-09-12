@@ -1,3 +1,4 @@
+import Darwin
 import XCTest
 
 final class DS007Tests: XCTestCase {
@@ -537,14 +538,67 @@ final class DS007Tests: XCTestCase {
         XCTAssertFalse(SettingsWindowLifecycleState.open.isReleasedWhenClosed)
     }
 
-    func testV1PeerIdentityCanNeverBeConfirmedInV2OnlyConfiguration() {
-        let profile = completeProfile(name: "Peer", displayID: UUID().uuidString)
-        XCTAssertEqual(
-            DisplayConfigurationStore.checkPeerIdentity(
-                profile, endpointID: UUID().uuidString, protocolVersion: 1
-            ),
-            .invalid
+    func testPeerEndpointCacheRejectsNonV2Update() {
+        let display = configuredDisplay()
+        let profile = completeProfile(name: "Peer", displayID: display.id)
+        let document = DisplayConfigurationStoreV5Document(
+            schemaVersion: 5,
+            localEndpointID: UUID().uuidString,
+            localDeviceName: "Local",
+            listenPort: 49_731,
+            linkAllDisplays: false,
+            displays: [display],
+            collaborationProfiles: [profile]
         )
+        XCTAssertNil(DisplayConfigurationStore.documentByCachingPeerEndpoint(
+            UUID().uuidString, protocolVersion: 1, forProfileID: profile.id, in: document
+        ))
+    }
+
+    func testPeerEndpointCachePreservesEnablementAndReturnsEqualDocumentWhenUnchanged() throws {
+        let display = configuredDisplay()
+        var profile = completeProfile(name: "Peer", displayID: display.id)
+        profile.coordinationEnabled = true
+        let document = DisplayConfigurationStoreV5Document(
+            schemaVersion: 5,
+            localEndpointID: UUID().uuidString,
+            localDeviceName: "Local",
+            listenPort: 49_731,
+            linkAllDisplays: false,
+            displays: [display],
+            collaborationProfiles: [profile]
+        )
+        let endpoint = "22222222-2222-4222-8222-222222222222"
+        let learned = try XCTUnwrap(DisplayConfigurationStore.documentByCachingPeerEndpoint(
+            endpoint, forProfileID: profile.id, in: document
+        ))
+        XCTAssertTrue(learned.collaborationProfiles[0].coordinationEnabled)
+        XCTAssertEqual(learned.collaborationProfiles[0].peerEndpointID, endpoint)
+        XCTAssertEqual(
+            DisplayConfigurationStore.documentByCachingPeerEndpoint(
+                endpoint.uppercased(), forProfileID: profile.id, in: learned
+            ),
+            learned
+        )
+    }
+
+    func testPeerEndpointCacheUpdatesDisabledProfileWithoutEnablingIt() throws {
+        let display = configuredDisplay()
+        var profile = completeProfile(name: "Peer", displayID: display.id)
+        profile.coordinationEnabled = false
+        profile.peerEndpointID = "22222222-2222-4222-8222-222222222222"
+        profile.peerProtocolVersion = 2
+        let document = DisplayConfigurationStoreV5Document(
+            schemaVersion: 5, localEndpointID: UUID().uuidString,
+            localDeviceName: "Local", listenPort: 49_731, linkAllDisplays: false,
+            displays: [display], collaborationProfiles: [profile]
+        )
+        let replacement = "33333333-3333-4333-8333-333333333333"
+        let updated = try XCTUnwrap(DisplayConfigurationStore.documentByCachingPeerEndpoint(
+            replacement, forProfileID: profile.id, in: document
+        ))
+        XCTAssertFalse(updated.collaborationProfiles[0].coordinationEnabled)
+        XCTAssertEqual(updated.collaborationProfiles[0].peerEndpointID, replacement)
     }
 
     func testU018ToU020StatusesAreIndependentAndExpireAfterSixSeconds() {
@@ -567,6 +621,129 @@ final class DS007Tests: XCTestCase {
         XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 8_001), .disabled)
         second.peerHost = ""
         XCTAssertEqual(store.state(for: second, displays: [display], nowMs: 8_001), .incomplete)
+    }
+
+    func testExplicitInspectionFailuresOverrideRecentSuccessAndRemainIsolatedUntilRecovery() {
+        let display = configuredDisplay()
+        let first = completeProfile(name: "First", displayID: display.id)
+        let second = completeProfile(name: "Second", displayID: display.id)
+        let failures: [CollaborationConnectionState] = [.noResponse, .authenticationFailed]
+
+        for failure in failures {
+            let store = CollaborationStatusStore()
+            store.recordAuthenticatedMessage(profileID: first.id, nowMs: 1_000)
+            store.recordAuthenticatedMessage(profileID: second.id, nowMs: 1_000)
+            store.beginCheck(profileID: first.id)
+            store.finishCheck(profileID: first.id, failure: failure)
+
+            let observationTimes: [Int64] = [2_000, 7_000, 7_001]
+            for now in observationTimes {
+                XCTAssertEqual(store.state(for: first, displays: [display], nowMs: now), failure)
+            }
+            XCTAssertEqual(store.state(for: second, displays: [display], nowMs: 2_000), .connected)
+            XCTAssertFalse(failure.connected)
+            XCTAssertEqual(
+                CollaborationConnectionStatusPresentation.text(for: failure, profileName: first.name),
+                failure == .authenticationFailed ? "配对码不匹配" : "无响应"
+            )
+
+            store.beginCheck(profileID: first.id)
+            XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 8_000), .checking)
+            store.recordAuthenticatedMessage(profileID: first.id, nowMs: 8_100)
+            XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 14_100), .connected)
+            XCTAssertEqual(store.state(for: first, displays: [display], nowMs: 14_101), .disconnected)
+        }
+    }
+
+    func testSwitchingSelectedProfileRejectsLateInspectionResultAndAcceptsCurrentResult() {
+        let firstID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        let secondID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        var selectedID: String? = firstID
+        XCTAssertTrue(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: firstID, selectedProfileID: selectedID
+        ))
+
+        selectedID = secondID
+        XCTAssertFalse(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: firstID, selectedProfileID: selectedID
+        ), "the previous profile's async result must not replace the selected profile's status or details")
+        XCTAssertTrue(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: secondID.uppercased(), selectedProfileID: selectedID
+        ))
+
+        selectedID = nil
+        XCTAssertFalse(PeerInspectionPresentationPolicy.shouldPresent(
+            resultProfileID: secondID, selectedProfileID: selectedID
+        ), "a result for a removed selection must not update the presentation")
+    }
+
+    func testInspectionSendFailureRemainsVisiblePastTimeoutAndSuccessfulCheckRecovers() {
+        let display = configuredDisplay()
+        let profile = completeProfile(name: "Peer", displayID: display.id)
+        let store = CollaborationStatusStore()
+        let error = PeerTransportSystemError(domain: .posix, code: ENETUNREACH)
+
+        store.beginCheck(profileID: profile.id)
+        store.finishCheck(profileID: profile.id, failure: .sendFailed(error))
+
+        XCTAssertEqual(
+            store.state(for: profile, displays: [display], nowMs: 0),
+            .sendFailed(error)
+        )
+        XCTAssertEqual(
+            store.state(for: profile, displays: [display], nowMs: 1_001),
+            .sendFailed(error),
+            "a later timeout observation must not replace the completed send failure"
+        )
+        XCTAssertEqual(
+            CollaborationConnectionState.sendFailed(error).text,
+            "发送失败（系统码：errno 51）"
+        )
+
+        store.beginCheck(profileID: profile.id)
+        store.finishCheck(profileID: profile.id, responded: true)
+        XCTAssertEqual(store.state(for: profile, displays: [display], nowMs: 2_000), .available)
+    }
+
+    func testInspectionListenerFailureClearsWhenAuthenticatedTrafficRecovers() {
+        let display = configuredDisplay()
+        let profile = completeProfile(name: "Peer", displayID: display.id)
+        let store = CollaborationStatusStore()
+        let error = PeerTransportSystemError(domain: .addressResolution, code: -2)
+
+        store.finishCheck(profileID: profile.id, failure: .listenerFailed(error))
+        XCTAssertEqual(
+            store.state(for: profile, displays: [display], nowMs: 1_000),
+            .listenerFailed(error)
+        )
+        XCTAssertEqual(
+            CollaborationConnectionState.listenerFailed(nil).text,
+            "监听失败（系统码：unknown）"
+        )
+
+        store.recordAuthenticatedMessage(profileID: profile.id, nowMs: 2_000)
+        XCTAssertEqual(store.state(for: profile, displays: [display], nowMs: 8_000), .connected)
+    }
+
+    func testConnectionStatusPresentationMatchesRuntimeCopyForManualAndPeriodicSuccess() {
+        XCTAssertEqual(
+            CollaborationConnectionStatusPresentation.text(
+                for: .available, profileName: "Windows"
+            ),
+            "已和对端（Windows）建立连接"
+        )
+        XCTAssertEqual(
+            CollaborationConnectionStatusPresentation.text(
+                for: .connected, profileName: "  "
+            ),
+            "已和对端建立连接"
+        )
+        XCTAssertEqual(
+            CollaborationConnectionStatusPresentation.text(
+                for: .noResponse, profileName: "Windows"
+            ),
+            "无响应"
+        )
     }
 
     func testU021OneHundredRapidWritesCoalesceToInflightAndLatest() {

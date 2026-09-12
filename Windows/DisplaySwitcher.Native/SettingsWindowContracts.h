@@ -1,11 +1,14 @@
-﻿#pragma once
+#pragma once
 
 #include <algorithm>
 #include <cstdint>
 #include <cwctype>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "AppConfig.h"
 
 namespace DisplaySwitcher::Native
 {
@@ -27,12 +30,116 @@ namespace DisplaySwitcher::Native
         std::vector<SettingsCardContract> cards;
     };
 
+    inline std::wstring CollaborationEnablementText(bool enabled, bool peerConfirmed)
+    {
+        if (!enabled) return L"未开启。";
+        return peerConfirmed ? L"已开启；连接状态见上方。"
+            : L"已开启，正在等待对端上线并自动连接。";
+    }
+
     enum class SettingsSaveFeedbackScope
     {
         None,
+        General,
+        Displays,
         Usb,
         Collaboration,
     };
+
+    inline bool RequiresCompleteCollaborationLink(UsbSwitchConfig const& original,
+        UsbSwitchConfig const& edited)
+    {
+        return edited.collaborationWakeEnabled &&
+            (!original.collaborationWakeEnabled ||
+                _wcsicmp(original.collaborationProfileId.c_str(), edited.collaborationProfileId.c_str()) != 0);
+    }
+
+    inline AppConfig MergeSettingsForScope(AppConfig const& original, AppConfig const& edited,
+        SettingsSaveFeedbackScope scope)
+    {
+        auto result = original;
+        switch (scope)
+        {
+        case SettingsSaveFeedbackScope::Usb:
+            result.usbSwitch = edited.usbSwitch;
+            break;
+        case SettingsSaveFeedbackScope::Collaboration:
+            result.collaborationProfiles = edited.collaborationProfiles;
+            if (!result.usbSwitch.collaborationProfileId.empty() &&
+                !result.FindCollaborationProfile(result.usbSwitch.collaborationProfileId))
+            {
+                result.usbSwitch.collaborationWakeEnabled = false;
+                result.usbSwitch.collaborationProfileId.clear();
+            }
+            break;
+        case SettingsSaveFeedbackScope::General:
+            result.startWithWindows = edited.startWithWindows;
+            result.detailedDiagnosticRecording = edited.detailedDiagnosticRecording;
+            break;
+        case SettingsSaveFeedbackScope::Displays:
+            result.linkAllDisplays = edited.linkAllDisplays;
+            result.displays = edited.displays;
+            result.displayConfigurationSafeMode = edited.displayConfigurationSafeMode;
+            break;
+        case SettingsSaveFeedbackScope::None:
+            break;
+        }
+        return result;
+    }
+    inline bool SameProfileConnectionSettings(CollaborationProfile const& left,
+        CollaborationProfile const& right)
+    {
+        if (_wcsicmp(left.id.c_str(), right.id.c_str()) != 0 ||
+            left.peerHost != right.peerHost || left.peerPort != right.peerPort) return false;
+        try { return AppConfig::NormalizeNfc(left.pairingCode) == AppConfig::NormalizeNfc(right.pairingCode); }
+        catch (...) { return false; }
+    }
+
+    inline void InvalidateChangedPeerRoute(CollaborationProfile& edited,
+        CollaborationProfile const& previous)
+    {
+        if (SameProfileConnectionSettings(edited, previous)) return;
+        edited.peerEndpointId.clear();
+        edited.peerProtocolVersion.reset();
+    }
+
+    inline void SynchronizePeerRouteCaches(AppConfig& original,
+        std::vector<CollaborationProfile>& workingProfiles, AppConfig const& runtime)
+    {
+        auto synchronize = [&](CollaborationProfile& profile)
+        {
+            auto current = runtime.FindCollaborationProfile(profile.id);
+            if (!current || !SameProfileConnectionSettings(profile, *current)) return;
+            profile.peerEndpointId = current->peerEndpointId;
+            profile.peerProtocolVersion = current->peerProtocolVersion;
+        };
+        for (auto& profile : original.collaborationProfiles) synchronize(profile);
+        for (auto& profile : workingProfiles) synchronize(profile);
+    }
+
+    inline AppConfig SettingsAfterFailedSave(AppConfig config)
+    {
+        config.displayConfigurationSafeMode = true;
+        return config;
+    }
+
+    inline bool RequiresSettingsPersistence(bool configChanged, AppConfig const& original)
+    {
+        return configChanged || original.displayConfigurationSafeMode;
+    }
+
+    inline AppConfig SettingsAfterSuccessfulSave(AppConfig config)
+    {
+        config.displayConfigurationSafeMode = false;
+        return config;
+    }
+
+    inline AppConfig PersistSettingsForPublication(AppConfig config,
+        std::function<void(AppConfig const&)> const& persist)
+    {
+        persist(config);
+        return SettingsAfterSuccessfulSave(std::move(config));
+    }
 
     enum class SettingsPage
     {
@@ -189,7 +296,7 @@ namespace DisplaySwitcher::Native
             bool succeeded, std::wstring const& message, int64_t nowMs)
         {
             if (!changed) return SettingsSaveFeedbackAction::None;
-            if (scope == SettingsSaveFeedbackScope::None)
+            if (scope != SettingsSaveFeedbackScope::Usb && scope != SettingsSaveFeedbackScope::Collaboration)
                 return succeeded ? SettingsSaveFeedbackAction::None : SettingsSaveFeedbackAction::ShowOperationFailure;
             if (succeeded)
             {
@@ -218,7 +325,8 @@ namespace DisplaySwitcher::Native
 
         void ClearTransientSuccess(SettingsSaveFeedbackScope scope)
         {
-            if (scope != SettingsSaveFeedbackScope::None) FeedbackFor(scope).ClearTransientSuccess();
+            if (scope == SettingsSaveFeedbackScope::Usb || scope == SettingsSaveFeedbackScope::Collaboration)
+                FeedbackFor(scope).ClearTransientSuccess();
         }
 
         void ClearTransientSuccesses()

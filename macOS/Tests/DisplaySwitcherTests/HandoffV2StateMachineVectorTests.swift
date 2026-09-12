@@ -120,6 +120,53 @@ final class HandoffV2StateMachineVectorTests: XCTestCase {
         XCTAssertEqual(sink.switchCalls, 1)
     }
 
+    func testPeerRouteChangeCancelsOnlyEventUsingReplacedEndpoint() {
+        let clock = V2VectorClock()
+        let scheduler = V2VectorScheduler(clock: clock)
+        let sink = V2VectorSink()
+        var actions: [V2HandoffAction] = []
+        let machine = HandoffV2StateMachine(
+            localEndpointID: "11111111-1111-4111-8111-111111111111",
+            sink: sink, scheduler: scheduler, eventIDSource: V2VectorEventIDs(),
+            actionLog: { actions.append($0) }
+        )
+        let first = "22222222-2222-4222-8222-222222222222"
+        let active = "33333333-3333-4333-8333-333333333333"
+        let replacement = "44444444-4444-4444-8444-444444444444"
+        let event = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        machine.configure(
+            localEndpointID: "11111111-1111-4111-8111-111111111111",
+            coordinationEnabled: true,
+            enabledTargets: [
+                .init(endpointID: first, capability: .v2, reachable: true),
+                .init(endpointID: active, capability: .v2, reachable: true)
+            ]
+        )
+        XCTAssertTrue(machine.handleManualSelect(endpointID: active, eventID: event))
+
+        machine.handlePeerRouteChanged(
+            replacing: first,
+            enabledTargets: [
+                .init(endpointID: replacement, capability: .v2, reachable: true),
+                .init(endpointID: active, capability: .v2, reachable: true)
+            ],
+            coordinationEnabled: true
+        )
+        XCTAssertEqual(machine.snapshot().activeEventID, event)
+        XCTAssertEqual(machine.snapshot().lockedTargetEndpointID, active)
+
+        machine.handlePeerRouteChanged(
+            replacing: active,
+            enabledTargets: [.init(endpointID: replacement, capability: .v2, reachable: true)],
+            coordinationEnabled: true
+        )
+        XCTAssertEqual(machine.snapshot().state, .cancelled)
+        XCTAssertNil(machine.snapshot().activeEventID)
+        XCTAssertTrue(actions.contains(.clearEvent(reason: .configurationChanged)))
+        XCTAssertEqual(sink.switchCalls, 0)
+        XCTAssertEqual(sink.wakeCalls, 0)
+    }
+
     private func apply(_ input: V2VectorInput, to machine: HandoffV2StateMachine) throws {
         switch input.kind {
         case "statusProbe":

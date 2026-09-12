@@ -166,15 +166,18 @@ private final class PendingPeerCapabilityInspection {
     let profile: CollaborationProfile
     let v2EventID: String
     let diagnosticContext: PeerInspectionDiagnosticContext
+    let reportsStatus: Bool
     let completion: (PeerCapabilityInspectionResult) -> Void
 
     init(id: String, profile: CollaborationProfile, v2EventID: String,
          diagnosticContext: PeerInspectionDiagnosticContext,
+         reportsStatus: Bool,
          completion: @escaping (PeerCapabilityInspectionResult) -> Void) {
         self.id = id
         self.profile = profile
         self.v2EventID = v2EventID
         self.diagnosticContext = diagnosticContext
+        self.reportsStatus = reportsStatus
         self.completion = completion
     }
 }
@@ -575,7 +578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             error: NSError(
                 domain: "DisplaySwitcher.Collaboration",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "请先在设置中检测并确认该配置的对端。"]
+                userInfo: [NSLocalizedDescriptionKey: "应用会自动连接；请检查地址、端口和配对码。"]
             )
         )
     }
@@ -1262,7 +1265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         if peerRuntime.v2Enabled || peerRuntime.unboundProbeEnabled {
             peerTransport.start(port: document.listenPort)
         }
-        if peerRuntime.v2Enabled { scheduleV2StatusProbes() }
+        if peerRuntime.unboundProbeEnabled { scheduleV2StatusProbes() }
     }
 
     private func applyPeerRuntimeConfiguration(
@@ -1290,7 +1293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         let v2Enabled = networkAllowed && usbLearningSafetyGate.allows(.network)
             && !v2RoutingTable.routesByEndpointID.isEmpty
         let unboundProbeEnabled = networkAllowed && usbLearningSafetyGate.allows(.network)
-            && !V2UnboundStatusProbeResolver.eligibleProfiles(in: document).isEmpty
+            && !V2StatusProbeResolver.eligibleProfiles(in: document).isEmpty
         handoffV2StateMachine.configure(
             localEndpointID: document.localEndpointID,
             coordinationEnabled: v2Enabled,
@@ -1341,6 +1344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
 
     private func beginPeerCapabilityInspection(
         profile: CollaborationProfile,
+        reportsStatus: Bool = true,
         completion: @escaping (PeerCapabilityInspectionResult) -> Void
     ) {
         guard configurationSafetyGate.allows(.network), usbLearningSafetyGate.allows(.network),
@@ -1360,11 +1364,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             profile: profile,
             v2EventID: eventID,
             diagnosticContext: diagnosticContext,
+            reportsStatus: reportsStatus,
             completion: completion
         )
         pendingPeerInspections[inspectionID] = pending
-        collaborationStatusStore.beginCheck(profileID: profile.id)
-        settingsWindowController.refreshSelectedCollaborationStatus()
+        if reportsStatus {
+            collaborationStatusStore.beginCheck(profileID: profile.id)
+            settingsWindowController.refreshSelectedCollaborationStatus()
+        }
         inspectionEventTracker.register(eventID: eventID, inspectionID: inspectionID)
         let listenPort = AppPreferences.localConfiguration.listenPort
         let startResult = peerTransport.start(port: listenPort)
@@ -1372,6 +1379,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             .listener(result: startResult, requestedPort: listenPort, actualPort: peerTransport.listeningPort),
             context: diagnosticContext
         )
+        if case .failure = startResult {
+            completePeerCapabilityInspection(
+                inspectionID, result: .listenerFailed(startResult.systemError)
+            )
+            return
+        }
         guard let data = makeV2StatusProbe(eventID: eventID, profile: profile) else {
             peerInspectionDiagnostics.record(
                 .responseRejected("probe-construction-failed"), context: diagnosticContext
@@ -1384,7 +1397,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         )
         peerTransport.send(data, host: profile.peerHost, port: profile.peerPort) {
             [weak self] result in
-            self?.peerInspectionDiagnostics.record(.sendFinished(result), context: diagnosticContext)
+            guard let self else { return }
+            self.peerInspectionDiagnostics.record(.sendFinished(result), context: diagnosticContext)
+            if case .failure = result {
+                self.completePeerCapabilityInspection(
+                    inspectionID, result: .sendFailed(result.systemError)
+                )
+            }
         }
         schedule("v2-inspection-\(inspectionID)", after: 1_000) { [weak self] in
             guard let self, let pending = self.pendingPeerInspections[inspectionID] else { return }
@@ -1420,22 +1439,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         inspectionEventTracker.complete(
             eventID: pending.v2EventID, context: pending.diagnosticContext
         )
-        if case .v2 = result {
-            collaborationStatusStore.finishCheck(profileID: pending.profile.id, responded: true)
-        } else {
-            collaborationStatusStore.finishCheck(profileID: pending.profile.id, responded: false)
+        if pending.reportsStatus {
+            switch result {
+            case .v2:
+                collaborationStatusStore.finishCheck(profileID: pending.profile.id, responded: true)
+            case .listenerFailed(let error):
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .listenerFailed(error)
+                )
+            case .sendFailed(let error):
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .sendFailed(error)
+                )
+            case .authenticationFailed:
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .authenticationFailed
+                )
+            case .noResponse:
+                collaborationStatusStore.finishCheck(
+                    profileID: pending.profile.id, failure: .noResponse
+                )
+            }
         }
         let diagnosticResult: String
         switch result {
         case .v2: diagnosticResult = "v2-available"
         case .authenticationFailed: diagnosticResult = "authentication-failed"
         case .noResponse: diagnosticResult = "no-response"
+        case .listenerFailed: diagnosticResult = "listener-failed"
+        case .sendFailed: diagnosticResult = "send-failed"
         }
         peerInspectionDiagnostics.record(
             .completed(diagnosticResult), context: pending.diagnosticContext
         )
         pending.completion(result)
-        settingsWindowController.refreshSelectedCollaborationStatus()
+        if pending.reportsStatus { settingsWindowController.refreshSelectedCollaborationStatus() }
     }
 
     private func handlePendingV2Inspection(
@@ -1479,11 +1517,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             return false
         }
         recordInspectionDatagram(data, from: endpoint, pending: pending, eventIDMatches: true)
-        if let rejection = PeerInspectionDatagramSourceValidator.rejectionReason(
-            sourcePort: endpoint.port, expectedPort: pending.profile.peerPort
+        if !peerTransport.sourceMatches(
+            endpoint,
+            configuredHost: pending.profile.peerHost,
+            port: pending.profile.peerPort
         ) {
             peerInspectionDiagnostics.record(
-                .responseRejected(rejection), context: pending.diagnosticContext
+                .responseRejected("source-endpoint-mismatch"), context: pending.diagnosticContext
             )
             return true
         }
@@ -1516,8 +1556,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             case .new:
                 break
             }
+            let oldEndpointID = pending.profile.peerEndpointID.flatMap(V2Crypto.normalizedUUID)
+            guard let update = persistPeerEndpointCache(
+                profileID: pending.profile.id, endpointID: endpointID
+            ) else { return true }
             peerInspectionDiagnostics.record(.responseAccepted, context: pending.diagnosticContext)
             completePeerCapabilityInspection(inspectionID, result: .v2(endpointID: endpointID))
+            if update.changed {
+                publishPeerEndpointCache(update.document, replacing: oldEndpointID, with: endpointID)
+            } else {
+                recordPeerAuthenticated(profileID: pending.profile.id, endpointID: endpointID)
+            }
         case .authenticationFailed:
             peerInspectionDiagnostics.record(
                 .responseRejected("authentication-failed"), context: pending.diagnosticContext
@@ -1559,19 +1608,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         if handlePendingV2Inspection(data, from: endpoint) { return }
         switch PeerProtocolVersionDispatcher.version(in: data) {
         case .v2:
-            handleV2Datagram(data, reply: reply)
+            handleV2Datagram(data, from: endpoint, reply: reply)
         case .unsupported, nil:
             return
         }
     }
 
-    private func handleV2Datagram(_ data: Data, reply: @escaping PeerTransport.DataReply) {
+    private func handleV2Datagram(
+        _ data: Data,
+        from endpoint: PeerTransportEndpoint,
+        reply: @escaping PeerTransport.DataReply
+    ) {
         let document = AppPreferences.localConfiguration
         guard let sourceEndpointID = V2MessageEnvelope.sourceEndpointID(in: data) else { return }
-        guard let route = v2RoutingTable.route(for: sourceEndpointID) else {
-            handleUnboundV2StatusProbe(data, document: document, reply: reply)
+        if PeerInspectionEnvelopeProjection.summary(data).type == V2MessageType.statusProbe.rawValue {
+            handleV2StatusProbe(data, from: endpoint, document: document, reply: reply)
             return
         }
+        guard let route = v2RoutingTable.route(for: sourceEndpointID) else {
+            return
+        }
+        guard peerTransport.sourceMatches(endpoint, configuredHost: route.host, port: route.port) else { return }
         guard
               let key = try? V2Crypto.deriveKey(
                 pairingCode: route.pairingCode,
@@ -1599,16 +1656,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         }
         updateV2PeerReachable(true, endpointID: sourceEndpointID)
 
-        if message.type == .statusProbe {
-            v2DatagramReplies[v2ReplyKey(eventID: message.eventID, endpointID: sourceEndpointID)] = reply
-        }
         switch message.type {
         case .statusProbe:
-            handoffV2StateMachine.handleStatusProbe(
-                endpointID: sourceEndpointID,
-                eventID: message.eventID,
-                authenticated: true
-            )
+            return
         case .statusResponse:
             handoffV2StateMachine.handleStatusResponse(endpointID: sourceEndpointID, authenticated: true)
         case .wakeDisplay:
@@ -1650,16 +1700,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         }
     }
 
-    private func handleUnboundV2StatusProbe(
+    private func handleV2StatusProbe(
         _ data: Data,
+        from endpoint: PeerTransportEndpoint,
         document: DisplayConfigurationStoreV5Document,
         reply: @escaping PeerTransport.DataReply
     ) {
         guard let nonce = try? V2Crypto.makeNonce(),
-              let resolution = V2UnboundStatusProbeResolver.resolve(
+              let resolution = V2StatusProbeResolver.resolve(
                 data: data,
                 document: document,
-                routingTable: v2RoutingTable,
+                sourceHost: endpoint.host,
+                sourcePort: endpoint.port,
+                sourceMatchesProfile: { [peerTransport] profile in
+                    peerTransport.sourceMatches(
+                        endpoint, configuredHost: profile.peerHost, port: profile.peerPort
+                    )
+                },
                 now: Int64(Date().timeIntervalSince1970),
                 responseNonce: nonce
               ) else { return }
@@ -1675,6 +1732,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             guard let cached = v2UnboundProbeResponses[cacheKey] else { return }
             reply(cached)
         case .new:
+            let oldEndpointID = document.collaborationProfiles.first {
+                $0.id == resolution.profileID
+            }?.peerEndpointID.flatMap(V2Crypto.normalizedUUID)
+            guard let update = persistPeerEndpointCache(
+                profileID: resolution.profileID,
+                endpointID: resolution.request.sourceEndpointID
+            ) else { return }
+            if update.changed {
+                publishPeerEndpointCache(
+                    update.document,
+                    replacing: oldEndpointID,
+                    with: resolution.request.sourceEndpointID
+                )
+            } else {
+                recordPeerAuthenticated(
+                    profileID: resolution.profileID,
+                    endpointID: resolution.request.sourceEndpointID
+                )
+            }
             if v2UnboundProbeResponses.count >= 128 {
                 v2UnboundProbeResponses.removeAll(keepingCapacity: true)
             }
@@ -1691,25 +1767,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         schedule("v2-status-probes", after: 2_000) { [weak self] in
             guard let self, self.configurationSafetyGate.allows(.network),
                   self.usbLearningSafetyGate.allows(.network),
-                  !self.v2RoutingTable.routesByEndpointID.isEmpty else { return }
+                  !V2StatusProbeResolver.eligibleProfiles(
+                    in: AppPreferences.localConfiguration
+                  ).isEmpty else { return }
             let now = self.currentTimeMs()
             for endpointID in self.v2RoutingTable.routesByEndpointID.keys.sorted() {
                 if let lastSeen = self.v2LastSeenAtMs[endpointID], now - lastSeen > 6_000 {
                     self.v2ReachableEndpoints.remove(endpointID)
                     self.handoffV2StateMachine.setTargetReachable(false, endpointID: endpointID)
                 }
-                self.sendV2Message(
-                    type: .statusProbe,
-                    eventID: self.nextEventID(),
-                    endpointID: endpointID,
-                    intent: nil,
-                    wakeSucceeded: nil,
-                    switchSucceeded: nil,
-                    reason: nil
-                )
+            }
+            for profile in V2StatusProbeResolver.eligibleProfiles(
+                in: AppPreferences.localConfiguration
+            ) where profile.coordinationEnabled
+                && !self.pendingPeerInspections.values.contains(where: { $0.profile.id == profile.id }) {
+                self.beginPeerCapabilityInspection(profile: profile, reportsStatus: false) { _ in }
             }
             self.refreshPeerConnectionStatus()
             self.scheduleV2StatusProbes()
+        }
+    }
+
+    private func persistPeerEndpointCache(
+        profileID: String,
+        endpointID: String
+    ) -> (document: DisplayConfigurationStoreV5Document, changed: Bool)? {
+        let document = AppPreferences.localConfiguration
+        guard let updated = DisplayConfigurationStore.documentByCachingPeerEndpoint(
+            endpointID, forProfileID: profileID, in: document
+        ) else { return nil }
+        guard updated != document else { return (document, false) }
+        do {
+            try AppPreferences.saveLocalConfiguration(updated)
+            return (updated, true)
+        } catch let error as DisplayConfigurationStoreError {
+            enterConfigurationSafetyState(error)
+            return nil
+        } catch {
+            enterConfigurationSafetyState(.writeFailed)
+            return nil
+        }
+    }
+
+    private func recordPeerAuthenticated(profileID: String, endpointID: String) {
+        guard v2RoutingTable.route(for: endpointID)?.profileID == profileID else { return }
+        collaborationStatusStore.recordAuthenticatedMessage(
+            profileID: profileID, nowMs: currentTimeMs()
+        )
+        updateV2PeerReachable(true, endpointID: endpointID)
+    }
+
+    private func publishPeerEndpointCache(
+        _ document: DisplayConfigurationStoreV5Document,
+        replacing oldEndpointID: String?,
+        with endpointID: String
+    ) {
+        let normalized = endpointID.lowercased()
+        if let oldEndpointID, oldEndpointID != normalized {
+            v2ReachableEndpoints.remove(oldEndpointID)
+            v2LastSeenAtMs.removeValue(forKey: oldEndpointID)
+        }
+        v2RoutingTable = V2EndpointRoutingTable.build(from: document)
+        handoffV2StateMachine.handlePeerRouteChanged(
+            replacing: oldEndpointID,
+            enabledTargets: v2RoutingTable.routesByEndpointID.values.map {
+                V2HandoffTarget(
+                    endpointID: $0.endpointID,
+                    capability: .v2,
+                    reachable: v2ReachableEndpoints.contains($0.endpointID)
+                )
+            },
+            coordinationEnabled: !v2RoutingTable.routesByEndpointID.isEmpty
+        )
+        if settingsWindowHasBeenShown { settingsWindowController.reloadPersistedConfiguration() }
+        if let route = v2RoutingTable.route(for: normalized) {
+            recordPeerAuthenticated(profileID: route.profileID, endpointID: normalized)
         }
     }
 

@@ -36,6 +36,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             std::function<void()> closed);
         void SetConnectionStatus(std::wstring const& status, bool connected);
         void ReloadConfiguration(::DisplaySwitcher::Native::AppConfig const& config);
+        void SynchronizePeerRoutes(::DisplaySwitcher::Native::AppConfig const& config);
         void ShowWindow();
         void CloseForExit();
 
@@ -162,6 +163,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             Microsoft::UI::Xaml::Controls::TextBox peerHost{ nullptr };
             Microsoft::UI::Xaml::Controls::TextBox peerPort{ nullptr };
             Microsoft::UI::Xaml::Controls::PasswordBox pairingCode{ nullptr };
+            Microsoft::UI::Xaml::Controls::TextBlock enablementStatus{ nullptr };
             std::vector<ProfileMappingControls> mappings;
         };
         std::vector<ProfileEditorControls> profileEditors_;
