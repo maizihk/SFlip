@@ -1,5 +1,7 @@
 # SFlip
 
+[简体中文](README.md) | [English](README.en.md)
+
 [![macOS CI](https://github.com/maizihk/SFlip/actions/workflows/macos.yml/badge.svg)](https://github.com/maizihk/SFlip/actions/workflows/macos.yml)
 [![Windows CI](https://github.com/maizihk/SFlip/actions/workflows/windows.yml/badge.svg)](https://github.com/maizihk/SFlip/actions/workflows/windows.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -30,7 +32,11 @@ SFlip 是 macOS 菜单栏和 Windows 托盘工具，适合多台电脑共用显�
 
 ## 基础使用
 
-下面介绍当前源码的配置方式。配对码自动连接及近期设置改进尚未进入上述正式版，下载版请同时参考对应发布说明。
+下面介绍当前源码的配置方式。语言选择、配对码自动连接及近期设置改进尚未进入上述正式版，下载版请同时参考对应发布说明。
+
+### 界面语言
+
+在“设置 → 常规 → 语言”中选择“跟随系统”、“简体中文”或“English”。默认跟随系统：中文系统使用简体中文，其他系统使用 English。
 
 ### 显示器调节
 

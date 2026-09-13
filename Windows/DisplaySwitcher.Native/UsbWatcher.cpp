@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "Diagnostics.h"
 #include "UsbPresencePollPolicy.h"
 #include "UsbWatcher.h"
@@ -229,7 +230,7 @@ namespace DisplaySwitcher::Native
             if (!vendor || !product) continue;
             auto name = ReadProperty(set, info, SPDRP_FRIENDLYNAME);
             if (name.empty()) name = ReadProperty(set, info, SPDRP_DEVICEDESC);
-            if (name.empty()) name = L"USB 设备";
+            if (name.empty()) name = ::DisplaySwitcher::Native::UiText(L"USB 设备");
             devices.push_back({ *vendor, *product, name, pnp });
         }
         SetupDiDestroyDeviceInfoList(set);

@@ -261,15 +261,15 @@ enum InputSourceSwitchFailure: Error, Equatable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .blocked:
-            return "输入源切换已被安全门控阻止。"
+            return L10n.text("输入源切换已被安全门控阻止。")
         case .missingInput:
-            return "目标显示器未配置输入源。"
+            return L10n.text("目标显示器未配置输入源。")
         case let .invalidInput(_, value):
-            return "输入源数值超出有效范围：\(value)"
+            return L10n.format("输入源数值超出有效范围：{0}", String(describing: value))
         case .displayUnavailable:
-            return "目标显示器的原生 DDC 通道当前不可用。"
+            return L10n.text("目标显示器的原生 DDC 通道当前不可用。")
         case .writeFailed:
-            return "写入显示器输入源失败。"
+            return L10n.text("写入显示器输入源失败。")
         }
     }
 }

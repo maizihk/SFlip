@@ -1,0 +1,1 @@
+"NSLocalNetworkUsageDescription" = "Used to detect and connect to SFlip devices on your local network, wake displays, and perform display switching you configure. Raw USB and display hardware identifiers are never synchronized.";

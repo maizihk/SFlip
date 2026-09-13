@@ -1,3 +1,4 @@
+#include "../DisplaySwitcher.Native/Localization.h"
 #include <windows.h>
 #include <shellapi.h>
 
@@ -47,7 +48,7 @@ namespace
     {
         wchar_t* buffer{};
         auto length = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, error, 0, reinterpret_cast<wchar_t*>(&buffer), 0, nullptr);
+            FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, error, DisplaySwitcher::Native::CurrentUiLanguage() == DisplaySwitcher::Native::UiLanguage::Chinese ? MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED) : MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), reinterpret_cast<wchar_t*>(&buffer), 0, nullptr);
         std::wstring text = length && buffer ? std::wstring(buffer, length) : L"Windows error " + std::to_wstring(error);
         if (buffer) LocalFree(buffer);
         return text;
@@ -62,7 +63,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     auto target = runtimeDirectory / L"DisplaySwitcher.Windows.exe";
     if (!std::filesystem::is_regular_file(target))
     {
-        MessageBoxW(nullptr, L"缺少 runtime\\DisplaySwitcher.Windows.exe，请重新复制完整程序目录。",
+        MessageBoxW(nullptr, DisplaySwitcher::Native::UiText(L"缺少 runtime\\DisplaySwitcher.Windows.exe，请重新复制完整程序目录。"),
             L"SFlip", MB_OK | MB_ICONERROR);
         return 2;
     }
@@ -84,7 +85,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     if (!CreateProcessW(target.c_str(), mutableCommand.data(), nullptr, nullptr, FALSE, 0, nullptr,
         runtimeDirectory.c_str(), &startup, &process))
     {
-        auto message = L"无法启动 SFlip：\n\n" + ErrorText(GetLastError());
+        auto message = DisplaySwitcher::Native::UiFormat(L"无法启动 SFlip：\n\n{error}", {{L"error", ErrorText(GetLastError())}});
         MessageBoxW(nullptr, message.c_str(), L"SFlip", MB_OK | MB_ICONERROR);
         return 3;
     }

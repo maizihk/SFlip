@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "DisplayModel.h"
 #include "DdcControl.h"
 
@@ -14,9 +15,11 @@ namespace
 
     bool IsGenericDisplayName(std::wstring const& name)
     {
-        constexpr std::wstring_view prefix = L"显示器 ";
-        if (!name.starts_with(prefix) || name.size() == prefix.size()) return name.empty();
-        return std::all_of(name.begin() + static_cast<std::ptrdiff_t>(prefix.size()), name.end(), iswdigit);
+        // These are stored generated-name patterns, independent of the current UI language.
+        for (std::wstring_view prefix : { L"显示器 ", L"Display " })
+            if (name.starts_with(prefix) && name.size() > prefix.size())
+                return std::all_of(name.begin() + static_cast<std::ptrdiff_t>(prefix.size()), name.end(), iswdigit);
+        return name.empty();
     }
 
     bool ContainsInsensitive(std::vector<std::wstring> const& values, std::wstring const& candidate)
@@ -114,7 +117,7 @@ namespace DisplaySwitcher::Native
                 || monitor.physicalHandleCount != 1 || duplicateStrongIdentity;
         }
 
-        for (auto& monitor : unique) if (monitor.displayName.empty()) monitor.displayName = L"显示器";
+        for (auto& monitor : unique) if (monitor.displayName.empty()) monitor.displayName = ::DisplaySwitcher::Native::UiText(L"未命名显示器");
         std::vector<std::wstring> baseNames;
         baseNames.reserve(unique.size());
         for (auto const& monitor : unique) baseNames.push_back(monitor.displayName);
@@ -156,8 +159,8 @@ namespace DisplaySwitcher::Native
             {
                 display.bindingStatus = DisplayBindingStatus::Ambiguous;
                 display.bindingMessage = monitor.physicalHandleCount != 1
-                    ? L"当前逻辑显示目标对应多个物理 DDC 句柄，需要重新确认"
-                    : L"显示器身份不唯一，需要重新确认";
+                    ? ::DisplaySwitcher::Native::UiText(L"当前逻辑显示目标对应多个物理 DDC 句柄，需要重新确认")
+                    : ::DisplaySwitcher::Native::UiText(L"显示器身份不唯一，需要重新确认");
             }
             else if (migrateBinding || EqualInsensitive(display.nativeMonitorId, monitor.id))
             {
@@ -167,12 +170,12 @@ namespace DisplaySwitcher::Native
                     result.changed = true;
                 }
                 display.bindingStatus = DisplayBindingStatus::Resolved;
-                display.bindingMessage = L"原生 DDC/CI 已绑定";
+                display.bindingMessage = ::DisplaySwitcher::Native::UiText(L"原生 DDC/CI 已绑定");
             }
             else
             {
                 display.bindingStatus = DisplayBindingStatus::NeedsConfirmation;
-                display.bindingMessage = L"当前显示目标需要用户重新确认绑定";
+                display.bindingMessage = ::DisplaySwitcher::Native::UiText(L"当前显示目标需要用户重新确认绑定");
             }
             if (IsGenericDisplayName(display.name) && display.name != monitor.displayName)
             {
@@ -248,7 +251,7 @@ namespace DisplaySwitcher::Native
                 ? DisplayBindingStatus::Offline : DisplayBindingStatus::NeedsConfirmation;
             display.topologyGeneration = 0;
             display.bindingMessage = display.bindingStatus == DisplayBindingStatus::Offline
-                ? L"显示器当前离线，配置已保留" : L"显示器绑定证据不足，需要重新确认";
+                ? ::DisplaySwitcher::Native::UiText(L"显示器当前离线，配置已保留") : ::DisplaySwitcher::Native::UiText(L"显示器绑定证据不足，需要重新确认");
             result.displays.push_back(std::move(display));
         }
         result.removed = 0;
@@ -340,7 +343,7 @@ namespace DisplaySwitcher::Native
                     && EqualInsensitive(display.nativeMonitorId.substr(PendingTargetPrefix.size()), monitor.logicalTargetId);
             });
             if (occupied) continue;
-            result.push_back({ monitor.id, monitor.displayName.empty() ? L"显示器" : monitor.displayName,
+            result.push_back({ monitor.id, monitor.displayName.empty() ? ::DisplaySwitcher::Native::UiText(L"未命名显示器") : monitor.displayName,
                 monitor.logicalTargetId, monitor.topologyGeneration });
         }
         std::sort(result.begin(), result.end(), [](auto const& left, auto const& right)
@@ -356,9 +359,9 @@ namespace DisplaySwitcher::Native
         DisplayRebindCandidate const& selected, std::vector<DdcMonitorInfo> const& connected,
         DisplayTopologyTrust topologyTrust)
     {
-        DisplayRebindResult result{ false, displays, L"当前显示拓扑已经变化，请重新选择显示器。" };
+        DisplayRebindResult result{ false, displays, ::DisplaySwitcher::Native::UiText(L"当前显示拓扑已经变化，请重新选择显示器。") };
         auto displayIndex = FindDisplayById(displays, displayId);
-        if (!displayIndex) { result.message = L"要重新绑定的显示器配置已不存在。"; return result; }
+        if (!displayIndex) { result.message = ::DisplaySwitcher::Native::UiText(L"要重新绑定的显示器配置已不存在。"); return result; }
         auto candidates = FindDisplayRebindCandidates(displays, displayId, connected, topologyTrust);
         auto match = std::find_if(candidates.begin(), candidates.end(), [&](auto const& candidate)
         {
@@ -373,14 +376,14 @@ namespace DisplaySwitcher::Native
         display.nativeMonitorId = match->monitorId;
         display.topologyGeneration = match->topologyGeneration;
         display.bindingStatus = DisplayBindingStatus::Resolved;
-        display.bindingMessage = L"原生 DDC/CI 已重新确认绑定";
+        display.bindingMessage = ::DisplaySwitcher::Native::UiText(L"原生 DDC/CI 已重新确认绑定");
         if (physicalIdentityChanged)
         {
             display.brightnessMax.reset(); display.contrastMax.reset(); display.volumeMax.reset();
             display.brightnessValue.reset(); display.contrastValue.reset(); display.volumeValue.reset();
         }
         result.success = true;
-        result.message = L"显示器绑定已重新确认。";
+        result.message = ::DisplaySwitcher::Native::UiText(L"显示器绑定已重新确认。");
         return result;
     }
 
@@ -394,11 +397,11 @@ namespace DisplaySwitcher::Native
         DdcEnumerationResult fresh;
         try { fresh = enumerate ? enumerate() : DdcEnumerationResult{}; }
         catch (...) { result.outcome = DisplayRebindCommitOutcome::EnumerationFailed;
-            result.message = L"确认时无法重新检测显示器，旧绑定已保留。"; return result; }
+            result.message = ::DisplaySwitcher::Native::UiText(L"确认时无法重新检测显示器，旧绑定已保留。"); return result; }
         if (!fresh.success || !fresh.IsTrustedNonEmptySnapshot())
         {
             result.outcome = DisplayRebindCommitOutcome::EnumerationFailed;
-            result.message = L"确认时无法取得可信的本地物理显示拓扑，旧绑定已保留。";
+            result.message = ::DisplaySwitcher::Native::UiText(L"确认时无法取得可信的本地物理显示拓扑，旧绑定已保留。");
             return result;
         }
         auto rebound = ConfirmDisplayRebind(displays, displayId, selected, fresh.monitors, fresh.topologyTrust);
@@ -413,19 +416,19 @@ namespace DisplaySwitcher::Native
             if (!save || !save(rebound.displays))
             {
                 result.outcome = DisplayRebindCommitOutcome::SaveFailed;
-                result.message = L"显示器绑定未保存；旧配置和全部映射已完整保留。";
+                result.message = ::DisplaySwitcher::Native::UiText(L"显示器绑定未保存；旧配置和全部映射已完整保留。");
                 return result;
             }
         }
         catch (...)
         {
             result.outcome = DisplayRebindCommitOutcome::SaveFailed;
-            result.message = L"显示器绑定未保存；旧配置和全部映射已完整保留。";
+            result.message = ::DisplaySwitcher::Native::UiText(L"显示器绑定未保存；旧配置和全部映射已完整保留。");
             return result;
         }
         result.outcome = DisplayRebindCommitOutcome::Saved;
         result.displays = std::move(rebound.displays);
-        result.message = L"显示器绑定已重新确认。";
+        result.message = ::DisplaySwitcher::Native::UiText(L"显示器绑定已重新确认。");
         return result;
     }
 
@@ -570,7 +573,7 @@ namespace DisplaySwitcher::Native
                 {
                     return ActionResult{ false, winrt::to_hstring(error.what()).c_str() };
                 }
-                catch (...) { return ActionResult{ false, L"未知错误" }; }
+                catch (...) { return ActionResult{ false, ::DisplaySwitcher::Native::UiText(L"未知错误") }; }
             }));
         }
 

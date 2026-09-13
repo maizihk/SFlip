@@ -19,28 +19,28 @@ struct LocalNetworkPermissionPresentation: Equatable {
         switch evidence {
         case .notChecked:
             return Self(
-                statusText: "未检测",
+                statusText: L10n.text("未检测"),
                 detailText: "",
                 isFailure: false,
                 isExplicitlyDenied: false
             )
         case .collaborationConnected:
             return Self(
-                statusText: "协同连接正常",
+                statusText: L10n.text("协同连接正常"),
                 detailText: "",
                 isFailure: false,
                 isExplicitlyDenied: false
             )
         case .explicitSystemDenial:
             return Self(
-                statusText: "系统明确拒绝",
-                detailText: "请前往“系统设置 → 隐私与安全性 → 本地网络”，允许 SFlip 访问。",
+                statusText: L10n.text("系统明确拒绝"),
+                detailText: L10n.text("请前往“系统设置 → 隐私与安全性 → 本地网络”，允许 SFlip 访问。"),
                 isFailure: true,
                 isExplicitlyDenied: true
             )
         case .timeout, .authenticationFailure, .ordinaryNetworkFailure:
             return Self(
-                statusText: "连接失败，请检查权限、地址和防火墙",
+                statusText: L10n.text("连接失败，请检查权限、地址和防火墙"),
                 detailText: "",
                 isFailure: true,
                 isExplicitlyDenied: false
@@ -103,14 +103,14 @@ struct AboutPageContent: Equatable {
             ?? "SFlip"
         let shortVersion = metadata.stringValue(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) ?? "未知"
+        ) ?? L10n.text("未知")
         let buildVersion = metadata.stringValue(forInfoDictionaryKey: "CFBundleVersion")
-            ?? "未知"
+            ?? L10n.text("未知")
         return AboutPageContent(
             productName: name,
-            summary: "一款在 macOS 与 Windows 之间协同切换显示器和 USB 设备的原生菜单栏工具。",
-            versionText: "版本 \(shortVersion) (\(buildVersion))",
-            platformText: "macOS · \(architecture) · 协议 v2"
+            summary: L10n.text("一款在 macOS 与 Windows 之间协同切换显示器和 USB 设备的原生菜单栏工具。"),
+            versionText: L10n.format("版本 {0} ({1})", String(describing: shortVersion), String(describing: buildVersion)),
+            platformText: L10n.format("macOS · {0} · 协议 v2", String(describing: architecture))
         )
     }
 
@@ -120,7 +120,7 @@ struct AboutPageContent: Equatable {
 #elseif arch(x86_64)
         return "Intel (x86_64)"
 #else
-        return "未知架构"
+        return L10n.text("未知架构")
 #endif
     }
 }
@@ -131,14 +131,14 @@ enum DisplayDDCStatusPresentation {
         skipReason: DDCReadSkipReason?
     ) -> String {
         if let skipReason { return skipReason.userFacingDescription }
-        if values.isEmpty { return "读取失败" }
-        if values.values.contains(where: \.estimated) { return "读取失败" }
-        return "读取成功"
+        if values.isEmpty { return L10n.text("读取失败") }
+        if values.values.contains(where: \.estimated) { return L10n.text("读取失败") }
+        return L10n.text("读取成功")
     }
 
     static func write(value: Int?, error: Error?) -> String {
-        if value != nil { return "写入成功" }
-        return error == nil ? "已取消" : "写入失败"
+        if value != nil { return L10n.text("写入成功") }
+        return error == nil ? L10n.text("已取消") : L10n.text("写入失败")
     }
 }
 
@@ -168,7 +168,7 @@ struct DiagnosticReport: Equatable {
             "",
             "[Application]",
             "product=\(about.productName)",
-            "version=\(about.versionText.replacingOccurrences(of: "版本 ", with: ""))",
+            "version=\(metadata.stringValue(forInfoDictionaryKey: "CFBundleShortVersionString") ?? "unknown") (\(metadata.stringValue(forInfoDictionaryKey: "CFBundleVersion") ?? "unknown"))",
             "platform=macOS architecture=\(architecture)",
             "protocol=v2 schema=\(document.schemaVersion)",
             "configuration-safety=\(safetyState == .ready ? "ready" : "user-review-required")",
@@ -182,7 +182,7 @@ struct DiagnosticReport: Equatable {
         } else {
             for (index, profile) in document.collaborationProfiles.enumerated() {
                 let state = collaborationStates.indices.contains(index)
-                    ? collaborationStates[index].text : "未知"
+                    ? collaborationStates[index].text : L10n.text("未知")
                 lines.append(
                     "profile=P\(index + 1) enabled=\(profile.coordinationEnabled)"
                         + " endpoint-bound=\(profile.peerEndpointID != nil) status=\(state)"
@@ -265,7 +265,7 @@ struct ManualSwitchMenuEntry: Equatable {
 
     static func entries(in document: DisplayConfigurationStoreV5Document) -> [ManualSwitchMenuEntry] {
         DisplayConfigurationStore.menuEligibleProfiles(in: document).map {
-            ManualSwitchMenuEntry(profileID: $0.id, title: "切换到 \($0.name)")
+            ManualSwitchMenuEntry(profileID: $0.id, title: L10n.format("切换到 {0}", String(describing: $0.name)))
         }
     }
 }

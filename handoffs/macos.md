@@ -1,5 +1,15 @@
 # macOS 交接记录
 
+## 当前任务：DS-047 中英双语与本机语言选择
+
+- 日期：2026-09-13；分支：`codex/windows-english-localization`；基线：`main@7aa467d`，跨端任务由协调端统一提交、推送和 PR。
+- 原界面只含中文硬编码文字，且展示静态 let/缓存状态会阻止即时切换。新增 `Localization.swift`，以独立 UserDefaults 本机偏好解析 System/zh-Hans/en，精确模板分别接收参数；用户命名、协议字段、存储键、旧名称识别和 UDP 诊断分类保持稳定。
+- 常规页选择默认跟随系统，中文系统选简体中文，其他选英文。语言修改仅重建同一 SettingsWindowController 的展示；保留内存配置、选中页/配置、DDC 样本和回调；读取/学习/检测期间禁用。菜单与媒体/USB/DDC 状态从模型或原模板重新生成，不执行 reloadSettings、检测、保存配置或硬件动作。
+- 修改 Mac 目录：中央语言实现；`SettingsWindowController.swift`、`main.swift`、DDC/输入源/USB/媒体/协同展示与错误来源；Xcode 工程、`Info.plist`、en/zh-Hans `InfoPlist.strings`；`LocalizationTests.swift` 和既有 11 个测试文件的可恢复中文语言 fixture；本机清单及此交接文件。Windows 和共享文档由协调端负责。
+- 静态确认：301 个既有模板都有英文，无缺失调用键；新目录占位符匹配；剩余源码汉字只为兼容旧名称正则、稳定 UDP 日志/操作 tag，以及展示时再本地化的原状态模板。临时库存文件已删除。`git diff --check` 通过。
+- 新测试覆盖系统语言/显式选择、缺失/未知偏好、全目录英文及占位符、含中文与 `{1}`/`%` 的用户名称原样保留、语言切换不改变序列化配置、动态标题更新、诊断分类跨语言稳定。Windows 主机不能执行 AppKit/XCTest；完整 Mac CI、Release/严格验签与可下载测试包等待协调端记录结果。
+- 尚需 GUI：六页及托盘英文布局/长错误、浅深模式、即时语言切换和重启持久化、System 回退、授权用途说明。系统权限弹窗由 macOS 选择 bundle 本地化，不宣称 App 偏好能即时改变系统弹窗；没有触发任何真实权限、网络、USB、DDC、睡眠或唤醒测试。
+
 ## 当前任务：DS-046 联动控制列对齐与集中读取
 
 - 日期：2026-09-12；分支：`codex/windows-linked-controls-alignment`；基线：`36b3b5a`，主任务已确认 `origin/main@f12a224`。

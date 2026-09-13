@@ -46,6 +46,23 @@ private final class RecordingAboutMetadata: AboutBundleMetadataSource {
 }
 
 final class PublicPresentationModelsTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        previousLanguagePreference = UserDefaults.standard.object(forKey: L10n.preferenceKey)
+        L10n.preference = .simplifiedChinese
+    }
+
+    private var previousLanguagePreference: Any?
+
+    override func tearDown() {
+        if let previousLanguagePreference {
+            UserDefaults.standard.set(previousLanguagePreference, forKey: L10n.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: L10n.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     func testSettingsCardUsesDynamicSemanticSurfaceAndRoundedClipping() throws {
         let light = try XCTUnwrap(NSAppearance(named: .aqua))
         let dark = try XCTUnwrap(NSAppearance(named: .darkAqua))

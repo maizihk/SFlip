@@ -1,3 +1,4 @@
+#include "Localization.h"
 #pragma once
 
 namespace DisplaySwitcher::Native
@@ -79,7 +80,7 @@ namespace DisplaySwitcher::Native
 
     inline std::wstring UsbTrayStatusText(bool active)
     {
-        return active ? L"USB 切换已开启" : L"USB 切换已关闭";
+        return active ? ::DisplaySwitcher::Native::UiText(L"USB 切换已开启") : ::DisplaySwitcher::Native::UiText(L"USB 切换已关闭");
     }
 
     struct UsbTrayRuntimeConditions

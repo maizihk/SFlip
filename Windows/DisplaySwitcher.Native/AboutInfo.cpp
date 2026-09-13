@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "AboutInfo.h"
 
 namespace DisplaySwitcher::Native
@@ -53,9 +54,9 @@ namespace DisplaySwitcher::Native
         auto version = VersionFromMetadata(applicationExecutable);
         return {
             L"SFlip",
-            version.value_or(L"未知"),
+            version.value_or(::DisplaySwitcher::Native::UiText(L"未知")),
             architecture,
-            L"UDP 协议 v2",
+            ::DisplaySwitcher::Native::UiText(L"UDP 协议 v2"),
             L"https://github.com/maizihk/DisplaySwitch",
             L"https://github.com/maizihk/DisplaySwitch/blob/main/LICENSE",
             L"https://github.com/maizihk/DisplaySwitch/blob/main/THIRD_PARTY_NOTICES.md",

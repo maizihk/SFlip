@@ -3,6 +3,23 @@ import Foundation
 import XCTest
 
 final class PeerProtocolV2Tests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        previousLanguagePreference = UserDefaults.standard.object(forKey: L10n.preferenceKey)
+        L10n.preference = .simplifiedChinese
+    }
+
+    private var previousLanguagePreference: Any?
+
+    override func tearDown() {
+        if let previousLanguagePreference {
+            UserDefaults.standard.set(previousLanguagePreference, forKey: L10n.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: L10n.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     func testPublicAuthenticationAndNormalizationVectors() throws {
         let object = try jsonObject(at: v2FixtureURL("auth-vectors.json"))
         let syntheticSecret = try XCTUnwrap(Data(hex: try string(object, "syntheticInputSecretHex")))

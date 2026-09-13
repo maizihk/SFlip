@@ -1,3 +1,4 @@
+#include "Localization.h"
 #pragma once
 #include "DdcControl.h"
 #include "MediaKeyWatcher.h"
@@ -61,7 +62,7 @@ namespace DisplaySwitcher::Native
         HWND window_{};
         std::unique_ptr<MediaKeyWatcher> mediaKeyWatcher_;
         std::wstring className_;
-        std::wstring status_{ L"正在初始化…" };
+        std::wstring status_{ ::DisplaySwitcher::Native::UiText(L"正在初始化…") };
         bool usbSwitchActive_{};
         std::vector<std::pair<std::wstring, std::wstring>> profiles_;
         std::vector<TrayDdcItem> ddcItems_;

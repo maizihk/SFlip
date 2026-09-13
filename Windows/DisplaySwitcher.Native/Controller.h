@@ -1,3 +1,4 @@
+#include "Localization.h"
 #pragma once
 #include "AppConfig.h"
 #include "DdcControl.h"
@@ -74,7 +75,7 @@ namespace DisplaySwitcher::Native
         DiagnosticSnapshot BuildDiagnosticSnapshot();
         void OnDisplayTopologyChanged();
         void SetStatus(std::wstring const& text);
-        void SetPeerConnectionStatus(std::wstring const& text, bool connected);
+        void SetPeerConnectionStatus(UiMessage const& text, bool connected);
         void Enqueue(std::function<void()> action);
         static std::wstring NewEventId();
 
@@ -113,7 +114,7 @@ namespace DisplaySwitcher::Native
         std::atomic<bool> networkAccessPrepared_{};
         winrt::Microsoft::UI::Xaml::Window settingsWindow_{ nullptr };
         std::mutex stateMutex_;
-        std::wstring peerConnectionStatus_{ L"协同未启用" };
+        UiMessage peerConnectionStatus_{ L"协同未启用" };
         bool peerConnected_{};
         std::atomic<bool> disposed_{};
         mutable std::mutex peerLifecycleMutex_;

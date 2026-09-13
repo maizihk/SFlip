@@ -110,19 +110,19 @@ enum CollaborationConnectionState: Equatable {
 
     var text: String {
         switch self {
-        case .disabled: return "未启用"
-        case .incomplete: return "配置不完整"
-        case .neverChecked: return "正在连接"
-        case .checking: return "正在检测"
-        case .noResponse: return "无响应"
-        case .authenticationFailed: return "配对码不匹配"
+        case .disabled: return L10n.text("未启用")
+        case .incomplete: return L10n.text("配置不完整")
+        case .neverChecked: return L10n.text("正在连接")
+        case .checking: return L10n.text("正在检测")
+        case .noResponse: return L10n.text("无响应")
+        case .authenticationFailed: return L10n.text("配对码不匹配")
         case .listenerFailed(let error):
-            return "监听失败（系统码：\(Self.errorCode(error))）"
+            return L10n.format("监听失败（系统码：{0}）", String(describing: Self.errorCode(error)))
         case .sendFailed(let error):
-            return "发送失败（系统码：\(Self.errorCode(error))）"
-        case .available: return "已连接"
-        case .connected: return "已连接"
-        case .disconnected: return "连接已断开"
+            return L10n.format("发送失败（系统码：{0}）", String(describing: Self.errorCode(error)))
+        case .available: return L10n.text("已连接")
+        case .connected: return L10n.text("已连接")
+        case .disconnected: return L10n.text("连接已断开")
         }
     }
 
@@ -141,7 +141,7 @@ enum CollaborationConnectionStatusPresentation {
     ) -> String {
         guard state.connected else { return state.text }
         let name = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "已和对端建立连接" : "已和对端（\(name)）建立连接"
+        return name.isEmpty ? L10n.text("已和对端建立连接") : L10n.format("已和对端（{0}）建立连接", String(describing: name))
     }
 }
 
@@ -315,7 +315,7 @@ struct TrayUSBStatusPresentation: Equatable {
     }
 
     var title: String {
-        isSettingEnabled ? "USB 切换已开启" : "USB 切换已关闭"
+        isSettingEnabled ? L10n.text("USB 切换已开启") : L10n.text("USB 切换已关闭")
     }
 
     var accessibilityLabel: String { title }
@@ -694,7 +694,7 @@ enum DDCAggregateValue: Equatable {
         case .unknown:
             return "—"
         case .mixed:
-            return "混合"
+            return L10n.text("混合")
         case let .uniform(value, estimated):
             return estimated ? "≈\(value)" : "\(value)"
         }
@@ -703,11 +703,11 @@ enum DDCAggregateValue: Equatable {
     var accessibilityValue: String {
         switch self {
         case .unknown:
-            return "未知"
+            return L10n.text("未知")
         case .mixed:
-            return "混合"
+            return L10n.text("混合")
         case let .uniform(value, estimated):
-            return estimated ? "约 \(value)" : "\(value)"
+            return estimated ? L10n.format("约 {0}", String(describing: value)) : "\(value)"
         }
     }
 }
@@ -738,7 +738,7 @@ enum LinkedDDCSliderVisualState: Equatable {
         case let .uniform(value, estimated):
             return estimated ? "≈\(value)" : "\(value)"
         case .mixed:
-            return "混合"
+            return L10n.text("混合")
         case .unknown:
             return "—"
         }
@@ -747,11 +747,11 @@ enum LinkedDDCSliderVisualState: Equatable {
     var accessibilityValue: String {
         switch self {
         case let .uniform(value, estimated):
-            return estimated ? "约 \(value)" : "\(value)"
+            return estimated ? L10n.format("约 {0}", String(describing: value)) : "\(value)"
         case .mixed:
-            return "混合"
+            return L10n.text("混合")
         case .unknown:
-            return "未知"
+            return L10n.text("未知")
         }
     }
 
@@ -1222,7 +1222,7 @@ func labeledTrailingAccessoryControlRow(
 struct SettingsMappingListLayout: Equatable {
     let displayCount: Int
 
-    static let title = "对端输入源"
+    static var title: String { L10n.text("对端输入源") }
     static let labelColumnWidth = SettingsFormRowLayout.labelColumnWidth
     static let listColumnWidth = SettingsFormRowLayout.controlColumnWidth
 
@@ -1262,7 +1262,7 @@ struct SettingsSaveStatusPresentation: Equatable {
     let accessibilityValue: String
 
     static let rowID = "settings-save-status"
-    static let rowTitle = "即时保存状态"
+    static var rowTitle: String { L10n.text("即时保存状态") }
     static let placement = Placement.nonScrollingWindowFooter
     static let isNonScrollingWindowFooter = true
     static let isInsideScrollDocument = false
@@ -1277,12 +1277,12 @@ struct SettingsSaveStatusPresentation: Equatable {
 
     static func saved(scope: SettingsSaveFeedbackScope) -> SettingsSaveStatusPresentation {
         SettingsSaveStatusPresentation(
-            text: "已保存",
+            text: L10n.text("已保存"),
             symbolName: "checkmark.circle.fill",
             textColor: .systemGreen,
             iconColor: .systemGreen,
             accessibilityLabel: scope.accessibilityLabel,
-            accessibilityValue: "已保存"
+            accessibilityValue: L10n.text("已保存")
         )
     }
 
@@ -1292,12 +1292,12 @@ struct SettingsSaveStatusPresentation: Equatable {
 
     static func failedRestored(scope: SettingsSaveFeedbackScope) -> SettingsSaveStatusPresentation {
         SettingsSaveStatusPresentation(
-            text: "保存失败，已恢复",
+            text: L10n.text("保存失败，已恢复"),
             symbolName: "exclamationmark.circle.fill",
             textColor: .systemRed,
             iconColor: .systemRed,
             accessibilityLabel: scope.accessibilityLabel,
-            accessibilityValue: "保存失败，已恢复"
+            accessibilityValue: L10n.text("保存失败，已恢复")
         )
     }
 }
@@ -1316,9 +1316,9 @@ enum SettingsSaveFeedbackScope: Equatable, Hashable, CaseIterable {
 
     var accessibilityLabel: String {
         switch self {
-        case .none: return "配置保存状态"
-        case .usb: return "USB 配置保存状态"
-        case .collaboration: return "协同配置保存状态"
+        case .none: return L10n.text("配置保存状态")
+        case .usb: return L10n.text("USB 配置保存状态")
+        case .collaboration: return L10n.text("协同配置保存状态")
         }
     }
 }
@@ -1468,7 +1468,7 @@ enum SettingsHorizontalRowAlignment: Equatable {
 }
 
 struct SettingsPageLayoutProjection: Equatable {
-    static let tabLabels = ["常规", "USB 切换", "协同", "显示器", "诊断", "关于"]
+    static var tabLabels:  [String] { [L10n.text("常规"), L10n.text("USB 切换"), L10n.text("协同"), L10n.text("显示器"), L10n.text("诊断"), L10n.text("关于")] }
 
     enum GroupID: String, Equatable {
         case usbAutomation
@@ -1478,10 +1478,10 @@ struct SettingsPageLayoutProjection: Equatable {
 
         var title: String {
             switch self {
-            case .usbAutomation: return "自动切换"
-            case .usbCollaboration: return "联动协同"
-            case .collaborationStatus: return "协同状态"
-            case .collaborationConfiguration: return "配置"
+            case .usbAutomation: return L10n.text("自动切换")
+            case .usbCollaboration: return L10n.text("联动协同")
+            case .collaborationStatus: return L10n.text("协同状态")
+            case .collaborationConfiguration: return L10n.text("配置")
             }
         }
     }
@@ -1565,22 +1565,22 @@ struct SettingsPageLayoutProjection: Equatable {
         }
         return SettingsPageLayoutProjection(groups: [
             Group(id: .usbAutomation, rows: [
-                Row(id: "usb-automatic-switch", title: "自动切换", action: .toggleUSBAutomation,
+                Row(id: "usb-automatic-switch", title: L10n.text("自动切换"), action: .toggleUSBAutomation,
                     isVisible: true, isEnabled: true),
                 .separator(id: "usb-automation-controls-separator"),
-                Row(id: "usb-trigger-device", title: "触发设备", action: .learnUSBDevice,
+                Row(id: "usb-trigger-device", title: L10n.text("触发设备"), action: .learnUSBDevice,
                     isVisible: true, isEnabled: !learningInProgress),
-                Row(id: "usb-connection-status", title: "当前状态", action: nil,
+                Row(id: "usb-connection-status", title: L10n.text("当前状态"), action: nil,
                     isVisible: true, isEnabled: true),
                 .separator(id: "usb-peer-inputs-separator")
             ] + (mappingRows.isEmpty ? [
-                Row(id: "usb-mapping-empty", title: "尚未检测到显示器", action: nil,
+                Row(id: "usb-mapping-empty", title: L10n.text("尚未检测到显示器"), action: nil,
                     isVisible: true, isEnabled: false)
             ] : mappingRows)),
             Group(id: .usbCollaboration, rows: [
-                Row(id: "usb-collaboration-target", title: "联动目标",
+                Row(id: "usb-collaboration-target", title: L10n.text("联动目标"),
                     action: .selectUSBWakeProfile, isVisible: true, isEnabled: true),
-                Row(id: "usb-collaboration-toggle", title: "联动协同",
+                Row(id: "usb-collaboration-toggle", title: L10n.text("联动协同"),
                     action: .toggleUSBWake, isVisible: true, isEnabled: true)
             ])
         ], windowFooterRows: [
@@ -1608,41 +1608,41 @@ struct SettingsPageLayoutProjection: Equatable {
             )
         }
         let details = [
-            Row(id: "collaboration-selector", title: "当前配置",
+            Row(id: "collaboration-selector", title: L10n.text("当前配置"),
                 action: .selectCollaborationProfile, isVisible: true,
                 isEnabled: hasSelectedProfile),
-            Row(id: "collaboration-add", title: "添加配置",
+            Row(id: "collaboration-add", title: L10n.text("添加配置"),
                 action: .addCollaborationProfile, isVisible: true, isEnabled: true),
             .separator(
                 id: "collaboration-selection-details-separator",
                 isVisible: hasSelectedProfile
             ),
-            Row(id: "collaboration-name", title: "配置名称", action: .editValue,
+            Row(id: "collaboration-name", title: L10n.text("配置名称"), action: .editValue,
                 isVisible: hasSelectedProfile, isEnabled: hasSelectedProfile),
-            Row(id: "collaboration-enabled", title: "启用此配置",
+            Row(id: "collaboration-enabled", title: L10n.text("启用此配置"),
                 action: .toggleCollaborationProfile,
                 isVisible: hasSelectedProfile, isEnabled: hasSelectedProfile),
-            Row(id: "collaboration-host", title: "对端地址", action: .editValue,
+            Row(id: "collaboration-host", title: L10n.text("对端地址"), action: .editValue,
                 isVisible: hasSelectedProfile, isEnabled: hasSelectedProfile),
-            Row(id: "collaboration-port", title: "端口", action: .editValue,
+            Row(id: "collaboration-port", title: L10n.text("端口"), action: .editValue,
                 isVisible: hasSelectedProfile, isEnabled: hasSelectedProfile),
-            Row(id: "collaboration-pairing-code", title: "配对密码", action: .editValue,
+            Row(id: "collaboration-pairing-code", title: L10n.text("配对密码"), action: .editValue,
                 isVisible: hasSelectedProfile, isEnabled: hasSelectedProfile),
             .separator(
                 id: "collaboration-peer-inputs-separator",
                 isVisible: hasSelectedProfile
             )
         ] + (mappingRows.isEmpty ? [
-            Row(id: "collaboration-mapping-empty", title: "尚未检测到显示器", action: nil,
+            Row(id: "collaboration-mapping-empty", title: L10n.text("尚未检测到显示器"), action: nil,
                 isVisible: hasSelectedProfile, isEnabled: false)
         ] : mappingRows) + [
-            Row(id: "collaboration-trigger-reference", title: "本机触发设备", action: nil,
+            Row(id: "collaboration-trigger-reference", title: L10n.text("本机触发设备"), action: nil,
                 isVisible: hasSelectedProfile, isEnabled: false),
             .separator(
                 id: "collaboration-actions-separator",
                 isVisible: hasSelectedProfile
             ),
-            Row(id: "collaboration-delete", title: "删除配置",
+            Row(id: "collaboration-delete", title: L10n.text("删除配置"),
                 action: .deleteCollaborationProfile,
                 isVisible: hasSelectedProfile, isEnabled: profileCount > 1)
         ]
@@ -1653,12 +1653,12 @@ struct SettingsPageLayoutProjection: Equatable {
         }
         return SettingsPageLayoutProjection(groups: [
             Group(id: .collaborationStatus, rows: [
-                Row(id: "collaboration-status", title: "协同状态", action: nil,
+                Row(id: "collaboration-status", title: L10n.text("协同状态"), action: nil,
                     isVisible: true, isEnabled: false),
-                Row(id: "collaboration-permission", title: "检查网络权限",
+                Row(id: "collaboration-permission", title: L10n.text("检查网络权限"),
                     action: .requestLocalNetworkPermission, isVisible: true,
                     isEnabled: hasSelectedProfile && !inspectionInProgress),
-                Row(id: "collaboration-inspection", title: "检测连接",
+                Row(id: "collaboration-inspection", title: L10n.text("检测连接"),
                     action: .inspectCollaboration, isVisible: true,
                     isEnabled: hasSelectedProfile && !inspectionInProgress)
             ]),

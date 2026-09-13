@@ -1002,8 +1002,8 @@ struct DDCVolumeHUDPresentation: Equatable {
         let safeMaximum = max(1, maximum)
         let fraction = min(1, max(0, Double(value) / Double(safeMaximum)))
         return Self(
-            title: "DDC 音量",
-            detail: "已提交 \(value) / \(safeMaximum)（\(Int((fraction * 100).rounded()))%）",
+            title: L10n.text("DDC 音量"),
+            detail: L10n.format("已提交 {0} / {1}（{2}%）", String(describing: value), String(describing: safeMaximum), String(describing: Int((fraction * 100).rounded()))),
             fraction: fraction,
             isFailure: false,
             icon: value == 0 ? .muted : .volume
@@ -1021,8 +1021,8 @@ struct DDCVolumeHUDPresentation: Equatable {
         guard let lower = percentages.min(), let upper = percentages.max() else { return nil }
         let average = Double(percentages.reduce(0, +)) / Double(percentages.count) / 100
         return Self(
-            title: "DDC 音量",
-            detail: "已提交到 \(values.count) 台显示器（\(lower)%–\(upper)%）",
+            title: L10n.text("DDC 音量"),
+            detail: L10n.format("已提交到 {0} 台显示器（{1}%–{2}%）", String(describing: values.count), String(describing: lower), String(describing: upper)),
             fraction: min(1, max(0, average)),
             isFailure: false,
             icon: upper == 0 ? .muted : .volume
@@ -1037,10 +1037,10 @@ struct DDCVolumeHUDPresentation: Equatable {
         guard let lower = percentages.min(), let upper = percentages.max() else { return nil }
         let average = Double(percentages.reduce(0, +)) / Double(percentages.count) / 100
         let detail = values.count == 1
-            ? "当前读取 \(first.value) / \(max(1, first.maximum))（\(lower)%）"
-            : "当前读取 \(values.count) 台显示器（\(lower)%–\(upper)%）"
+            ? L10n.format("当前读取 {0} / {1}（{2}%）", String(describing: first.value), String(describing: max(1, first.maximum)), String(describing: lower))
+            : L10n.format("当前读取 {0} 台显示器（{1}%–{2}%）", String(describing: values.count), String(describing: lower), String(describing: upper))
         return Self(
-            title: "DDC 音量",
+            title: L10n.text("DDC 音量"),
             detail: detail,
             fraction: min(1, max(0, average)),
             isFailure: false,
@@ -1049,8 +1049,8 @@ struct DDCVolumeHUDPresentation: Equatable {
     }
 
     static let failed = Self(
-        title: "DDC 音量",
-        detail: "显示器写入失败；下一次按键将交给 macOS",
+        title: L10n.text("DDC 音量"),
+        detail: L10n.text("显示器写入失败；下一次按键将交给 macOS"),
         fraction: 0,
         isFailure: true,
         icon: .failure
@@ -1283,7 +1283,7 @@ final class DDCVolumeHUDController {
         }
         panel.setAccessibilityElement(true)
         panel.setAccessibilityRole(.group)
-        panel.setAccessibilityLabel("DDC 音量状态")
+        panel.setAccessibilityLabel(L10n.text("DDC 音量状态"))
     }
 
     func show(_ presentation: DDCVolumeHUDPresentation) {
@@ -1296,7 +1296,7 @@ final class DDCVolumeHUDController {
         progress.isHidden = presentation.isFailure
         iconView.image = NSImage(
             systemSymbolName: presentation.icon.symbolName,
-            accessibilityDescription: presentation.isFailure ? "DDC 音量写入失败" : "DDC 音量"
+            accessibilityDescription: presentation.isFailure ? L10n.text("DDC 音量写入失败") : L10n.text("DDC 音量")
         )
         iconView.image?.isTemplate = true
         iconView.contentTintColor = presentation.isFailure ? .systemOrange : .labelColor
@@ -1600,13 +1600,13 @@ enum MediaKeyDDCRouteOutcome: Equatable {
 
     var userFacingValue: String {
         switch self {
-        case .applied(let count): return "已向 \(count) 台显示器提交"
-        case .ignoredMuteRepeat: return "已忽略静音长按重复"
-        case .noEnabledTargets: return "没有启用对应控制项的显示器"
-        case .missingTrustedValues: return "缺少可信当前值，未写入"
-        case .mixedLinkedValues: return "联动值不一致，未写入"
-        case .noStoredMuteValue: return "没有可安全恢复的音量，未写入"
-        case .unchanged: return "已达到调节边界，未写入"
+        case .applied(let count): return L10n.format("已向 {0} 台显示器提交", String(describing: count))
+        case .ignoredMuteRepeat: return L10n.text("已忽略静音长按重复")
+        case .noEnabledTargets: return L10n.text("没有启用对应控制项的显示器")
+        case .missingTrustedValues: return L10n.text("缺少可信当前值，未写入")
+        case .mixedLinkedValues: return L10n.text("联动值不一致，未写入")
+        case .noStoredMuteValue: return L10n.text("没有可安全恢复的音量，未写入")
+        case .unchanged: return L10n.text("已达到调节边界，未写入")
         }
     }
 }
@@ -1834,27 +1834,27 @@ struct MediaKeyShortcutPresentation: Equatable {
     static func make(state: MediaKeyMonitorState, lastRoute: String?) -> Self {
         switch state {
         case .passive, .activeTakeover:
-            let suffix = lastRoute.map { " 最近一次：\($0)。" } ?? ""
+            let suffix = lastRoute.map { L10n.format(" 最近一次：{0}。", String(describing: $0)) } ?? ""
             return Self(
-                title: "媒体快捷键关联已启用",
+                title: L10n.text("媒体快捷键关联已启用"),
                 detail: state == .activeTakeover
-                    ? "F1/F2 始终放行；符合安全条件时接管 F10/F11/F12。\(suffix)"
-                    : "F1/F2 关联亮度，F10/F11/F12 关联音量；系统原生行为不受影响。\(suffix)",
+                    ? L10n.format("F1/F2 始终放行；符合安全条件时接管 F10/F11/F12。{0}", String(describing: suffix))
+                    : L10n.format("F1/F2 关联亮度，F10/F11/F12 关联音量；系统原生行为不受影响。{0}", String(describing: suffix)),
                 actionTitle: nil,
                 action: nil
             )
         case .permissionRequired:
             return Self(
-                title: "媒体快捷键关联需要输入监控权限",
-                detail: "未授权时仅停用快捷键关联，其他功能不受影响。请在“系统设置 > 隐私与安全性 > 输入监控”中允许 SFlip。",
-                actionTitle: "申请权限",
+                title: L10n.text("媒体快捷键关联需要输入监控权限"),
+                detail: L10n.text("未授权时仅停用快捷键关联，其他功能不受影响。请在“系统设置 > 隐私与安全性 > 输入监控”中允许 SFlip。"),
+                actionTitle: L10n.text("申请权限"),
                 action: .requestInputMonitoring
             )
         case .unavailable:
             return Self(
-                title: "媒体快捷键监听未启动",
-                detail: "未执行任何快捷键 DDC 写入；可重试监听，其他功能不受影响。",
-                actionTitle: "重试",
+                title: L10n.text("媒体快捷键监听未启动"),
+                detail: L10n.text("未执行任何快捷键 DDC 写入；可重试监听，其他功能不受影响。"),
+                actionTitle: L10n.text("重试"),
                 action: .retryListener
             )
         }
@@ -1882,8 +1882,8 @@ struct MediaKeyVolumeTakeoverPresentation: Equatable {
         guard enabled else {
             return Self(
                 enabled: false,
-                title: "HDMI/DP DDC 音量接管（可选）",
-                detail: "默认关闭。需要辅助功能权限；仅在默认音频输出为 HDMI/DisplayPort，且 macOS 自身无法调音量时接管 F10/F11/F12。",
+                title: L10n.text("HDMI/DP DDC 音量接管（可选）"),
+                detail: L10n.text("默认关闭。需要辅助功能权限；仅在默认音频输出为 HDMI/DisplayPort，且 macOS 自身无法调音量时接管 F10/F11/F12。"),
                 actionTitle: nil,
                 action: nil
             )
@@ -1891,34 +1891,34 @@ struct MediaKeyVolumeTakeoverPresentation: Equatable {
         guard accessibilityTrusted else {
             return Self(
                 enabled: true,
-                title: "音量接管需要辅助功能权限",
-                detail: "未授权时保持被动监听，不吞按键；仅当输出符合 HDMI/DP 条件时仍额外执行 DDC。可在系统设置中允许 SFlip。",
-                actionTitle: "申请辅助功能权限",
+                title: L10n.text("音量接管需要辅助功能权限"),
+                detail: L10n.text("未授权时保持被动监听，不吞按键；仅当输出符合 HDMI/DP 条件时仍额外执行 DDC。可在系统设置中允许 SFlip。"),
+                actionTitle: L10n.text("申请辅助功能权限"),
                 action: .requestAccessibility
             )
         }
-        let mode = monitorState == .activeTakeover ? "主动监听" : "被动监听"
+        let mode = monitorState == .activeTakeover ? L10n.text("主动监听") : L10n.text("被动监听")
         let routeText: String
         if !route.isComplete {
-            routeText = "默认音频输出不可确认"
+            routeText = L10n.text("默认音频输出不可确认")
         } else if !route.transport.isExternalDisplay {
-            routeText = "默认音频输出不是 HDMI/DisplayPort"
+            routeText = L10n.text("默认音频输出不是 HDMI/DisplayPort")
         } else if route.systemVolumeSettable || route.systemMuteSettable {
-            routeText = "macOS 可直接调节当前输出"
+            routeText = L10n.text("macOS 可直接调节当前输出")
         } else {
-            routeText = "HDMI/DisplayPort 输出符合接管条件"
+            routeText = L10n.text("HDMI/DisplayPort 输出符合接管条件")
         }
         let behaviorText: String
         if route.allowsDDCTakeover {
             behaviorText = armed
-                ? "音量键已接管，每次写入前仍会重新读取显示器"
-                : "首次按键仍交给 macOS，DDC 成功后再接管"
+                ? L10n.text("音量键已接管，每次写入前仍会重新读取显示器")
+                : L10n.text("首次按键仍交给 macOS，DDC 成功后再接管")
         } else {
-            behaviorText = "当前音量键完全交给 macOS，不执行 DDC"
+            behaviorText = L10n.text("当前音量键完全交给 macOS，不执行 DDC")
         }
         return Self(
             enabled: true,
-            title: armed ? "HDMI/DP DDC 音量接管已就绪" : "HDMI/DP DDC 音量接管待确认",
+            title: armed ? L10n.text("HDMI/DP DDC 音量接管已就绪") : L10n.text("HDMI/DP DDC 音量接管待确认"),
             detail: "\(mode)；\(routeText)；\(behaviorText)。",
             actionTitle: nil,
             action: nil

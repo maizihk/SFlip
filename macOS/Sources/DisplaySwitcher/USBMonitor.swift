@@ -220,7 +220,7 @@ final class USBMonitor {
 
             let name = stringProperty("USB Product Name", service: service)
                 ?? stringProperty("kUSBProductString", service: service)
-                ?? "USB 设备"
+                ?? L10n.text("USB 设备")
             let serial = stringProperty("USB Serial Number", service: service)
                 ?? stringProperty("kUSBSerialNumberString", service: service)
 

@@ -19,10 +19,10 @@ enum DDCCommand: UInt8, CaseIterable, Hashable {
 
     var userFacingName: String {
         switch self {
-        case .luminance: return "亮度"
-        case .contrast: return "对比度"
-        case .input: return "输入源"
-        case .volume: return "音量"
+        case .luminance: return L10n.text("亮度")
+        case .contrast: return L10n.text("对比度")
+        case .input: return L10n.text("输入源")
+        case .volume: return L10n.text("音量")
         }
     }
 }
@@ -299,7 +299,7 @@ struct NativeDDCDiagnosticSnapshot: Equatable {
 
     var userFacingDescription: String {
         if operationCategory == .reliableReadUnsupported {
-            return "当前连接不支持可靠读取"
+            return L10n.text("当前连接不支持可靠读取")
         }
         var operation = operationCategory.rawValue
         if operationCategory == .readReplyRejected, let replyIssue {
@@ -376,21 +376,21 @@ enum DDCBackendError: Error, Equatable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            return "没有可用的硬件 DDC 后端。"
+            return L10n.text("没有可用的硬件 DDC 后端。")
         case .displayUnavailable:
-            return "目标显示器在当前 DDC 后端中不可用。"
+            return L10n.text("目标显示器在当前 DDC 后端中不可用。")
         case let .readFailed(_, command):
-            return "读取\(command.userFacingName)失败。"
+            return L10n.format("读取{0}失败。", String(describing: command.userFacingName))
         case let .writeFailed(_, command):
-            return "写入\(command.userFacingName)失败。"
+            return L10n.format("写入{0}失败。", String(describing: command.userFacingName))
         case let .invalidValue(command, value):
-            return "\(command.userFacingName)数值超出安全范围：\(value)。"
+            return L10n.format("{0}数值超出安全范围：{1}。", String(describing: command.userFacingName), String(describing: value))
         case let .invalidReply(command, issue):
-            return "读取\(command.userFacingName)失败：\(issue.userFacingDescription)。"
+            return L10n.format("读取{0}失败：{1}。", String(describing: command.userFacingName), String(describing: issue.userFacingDescription))
         case .reliableReadUnsupported:
-            return "当前连接不支持可靠读取。"
+            return L10n.text("当前连接不支持可靠读取。")
         case .cancelled:
-            return "DDC 操作已取消。"
+            return L10n.text("DDC 操作已取消。")
         }
     }
 }
@@ -412,19 +412,19 @@ enum NativeDDCReplyIssue: Error, Equatable {
 
     var userFacingDescription: String {
         switch self {
-        case .requestWriteFailed: return "读取请求写入失败"
-        case .responseTimeout: return "读取回复超时"
-        case .responseReadFailed: return "读取回复 I2C 失败"
-        case .nullReply: return "显示器返回 DDC 空回复"
-        case .wrongLength: return "回复长度无效"
-        case .badChecksum: return "回复校验失败"
-        case .wrongSource: return "回复来源无效"
-        case .wrongPayloadLength: return "回复载荷长度无效"
-        case .wrongOpcode: return "回复类型不匹配"
-        case .monitorRejected: return "显示器拒绝该 VCP 请求"
-        case .wrongCommand: return "回复的 VCP 项不匹配"
-        case .invalidRange: return "回复的 VCP 数值范围无效"
-        case .inconsistentStrictReplies: return "连续严格回复的 VCP 数值不一致"
+        case .requestWriteFailed: return L10n.text("读取请求写入失败")
+        case .responseTimeout: return L10n.text("读取回复超时")
+        case .responseReadFailed: return L10n.text("读取回复 I2C 失败")
+        case .nullReply: return L10n.text("显示器返回 DDC 空回复")
+        case .wrongLength: return L10n.text("回复长度无效")
+        case .badChecksum: return L10n.text("回复校验失败")
+        case .wrongSource: return L10n.text("回复来源无效")
+        case .wrongPayloadLength: return L10n.text("回复载荷长度无效")
+        case .wrongOpcode: return L10n.text("回复类型不匹配")
+        case .monitorRejected: return L10n.text("显示器拒绝该 VCP 请求")
+        case .wrongCommand: return L10n.text("回复的 VCP 项不匹配")
+        case .invalidRange: return L10n.text("回复的 VCP 数值范围无效")
+        case .inconsistentStrictReplies: return L10n.text("连续严格回复的 VCP 数值不一致")
         }
     }
 
@@ -1490,7 +1490,7 @@ enum DisplayPresentationNameResolver {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let system = display.name.trimmingCharacters(in: .whitespacesAndNewlines)
             let preferred = saved.flatMap { isGenericLegacyName($0) ? nil : $0 }
-                ?? (system.isEmpty ? "外接显示器" : system)
+                ?? (system.isEmpty ? L10n.text("外接显示器") : system)
             return (display, preferred)
         }
         let groups = Dictionary(grouping: candidates) { $0.1.lowercased() }
@@ -1534,7 +1534,7 @@ enum DDCReadSkipReason: Equatable {
     var userFacingDescription: String {
         switch self {
         case .noEnabledCommands:
-            return "未开启可读取的 DDC 功能"
+            return L10n.text("未开启可读取的 DDC 功能")
         }
     }
 }

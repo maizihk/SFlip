@@ -1,3 +1,4 @@
+#include "../DisplaySwitcher.Native/Localization.h"
 #include "../DisplaySwitcher.Native/pch.h"
 #include "../DisplaySwitcher.Native/AppConfig.h"
 #include "../DisplaySwitcher.Native/AboutInfo.h"
@@ -3849,13 +3850,86 @@ auto offlineConfig = strongFirst.displays;
     }
 }
 
+namespace {
+    void TestUiLocalization(std::filesystem::path const& root)
+    {
+        Check(ResolveUiLanguage(UiLanguagePreference::System, L"zh-Hans-CN") == UiLanguage::Chinese &&
+            ResolveUiLanguage(UiLanguagePreference::System, L"zh-Hant-TW") == UiLanguage::Chinese &&
+            ResolveUiLanguage(UiLanguagePreference::System, L"en-US") == UiLanguage::English &&
+            ResolveUiLanguage(UiLanguagePreference::System, L"de-DE") == UiLanguage::English &&
+            ResolveUiLanguage(UiLanguagePreference::System, L"") == UiLanguage::English,
+            L"语言：跟随系统时仅中文界面语言选择简体中文，其余选择英文");
+        Check(ResolveUiLanguage(UiLanguagePreference::English, L"zh-CN") == UiLanguage::English &&
+            ResolveUiLanguage(UiLanguagePreference::Chinese, L"en-US") == UiLanguage::Chinese,
+            L"语言：明确选择优先于系统界面语言");
+        auto preferenceFile = root / L"ui-language.txt";
+        Check(ReadLanguagePreferenceFrom(preferenceFile) == UiLanguagePreference::System,
+            L"语言：首次安装缺少独立设置时跟随系统");
+        Check(SaveLanguagePreferenceTo(preferenceFile, UiLanguagePreference::English) &&
+            ReadLanguagePreferenceFrom(preferenceFile) == UiLanguagePreference::English &&
+            SaveLanguagePreferenceTo(preferenceFile, UiLanguagePreference::Chinese) &&
+            ReadLanguagePreferenceFrom(preferenceFile) == UiLanguagePreference::Chinese &&
+            SaveLanguagePreferenceTo(preferenceFile, UiLanguagePreference::System) &&
+            ReadLanguagePreferenceFrom(preferenceFile) == UiLanguagePreference::System,
+            L"语言：三种偏好可原子保存并跨重启回读");
+        { std::ofstream malformed(preferenceFile); malformed << "invalid-language"; }
+        Check(ReadLanguagePreferenceFrom(preferenceFile) == UiLanguagePreference::System,
+            L"语言：损坏偏好安全回退到系统");
+        auto blocked = root / L"blocked-language-parent";
+        { std::ofstream parent(blocked); parent << "keep"; }
+        Check(!SaveLanguagePreferenceTo(blocked / L"ui-language.txt", UiLanguagePreference::English) &&
+            std::filesystem::is_regular_file(blocked), L"语言：保存失败完整保留已有本机文件");
+        Check(ValidateUiCatalog() && UiCatalogSize() >= 350, L"语言：完整目录无重复且两种语言占位符相同");
+        SetLanguageForTests(UiLanguage::English);
+        Check(std::wstring(UiText(L"常规")) == L"General" && std::wstring(UiText(L"协同")) == L"Collaboration" &&
+            std::wstring(UiText(L"读取 DDC 参数")) == L"Read DDC Parameters" &&
+            std::wstring(UiText(L"无响应")) == L"No Response" && UsbTrayStatusText(true) == L"USB Switching On",
+            L"语言：设置标签、DDC 动作、连接状态和托盘真实入口输出英文");
+        UiMessage failedState(L"无响应"); UiMessage connectedState(L"已和对端（{name}）建立连接", {{L"name", L"工作电脑 {error}"}});
+        auto chineseRecipe = connectedState.source;
+        Check(failedState.Render() == L"No Response" && connectedState.Render() == L"Connected to 工作电脑 {error}",
+            L"语言：持有文案模板后重绘保留检测失败与已连接名称，不改为正在连接");
+        SetLanguageForTests(UiLanguage::Chinese);
+        Check(failedState.Render() == L"无响应" && connectedState.source == chineseRecipe &&
+            connectedState.Render() == L"已和对端（工作电脑 {error}）建立连接", L"语言：双向重绘保留失败状态及具名参数");
+        SetLanguageForTests(UiLanguage::English);
+        std::wstring userName = L"常规 {error} 工作显示器";
+        Check(UiFormat(L"已和对端（{name}）建立连接", {{L"name", userName}}) == L"Connected to " + userName &&
+            UiFormat(L"切换到 {name} 失败：{error}", {{L"error", L"No Response"}, {L"name", userName}}) ==
+                L"Switch to " + userName + L" failed: No Response" &&
+            std::wstring(UiText(userName.c_str())) == userName && std::wstring(UiText(L"unknown.resource")) == L"unknown.resource",
+            L"语言：具名占位符支持重排，用户名称及未知目录键原样保留且不递归替换");
+        bool missingRejected{};
+        try { UiFormat(L"已和对端（{name}）建立连接", {}); }
+        catch(std::invalid_argument const&) { missingRejected = true; }
+        Check(missingRejected, L"语言：缺少具名参数明确失败，不显示未替换占位符");
+        auto config = ConfigWithDisplays(2);
+        auto englishConfigPath = root / L"language-english-config.json";
+        auto chineseConfigPath = root / L"language-chinese-config.json";
+        config.SaveToPath(englishConfigPath); auto originalJson = ReadBytes(englishConfigPath);
+        auto before = MergeSettingsForScope(config, config, SettingsSaveFeedbackScope::General);
+        SetLanguageForTests(UiLanguage::Chinese);
+        auto after = MergeSettingsForScope(config, config, SettingsSaveFeedbackScope::General);
+        before.SaveToPath(englishConfigPath); after.SaveToPath(chineseConfigPath);
+        Check(ReadBytes(englishConfigPath) == ReadBytes(chineseConfigPath) && ReadBytes(englishConfigPath) == originalJson &&
+            config.collaborationProfiles[0].name == L"工作电脑", L"语言：切换仅改变文案，不改配置结构、名称及常规保存语义");
+        auto chineseStatus = UsbTrayStatusText(true);
+        SetLanguageForTests(UiLanguage::English);
+        Check(chineseStatus == L"USB 切换已开启" && UsbTrayStatusText(true) == L"USB Switching On",
+            L"语言：生产投影每次按当前语言生成，不缓存首次语言");
+        SetLanguageForTests(UiLanguage::Chinese);
+    }
+}
+
 int wmain()
 {
     winrt::init_apartment();
+    DisplaySwitcher::Native::SetLanguageForTests(DisplaySwitcher::Native::UiLanguage::Chinese);
     auto root = std::filesystem::temp_directory_path() / (L"DisplaySwitcher-DS004-" + GenerateIdentifier());
     std::filesystem::create_directories(root);
     try
     {
+        TestUiLocalization(root);
         TestV2OnlyDatagramGate();
         TestFreshInstallAndCounts(root);
         TestSettingsWindowLayoutContracts();

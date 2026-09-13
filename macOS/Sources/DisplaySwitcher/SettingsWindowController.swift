@@ -20,7 +20,7 @@ private final class DisplayInputMappingRowView: NSStackView {
         titleLabel.maximumNumberOfLines = 0
         titleLabel.lineBreakMode = .byWordWrapping
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        inputField.placeholderString = "留空或 1–65535"
+        inputField.placeholderString = L10n.text("留空或 1–65535")
         inputField.widthAnchor.constraint(equalToConstant: 108).isActive = true
         inputField.setContentHuggingPriority(.required, for: .horizontal)
         inputField.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -40,7 +40,7 @@ private final class DisplayInputMappingRowView: NSStackView {
         titleLabel.stringValue = title
         inputField.stringValue = value
         inputField.delegate = delegate
-        inputField.setAccessibilityLabel("\(title)输入源")
+        inputField.setAccessibilityLabel(L10n.format("{0}输入源", String(describing: title)))
     }
 
     func setPreferredWidth(_ width: CGFloat) {
@@ -142,7 +142,7 @@ private final class SettingsTabButton: NSControl {
 
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 84),
+            widthAnchor.constraint(equalToConstant: 100),
             heightAnchor.constraint(equalToConstant: 56),
             selectionShadowView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 1),
             selectionShadowView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -1),
@@ -204,11 +204,12 @@ private final class SettingsTabButton: NSControl {
         selectionShadowView.isHidden = state != .on
         iconView.contentTintColor = state == .on ? .controlAccentColor : .secondaryLabelColor
         titleLabel.textColor = state == .on ? .controlAccentColor : .secondaryLabelColor
-        setAccessibilityValue(state == .on ? "已选择" : "未选择")
+        setAccessibilityValue(state == .on ? L10n.text("已选择") : L10n.text("未选择"))
     }
 }
 
 final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTextFieldDelegate {
+    var onLanguageChanged: (() -> Void)?
     var onSave: (() -> Void)?
     var onConfigurationSaveFailure: ((DisplayConfigurationStoreError) -> Void)?
     var onLearnUSB: (() -> Void)?
@@ -236,20 +237,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let linkedCheckbox = NSSwitch()
     private let launchAtLoginCheckbox = NSSwitch()
     private let detailedDiagnosticRecordingCheckbox = NSSwitch()
-    private let mediaKeyShortcutTitleLabel = NSTextField(labelWithString: "媒体快捷键关联需要输入监控权限")
+    private let mediaKeyShortcutTitleLabel = NSTextField(labelWithString: L10n.text("媒体快捷键关联需要输入监控权限"))
     private let mediaKeyShortcutDetailLabel = NSTextField(wrappingLabelWithString: "")
     private lazy var requestMediaKeyPermissionButton = NSButton(
-        title: "申请权限",
+        title: L10n.text("申请权限"),
         target: self,
         action: #selector(requestMediaKeyPermission)
     )
     private let mediaKeyShortcutTrailingStack = NSStackView()
     private weak var mediaKeyShortcutRowContainer: NSView?
     private let mediaKeyVolumeTakeoverCheckbox = NSSwitch()
-    private let mediaKeyVolumeTakeoverTitleLabel = NSTextField(labelWithString: "HDMI/DP DDC 音量接管（可选）")
+    private let mediaKeyVolumeTakeoverTitleLabel = NSTextField(labelWithString: L10n.text("HDMI/DP DDC 音量接管（可选）"))
     private let mediaKeyVolumeTakeoverDetailLabel = NSTextField(wrappingLabelWithString: "")
     private lazy var requestAccessibilityPermissionButton = NSButton(
-        title: "申请辅助功能权限",
+        title: L10n.text("申请辅助功能权限"),
         target: self,
         action: #selector(requestAccessibilityPermission)
     )
@@ -262,36 +263,36 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private let peerHostField = NSTextField()
     private let peerPortField = NSTextField()
     private let pairingCodeField = NSSecureTextField()
-    private let peerStatusLabel = NSTextField(wrappingLabelWithString: "协同未启用")
+    private let peerStatusLabel = NSTextField(wrappingLabelWithString: L10n.text("协同未启用"))
     private let localNetworkPermissionDetailLabel = NSTextField(wrappingLabelWithString: "")
     private let profilePopup = NSPopUpButton()
     private let profileNameField = NSTextField()
     private let profileMappingStack = NSStackView()
     private let profileMappingContainerStack = NSStackView()
-    private lazy var addProfileButton = NSButton(title: "添加配置", target: self, action: #selector(addProfile))
-    private lazy var removeProfileButton = NSButton(title: "删除配置", target: self, action: #selector(removeProfile))
-    private lazy var inspectProfileButton = NSButton(title: "检测连接", target: self, action: #selector(inspectCurrentProfile))
+    private lazy var addProfileButton = NSButton(title: L10n.text("添加配置"), target: self, action: #selector(addProfile))
+    private lazy var removeProfileButton = NSButton(title: L10n.text("删除配置"), target: self, action: #selector(removeProfile))
+    private lazy var inspectProfileButton = NSButton(title: L10n.text("检测连接"), target: self, action: #selector(inspectCurrentProfile))
     private lazy var requestLocalNetworkPermissionButton = NSButton(
-        title: "检查网络权限",
+        title: L10n.text("检查网络权限"),
         target: self,
         action: #selector(requestLocalNetworkPermission)
     )
-    private lazy var refreshDisplaysButton = NSButton(title: "检测/刷新", target: self, action: #selector(refreshDisplays))
+    private lazy var refreshDisplaysButton = NSButton(title: L10n.text("检测/刷新"), target: self, action: #selector(refreshDisplays))
     private lazy var refreshDiagnosticPreviewButton = NSButton(
-        title: "刷新预览", target: self, action: #selector(refreshDiagnosticPreview)
+        title: L10n.text("刷新预览"), target: self, action: #selector(refreshDiagnosticPreview)
     )
     private lazy var copyDiagnosticPreviewButton = NSButton(
-        title: "复制诊断", target: self, action: #selector(copyDiagnosticPreview)
+        title: L10n.text("复制诊断"), target: self, action: #selector(copyDiagnosticPreview)
     )
     private let diagnosticTextView = NSTextView()
     private let diagnosticCopyStatusLabel = NSTextField(labelWithString: "")
-    private let usbDeviceLabel = NSTextField(wrappingLabelWithString: "未选择触发设备")
-    private let usbStatusLabel = NSTextField(wrappingLabelWithString: "USB 切换未启用")
+    private let usbDeviceLabel = NSTextField(wrappingLabelWithString: L10n.text("未选择触发设备"))
+    private let usbStatusLabel = NSTextField(wrappingLabelWithString: L10n.text("USB 切换未启用"))
     private let usbMappingStack = NSStackView()
     private let usbMappingContainerStack = NSStackView()
-    private let usbMappingEmptyLabel = NSTextField(wrappingLabelWithString: "尚未检测到显示器。")
-    private let profileMappingEmptyLabel = NSTextField(wrappingLabelWithString: "尚未检测到显示器。")
-    private let peerTriggerDeviceStatusLabel = NSTextField(wrappingLabelWithString: "未引用本机触发设备")
+    private let usbMappingEmptyLabel = NSTextField(wrappingLabelWithString: L10n.text("尚未检测到显示器。"))
+    private let profileMappingEmptyLabel = NSTextField(wrappingLabelWithString: L10n.text("尚未检测到显示器。"))
+    private let peerTriggerDeviceStatusLabel = NSTextField(wrappingLabelWithString: L10n.text("未引用本机触发设备"))
     private let saveStatusIconView = NSImageView()
     private let saveStatusLabel = NSTextField(labelWithString: "")
     private let saveStatusRow = NSStackView()
@@ -301,7 +302,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     ) { [weak self] _, _ in
         self?.refreshSaveFeedbackPresentation()
     }
-    private lazy var learnUSBButton = NSButton(title: "学习", target: self, action: #selector(learnUSBDevice))
+    private lazy var learnUSBButton = NSButton(title: L10n.text("学习"), target: self, action: #selector(learnUSBDevice))
     private var inputFields: [String: NSTextField] = [:]
     private var profileMappingRows: [String: DisplayInputMappingRowView] = [:]
     private var displayFeatureSwitches: [Int: [DDCCommand: NSSwitch]] = [:]
@@ -318,11 +319,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private var runtimeDisplayConfigurations: [DisplayConfiguration] = []
     private let displayStack = NSStackView()
     private var displayReadButtons: [Int: NSButton] = [:]
-    private var displayReadPending = false
+    private var displayReadPending = false { didSet { updateLanguagePickerAvailability() } }
     private lazy var linkedReadDDCButton = NSButton(
-        title: "读取 DDC 参数", target: self, action: #selector(readLinkedDisplayDDC)
+        title: L10n.text("读取 DDC 参数"), target: self, action: #selector(readLinkedDisplayDDC)
     )
-    private var usbLearningPending = false
+    private var usbLearningPending = false { didSet { updateLanguagePickerAvailability() } }
+    private var peerInspectionPending = false { didSet { updateLanguagePickerAvailability() } }
+    private let languagePopup = NSPopUpButton()
+    private var permissionEvidence: LocalNetworkPermissionEvidence = .notChecked
+    private var usbStatusSource: (String, Bool)?
+    private var ddcStatusPresentations: [String: () -> String] = [:]
     private var usbInputFields: [String: NSTextField] = [:]
     private var usbMappingRows: [String: DisplayInputMappingRowView] = [:]
     private var configurationDocument: DisplayConfigurationStoreV5Document?
@@ -340,7 +346,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             backing: .buffered,
             defer: false
         )
-        window.title = "常规"
+        window.title = L10n.text("常规")
         window.backgroundColor = .underPageBackgroundColor
         window.titlebarAppearsTransparent = false
         window.titleVisibility = .visible
@@ -416,9 +422,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             displayValueLabels[index]?[command]?.stringValue = resolved.estimated
                 ? "≈\(resolved.reading.current)" : "\(resolved.reading.current)"
         }
-        displayStatusLabels[index]?.stringValue = DisplayDDCStatusPresentation.read(
-            values: values, skipReason: skipReason
-        )
+        ddcStatusPresentations[stableID.lowercased()] = { DisplayDDCStatusPresentation.read(values: values, skipReason: skipReason) }
+        displayStatusLabels[index]?.stringValue = ddcStatusPresentations[stableID.lowercased()]?() ?? L10n.text("尚未读取")
         refreshLinkedDisplayControls()
     }
 
@@ -437,14 +442,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             )
             displayValueLabels[index]?[command]?.stringValue = "\(value)"
         }
-        displayStatusLabels[index]?.stringValue = DisplayDDCStatusPresentation.write(
-            value: value, error: error
-        )
+        ddcStatusPresentations[stableID.lowercased()] = { DisplayDDCStatusPresentation.write(value: value, error: error) }
+        displayStatusLabels[index]?.stringValue = ddcStatusPresentations[stableID.lowercased()]?() ?? L10n.text("尚未读取")
         refreshLinkedDisplayControls()
     }
 
     func updateUSBSwitchStatus(_ text: String, isError: Bool) {
-        usbStatusLabel.stringValue = text
+        usbStatusSource = (text, isError)
+        usbStatusLabel.stringValue = L10n.text(text)
         usbStatusLabel.textColor = isError ? .systemRed : .secondaryLabelColor
     }
 
@@ -493,13 +498,102 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         guard let window else { return }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "配置安全模式"
-        alert.informativeText = "\(error.localizedDescription)\n\n原配置已保留。请检查当前设置并成功保存；在此之前 App 不会执行 USB、DDC、显示器唤醒或网络交接。"
+        alert.messageText = L10n.text("配置安全模式")
+        alert.informativeText = L10n.format("{0}\n\n原配置已保留。请检查当前设置并成功保存；在此之前 App 不会执行 USB、DDC、显示器唤醒或网络交接。", String(describing: error.localizedDescription))
         alert.beginSheetModal(for: window)
+    }
+
+    private func updateLanguagePickerAvailability() {
+        languagePopup.isEnabled = !displayReadPending && !usbLearningPending && !peerInspectionPending
+    }
+
+    @objc private func languageChanged(_ sender: NSPopUpButton) {
+        guard sender.isEnabled,
+              AppLanguage.allCases.indices.contains(sender.indexOfSelectedItem),
+              window?.attachedSheet == nil else { return }
+        // Finish ordinary text editing first; this does not invoke a hardware operation.
+        window?.makeFirstResponder(nil)
+        let selectedTab = tabView.selectedTabViewItem.map { tabView.indexOfTabViewItem($0) } ?? 0
+        L10n.preference = AppLanguage.allCases[sender.indexOfSelectedItem]
+        // Rebuild presentation only. Keep document, profile selection, samples, and callbacks.
+        for item in tabView.tabViewItems { tabView.removeTabViewItem(item) }
+        window?.contentView = NSView()
+        for view in displayStack.arrangedSubviews { displayStack.removeArrangedSubview(view); view.removeFromSuperview() }
+        usbMappingRows.removeAll()
+        profileMappingRows.removeAll()
+        resetLocalizedControlText()
+        buildInterface()
+        if let document = configurationDocument {
+            reloadProfilePopup()
+            reloadUSBControls(document: document)
+            loadSelectedProfileFields()
+            rebuildDisplayForms(document.displays.enumerated().map { offset, display in
+                DisplayConfiguration(id: display.id, index: offset + 1, name: display.name, selector: display.selector, localInput: display.localInput, targetInput: nil, readEnabled: display.readEnabled)
+            })
+            restoreCachedDDCValues(in: document)
+            for (offset, display) in document.displays.enumerated() {
+                let index = offset + 1
+                let states: [(DDCCommand, Bool, Bool)] = [
+                    (.luminance, display.brightnessEnabled, display.brightnessShowInTray),
+                    (.contrast, display.contrastEnabled, display.contrastShowInTray),
+                    (.volume, display.volumeEnabled, display.volumeShowInTray)
+                ]
+                for (command, enabled, inTray) in states {
+                    displayFeatureSwitches[index]?[command]?.state = enabled ? .on : .off
+                    displayTraySwitches[index]?[command]?.state = inTray ? .on : .off
+                    displayTraySwitches[index]?[command]?.isEnabled = enabled
+                    displaySliders[index]?[command]?.isEnabled = enabled
+                }
+                if let presentation = ddcStatusPresentations[display.id.lowercased()],
+                   deleteDisplayIDsByTag[index] == nil {
+                    displayStatusLabels[index]?.stringValue = presentation()
+                }
+            }
+            if let status = usbStatusSource {
+                updateUSBSwitchStatus(status.0, isError: status.1)
+            } else {
+                usbStatusLabel.stringValue = L10n.text(document.usbSwitch.enabled ? "等待设备状态" : "USB 切换未启用")
+            }
+        }
+        refreshSelectedCollaborationStatus()
+        updateLocalNetworkPermissionPresentation(permissionEvidence)
+        refreshSaveFeedbackPresentation()
+        onLanguageChanged?()
+        selectTab(at: selectedTab)
+    }
+
+    private func resetLocalizedControlText() {
+        mediaKeyShortcutTitleLabel.stringValue = L10n.text("媒体快捷键关联需要输入监控权限")
+        requestMediaKeyPermissionButton.title = L10n.text("申请权限")
+        mediaKeyVolumeTakeoverTitleLabel.stringValue = L10n.text("HDMI/DP DDC 音量接管（可选）")
+        requestAccessibilityPermissionButton.title = L10n.text("申请辅助功能权限")
+        peerStatusLabel.stringValue = L10n.text("协同未启用")
+        addProfileButton.title = L10n.text("添加配置")
+        removeProfileButton.title = L10n.text("删除配置")
+        inspectProfileButton.title = L10n.text("检测连接")
+        requestLocalNetworkPermissionButton.title = L10n.text("检查网络权限")
+        refreshDisplaysButton.title = L10n.text("检测/刷新")
+        refreshDiagnosticPreviewButton.title = L10n.text("刷新预览")
+        copyDiagnosticPreviewButton.title = L10n.text("复制诊断")
+        usbDeviceLabel.stringValue = L10n.text("未选择触发设备")
+        usbStatusLabel.stringValue = L10n.text("USB 切换未启用")
+        usbMappingEmptyLabel.stringValue = L10n.text("尚未检测到显示器。")
+        profileMappingEmptyLabel.stringValue = L10n.text("尚未检测到显示器。")
+        peerTriggerDeviceStatusLabel.stringValue = L10n.text("未引用本机触发设备")
+        learnUSBButton.title = L10n.text("学习")
+        linkedReadDDCButton.title = L10n.text("读取 DDC 参数")
     }
 
     private func buildInterface() {
         guard let contentView = window?.contentView else { return }
+
+        languagePopup.removeAllItems()
+        languagePopup.addItems(withTitles: [L10n.text("跟随系统"), "简体中文", "English"])
+        languagePopup.selectItem(at: AppLanguage.allCases.firstIndex(of: L10n.preference) ?? 0)
+        languagePopup.target = self
+        languagePopup.action = #selector(languageChanged(_:))
+        languagePopup.setAccessibilityLabel(L10n.text("语言"))
+        updateLanguagePickerAvailability()
 
         linkedCheckbox.target = self
         linkedCheckbox.action = #selector(displaySettingChanged(_:))
@@ -532,7 +626,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let tabBar = NSStackView(views: tabButtons)
         tabBar.orientation = .horizontal
         tabBar.alignment = .centerY
-        tabBar.spacing = 10
+        tabBar.spacing = 8
         tabBar.translatesAutoresizingMaskIntoConstraints = false
 
         let tabHoverRegion = HoverTrackingView()
@@ -555,23 +649,25 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         validationLabel.font = .systemFont(ofSize: 11)
         validationLabel.maximumNumberOfLines = 2
         validationLabel.isHidden = true
-        validationLabel.setAccessibilityLabel("设置错误")
+        validationLabel.setAccessibilityLabel(L10n.text("设置错误"))
         validationLabel.translatesAutoresizingMaskIntoConstraints = false
         validationLabel.widthAnchor.constraint(equalToConstant: 630).isActive = true
 
-        tabView.addTabViewItem(makePage(label: "常规", views: [
-            module(title: "常规", views: [
+        tabView.addTabViewItem(makePage(label: L10n.text("常规"), views: [
+            module(title: L10n.text("常规"), views: [
+                labeledControlRow(title: L10n.text("语言"), control: languagePopup),
+                separator(),
                 switchRow(
                     button: launchAtLoginCheckbox,
-                    title: "登录时启动",
-                    description: "登录 macOS 后自动在菜单栏启动显示器控制。",
+                    title: L10n.text("登录时启动"),
+                    description: L10n.text("登录 macOS 后自动在菜单栏启动显示器控制。"),
                     symbolName: "power"
                 ),
                 separator(),
                 switchRow(
                     button: detailedDiagnosticRecordingCheckbox,
-                    title: "详细诊断记录",
-                    description: "默认关闭。仅在排查问题时开启；关闭会清空本次会话的详细记录。",
+                    title: L10n.text("详细诊断记录"),
+                    description: L10n.text("默认关闭。仅在排查问题时开启；关闭会清空本次会话的详细记录。"),
                     symbolName: "stethoscope"
                 ),
                 separator(),
@@ -602,14 +698,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             label.font = .systemFont(ofSize: 11)
         }
         let usbHint = NSTextField(wrappingLabelWithString:
-            "只监听明确选择的一个本机设备；USB 离开时切换显示器，接入时只唤醒本机；联动协同默认关闭。")
+            L10n.text("只监听明确选择的一个本机设备；USB 离开时切换显示器，接入时只唤醒本机；联动协同默认关闭。"))
         usbHint.textColor = .secondaryLabelColor
         usbHint.font = .systemFont(ofSize: 11)
         usbHint.maximumNumberOfLines = 2
         usbHint.widthAnchor.constraint(equalToConstant: 630).isActive = true
         profilePopup.target = self
         profilePopup.action = #selector(profileSelectionChanged(_:))
-        profileNameField.placeholderString = "配置名称"
+        profileNameField.placeholderString = L10n.text("配置名称")
         for field in [profileNameField, peerHostField, peerPortField, pairingCodeField] {
             field.delegate = self
         }
@@ -631,21 +727,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         ] {
             SettingsActionButtonStyle.apply(to: button)
         }
-        peerHostField.placeholderString = "IP 或主机名，例如 peer.example"
+        peerHostField.placeholderString = L10n.text("IP 或主机名，例如 peer.example")
         peerPortField.placeholderString = "49731"
-        pairingCodeField.placeholderString = "两端填写相同的配对密码"
-        profilePopup.setAccessibilityLabel("协同配置")
-        profileNameField.setAccessibilityLabel("配置名称")
-        peerHostField.setAccessibilityLabel("对端地址")
-        peerPortField.setAccessibilityLabel("通信端口")
-        pairingCodeField.setAccessibilityLabel("配对密码")
-        peerCoordinationCheckbox.setAccessibilityLabel("启用此配置")
-        addProfileButton.setAccessibilityLabel("添加协同配置")
-        removeProfileButton.setAccessibilityLabel("删除协同配置")
-        inspectProfileButton.setAccessibilityLabel("检测当前协同配置")
-        requestLocalNetworkPermissionButton.setAccessibilityLabel("检查本地网络权限")
-        requestMediaKeyPermissionButton.setAccessibilityLabel("申请媒体快捷键输入监控权限")
-        learnUSBButton.setAccessibilityLabel("学习 USB 设备")
+        pairingCodeField.placeholderString = L10n.text("两端填写相同的配对密码")
+        profilePopup.setAccessibilityLabel(L10n.text("协同配置"))
+        profileNameField.setAccessibilityLabel(L10n.text("配置名称"))
+        peerHostField.setAccessibilityLabel(L10n.text("对端地址"))
+        peerPortField.setAccessibilityLabel(L10n.text("通信端口"))
+        pairingCodeField.setAccessibilityLabel(L10n.text("配对密码"))
+        peerCoordinationCheckbox.setAccessibilityLabel(L10n.text("启用此配置"))
+        addProfileButton.setAccessibilityLabel(L10n.text("添加协同配置"))
+        removeProfileButton.setAccessibilityLabel(L10n.text("删除协同配置"))
+        inspectProfileButton.setAccessibilityLabel(L10n.text("检测当前协同配置"))
+        requestLocalNetworkPermissionButton.setAccessibilityLabel(L10n.text("检查本地网络权限"))
+        requestMediaKeyPermissionButton.setAccessibilityLabel(L10n.text("申请媒体快捷键输入监控权限"))
+        learnUSBButton.setAccessibilityLabel(L10n.text("学习 USB 设备"))
         peerStatusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         localNetworkPermissionDetailLabel.font = .systemFont(ofSize: 11)
         localNetworkPermissionDetailLabel.textColor = .secondaryLabelColor
@@ -669,13 +765,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         contentView.addSubview(settingsFooterStack)
 
         let usbDeviceRow = labeledControlRow(
-            title: "触发设备", control: usbDeviceLabel, accessory: learnUSBButton
+            title: L10n.text("触发设备"), control: usbDeviceLabel, accessory: learnUSBButton
         )
-        let usbStateRow = labeledControlRow(title: "当前状态", control: usbStatusLabel)
-        usbCollaborationProfilePopup.setAccessibilityLabel("USB 联动目标")
-        usbArrivalSwitchCheckbox.setAccessibilityLabel("联动协同")
+        let usbStateRow = labeledControlRow(title: L10n.text("当前状态"), control: usbStatusLabel)
+        usbCollaborationProfilePopup.setAccessibilityLabel(L10n.text("USB 联动目标"))
+        usbArrivalSwitchCheckbox.setAccessibilityLabel(L10n.text("联动协同"))
         let usbCollaborationRow = labeledControlRow(
-            title: "联动目标", control: usbCollaborationProfilePopup,
+            title: L10n.text("联动目标"), control: usbCollaborationProfilePopup,
             accessory: usbArrivalSwitchCheckbox
         )
 
@@ -685,26 +781,26 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             expandsPrimary: true
         )
         let profileSelectionRow = labeledTrailingAccessoryControlRow(
-            title: "当前配置",
+            title: L10n.text("当前配置"),
             control: profilePopup,
             accessory: addProfileButton
         )
         let profileNameRow = labeledTrailingAccessoryControlRow(
-            title: "配置名称",
+            title: L10n.text("配置名称"),
             control: profileNameField,
             accessory: peerCoordinationCheckbox
         )
         let peerAddressRow = addressAndPortRow()
-        let pairingRow = labeledControlRow(title: "配对密码", control: pairingCodeField)
+        let pairingRow = labeledControlRow(title: L10n.text("配对密码"), control: pairingCodeField)
         let profileActions = horizontalActionRow(primary: removeProfileButton, actions: [])
 
         requestLocalNetworkPermissionButton.setContentHuggingPriority(.required, for: .horizontal)
-        tabView.addTabViewItem(makeScrollablePage(label: "USB 切换", views: [
+        tabView.addTabViewItem(makeScrollablePage(label: L10n.text("USB 切换"), views: [
             module(title: SettingsPageLayoutProjection.GroupID.usbAutomation.title, views: [
                 switchRow(
                     button: usbAutomationCheckbox,
-                    title: "自动切换",
-                    description: "根据一个本机 USB 设备的接入状态执行本机显示器动作。",
+                    title: L10n.text("自动切换"),
+                    description: L10n.text("根据一个本机 USB 设备的接入状态执行本机显示器动作。"),
                     symbolName: "cable.connector"
                 ),
                 separator(),
@@ -722,7 +818,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             usbHint
         ]))
 
-        tabView.addTabViewItem(makeScrollablePage(label: "协同", views: [
+        tabView.addTabViewItem(makeScrollablePage(label: L10n.text("协同"), views: [
             module(title: SettingsPageLayoutProjection.GroupID.collaborationStatus.title, views: [
                 peerStatusActions,
                 localNetworkPermissionDetailLabel
@@ -795,17 +891,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let label = tabView.tabViewItem(at: index).label
         window?.title = label
         refreshSaveFeedbackPresentation()
-        if label == "诊断" {
+        if index == 4 {
             refreshDiagnosticPreview()
         }
     }
 
     private func saveFeedbackScope(forTabLabel label: String) -> SettingsSaveFeedbackScope {
-        switch label {
-        case "USB 切换": return .usb
-        case "协同": return .collaboration
-        default: return .none
-        }
+        if label == L10n.text("USB 切换") { return .usb }
+        if label == L10n.text("协同") { return .collaboration }
+        return .none
     }
 
     private func makePage(label: String, views: [NSView]) -> NSTabViewItem {
@@ -855,13 +949,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func makeDisplayPage() -> NSTabViewItem {
-        let item = NSTabViewItem(identifier: "显示器")
-        item.label = "显示器"
+        let item = NSTabViewItem(identifier: L10n.text("显示器"))
+        item.label = L10n.text("显示器")
         let scrollView = SettingsPageScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
 
-        refreshDisplaysButton.setAccessibilityLabel("检测并刷新显示器")
+        refreshDisplaysButton.setAccessibilityLabel(L10n.text("检测并刷新显示器"))
 
         let documentView = FlippedDocumentView()
         documentView.translatesAutoresizingMaskIntoConstraints = false
@@ -869,7 +963,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         documentView.addSubview(displayStack)
         scrollView.documentView = documentView
         displayStack.addArrangedSubview(module(
-            title: "显示器控制",
+            title: L10n.text("显示器控制"),
             headerAccessory: displayControlHeaderActions(),
             views: displayControlModuleViews()
         ))
@@ -893,8 +987,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         diagnosticTextView.textContainer?.widthTracksTextView = true
         diagnosticTextView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         diagnosticTextView.textContainerInset = NSSize(width: 8, height: 8)
-        diagnosticTextView.string = "打开此页面后生成脱敏预览。详细记录默认关闭。"
-        diagnosticTextView.setAccessibilityLabel("诊断预览")
+        diagnosticTextView.string = L10n.text("打开此页面后生成脱敏预览。详细记录默认关闭。")
+        diagnosticTextView.setAccessibilityLabel(L10n.text("诊断预览"))
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -914,19 +1008,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         actions.spacing = 10
 
         let explanation = NSTextField(wrappingLabelWithString:
-            "需要详细轨迹时，请先在“常规”中开启记录并复现问题。")
+            L10n.text("需要详细轨迹时，请先在“常规”中开启记录并复现问题。"))
         explanation.font = .systemFont(ofSize: 11)
         explanation.textColor = .secondaryLabelColor
         explanation.maximumNumberOfLines = 2
 
-        return makePage(label: "诊断", views: [
-            module(title: "诊断与隐私", views: [explanation, actions, scrollView])
+        return makePage(label: L10n.text("诊断"), views: [
+            module(title: L10n.text("诊断与隐私"), views: [explanation, actions, scrollView])
         ])
     }
 
     private func makeAboutPage() -> NSTabViewItem {
-        let item = NSTabViewItem(identifier: "关于")
-        item.label = "关于"
+        let item = NSTabViewItem(identifier: L10n.text("关于"))
+        item.label = L10n.text("关于")
         let content = AboutPageContent.make(metadata: Bundle.main)
 
         let container = SettingsPageBackgroundView()
@@ -965,18 +1059,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         githubButton.contentTintColor = .linkColor
         githubButton.image = NSImage(
             systemSymbolName: "arrow.up.right.square",
-            accessibilityDescription: "打开 GitHub"
+            accessibilityDescription: L10n.text("打开 GitHub")
         )
         githubButton.imagePosition = .imageTrailing
         githubButton.toolTip = "https://github.com/maizihk/DisplaySwitch"
 
         let licenseButton = NSButton(
-            title: "MIT 许可证",
+            title: L10n.text("MIT 许可证"),
             target: self,
             action: #selector(openLicense)
         )
         let thirdPartyButton = NSButton(
-            title: "第三方说明",
+            title: L10n.text("第三方说明"),
             target: self,
             action: #selector(openThirdPartyNotices)
         )
@@ -1038,7 +1132,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         linkedDisplayValueLabels.removeAll()
 
         displayStack.addArrangedSubview(module(
-            title: "显示器控制",
+            title: L10n.text("显示器控制"),
             headerAccessory: displayControlHeaderActions(),
             views: displayControlModuleViews()
         ))
@@ -1050,19 +1144,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             let canDelete = displayDeletionAvailability?().allowsDeletion(stableID: stableID) == true
             if canDelete {
                 readControls.button.isEnabled = false
-                readControls.status.stringValue = "离线（已由连续两次可信检测确认）"
+                readControls.status.stringValue = L10n.text("离线（已由连续两次可信检测确认）")
             }
             let accessory: NSView?
             if canDelete {
                 let deleteButton = NSButton(
-                    title: "删除",
+                    title: L10n.text("删除"),
                     target: self,
                     action: #selector(confirmDeleteDisplay(_:))
                 )
                 SettingsActionButtonStyle.apply(to: deleteButton)
                 deleteButton.hasDestructiveAction = true
                 deleteButton.tag = configuration.index
-                deleteButton.setAccessibilityLabel("删除离线显示器\(configuration.name)")
+                deleteButton.setAccessibilityLabel(L10n.format("删除离线显示器{0}", String(describing: configuration.name)))
                 deleteDisplayIDsByTag[configuration.index] = stableID
                 let actions = NSStackView(views: linked ? [deleteButton] : [readControls.button, deleteButton])
                 actions.orientation = .horizontal
@@ -1081,7 +1175,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         if configurations.isEmpty {
             let emptyState = NSTextField(
-                wrappingLabelWithString: "尚未检测到显示器，请使用上方的检测按钮。"
+                wrappingLabelWithString: L10n.text("尚未检测到显示器，请使用上方的检测按钮。")
             )
             emptyState.textColor = .secondaryLabelColor
             emptyState.font = .systemFont(ofSize: 12)
@@ -1152,8 +1246,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             case .linkAllDisplays:
                 return switchRow(
                     button: linkedCheckbox,
-                    title: "联动调节所有显示器",
-                    description: "只联动同时开启相同控制项的显示器。",
+                    title: L10n.text("联动调节所有显示器"),
+                    description: L10n.text("只联动同时开启相同控制项的显示器。"),
                     symbolName: "link"
                 )
             case .linkedDisplayControls:
@@ -1234,7 +1328,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     private func mediaKeyShortcutRow() -> NSView {
         let icon = NSImageView()
-        icon.image = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: "媒体快捷键")
+        icon.image = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: L10n.text("媒体快捷键"))
         icon.contentTintColor = .secondaryLabelColor
         icon.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1275,7 +1369,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         ])
         row.setAccessibilityElement(true)
         row.setAccessibilityRole(.group)
-        row.setAccessibilityLabel("媒体快捷键与输入监控权限")
+        row.setAccessibilityLabel(L10n.text("媒体快捷键与输入监控权限"))
         mediaKeyShortcutRowContainer = row
         mediaKeyShortcutTrailingStack.setViews([], in: .center)
         return row
@@ -1283,7 +1377,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     private func mediaKeyVolumeTakeoverRow() -> NSView {
         let icon = NSImageView()
-        icon.image = NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: "DDC 音量接管")
+        icon.image = NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: L10n.text("DDC 音量接管"))
         icon.contentTintColor = .secondaryLabelColor
         icon.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1323,20 +1417,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         ])
         row.setAccessibilityElement(true)
         row.setAccessibilityRole(.group)
-        row.setAccessibilityLabel("HDMI/DisplayPort DDC 音量接管与辅助功能权限")
+        row.setAccessibilityLabel(L10n.text("HDMI/DisplayPort DDC 音量接管与辅助功能权限"))
         mediaKeyVolumeTakeoverRowContainer = row
         mediaKeyVolumeTakeoverTrailingStack.setViews([mediaKeyVolumeTakeoverCheckbox], in: .center)
         return row
     }
 
     private func displayReadControls(index: Int, name: String) -> (button: NSButton, status: NSTextField) {
-        let readButton = NSButton(title: "读取 DDC 参数", target: self, action: #selector(readDisplayDDC(_:)))
+        let readButton = NSButton(title: L10n.text("读取 DDC 参数"), target: self, action: #selector(readDisplayDDC(_:)))
         SettingsActionButtonStyle.apply(to: readButton)
         readButton.tag = index
         readButton.isEnabled = !displayReadPending
         displayReadButtons[index] = readButton
-        readButton.setAccessibilityLabel("读取\(name) DDC 参数")
-        let status = NSTextField(wrappingLabelWithString: "尚未读取")
+        readButton.setAccessibilityLabel(L10n.format("读取{0} DDC 参数", String(describing: name)))
+        let status = NSTextField(wrappingLabelWithString: L10n.text("尚未读取"))
         status.textColor = .secondaryLabelColor
         status.font = .systemFont(ofSize: 11)
         status.maximumNumberOfLines = DisplayStatusLayout.maximumNumberOfLines
@@ -1350,18 +1444,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private func displayForm(index: Int) -> NSView {
         let showsIndividualSliders = displayControlLayoutProjection().showsIndividualSliders
         var headingViews: [NSView] = [
-            fixedLabel("", width: 64), fixedLabel("功能", width: 44),
-            fixedLabel("在托盘显示", width: 82)
+            fixedLabel("", width: 64), fixedLabel(L10n.text("功能"), width: 44),
+            fixedLabel(L10n.text("在托盘显示"), width: 82)
         ]
         if showsIndividualSliders {
             headingViews.append(fixedLabel("", width: 300))
-            headingViews.append(fixedLabel("数值", width: 42))
+            headingViews.append(fixedLabel(L10n.text("数值"), width: 42))
         }
         let headings = NSStackView(views: headingViews)
         headings.orientation = .horizontal
         headings.spacing = 8
 
-        let controls: [(String, DDCCommand)] = [("亮度", .luminance), ("对比度", .contrast), ("音量", .volume)]
+        let controls: [(String, DDCCommand)] = [(L10n.text("亮度"), .luminance), (L10n.text("对比度"), .contrast), (L10n.text("音量"), .volume)]
         let rows = controls.map { title, command -> NSView in
             let feature = NSSwitch()
             let tray = NSSwitch()
@@ -1372,8 +1466,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             feature.action = #selector(displaySettingChanged(_:))
             tray.target = self
             tray.action = #selector(displaySettingChanged(_:))
-            feature.setAccessibilityLabel("\(title)功能")
-            tray.setAccessibilityLabel("\(title)在托盘显示")
+            feature.setAccessibilityLabel(L10n.format("{0}功能", String(describing: title)))
+            tray.setAccessibilityLabel(L10n.format("{0}在托盘显示", String(describing: title)))
             displayFeatureSwitches[index, default: [:]][command] = feature
             displayTraySwitches[index, default: [:]][command] = tray
             var rowViews: [NSView] = [fixedLabel(title, width: 64), feature, tray]
@@ -1384,7 +1478,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 slider.tag = tag
                 slider.isContinuous = true
                 slider.widthAnchor.constraint(equalToConstant: 300).isActive = true
-                slider.setAccessibilityLabel("\(title)数值")
+                slider.setAccessibilityLabel(L10n.format("{0}数值", String(describing: title)))
                 displaySliders[index, default: [:]][command] = slider
                 displayValueLabels[index, default: [:]][command] = value
                 rowViews.append(slider)
@@ -1406,9 +1500,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     private func linkedDisplayControlForm() -> NSView {
         let headingLabels = [
-            fixedLabel("", width: 64), fixedLabel("功能", width: 90),
-            fixedLabel("在托盘显示", width: 90), fixedLabel("", width: 230),
-            fixedLabel("数值", width: 74)
+            fixedLabel("", width: 64), fixedLabel(L10n.text("功能"), width: 90),
+            fixedLabel(L10n.text("在托盘显示"), width: 90), fixedLabel("", width: 230),
+            fixedLabel(L10n.text("数值"), width: 74)
         ]
         headingLabels.forEach { $0.alignment = .left }
         let headings = NSStackView(views: headingLabels)
@@ -1435,7 +1529,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             slider.tag = Int(entry.command.rawValue)
             slider.isContinuous = true
             slider.widthAnchor.constraint(equalToConstant: 230).isActive = true
-            slider.setAccessibilityLabel("统一\(entry.command.userFacingName)")
+            slider.setAccessibilityLabel(L10n.format("统一{0}", String(describing: entry.command.userFacingName)))
             let value = fixedLabel(entry.value.displayText, width: 74)
             value.alignment = .left
             linkedDisplaySliders[entry.command] = slider
@@ -1469,11 +1563,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         toggle.tag = Int(command.rawValue)
         toggle.target = self
         toggle.action = #selector(linkedDisplaySettingChanged(_:))
-        toggle.setAccessibilityLabel("统一\(command.userFacingName)\(isTray ? "在托盘显示" : "功能")")
-        toggle.setAccessibilityValue(state == .mixed ? "部分开启" : (state == .on ? "开启" : "关闭"))
+        toggle.setAccessibilityLabel(L10n.format("统一{0}{1}", String(describing: command.userFacingName), String(describing: isTray ? L10n.text("在托盘显示") : L10n.text("功能"))))
+        toggle.setAccessibilityValue(state == .mixed ? L10n.text("部分开启") : (state == .on ? L10n.text("开启") : L10n.text("关闭")))
         if isTray { linkedTraySwitches[command] = toggle }
         else { linkedFeatureSwitches[command] = toggle }
-        let partial = fixedLabel(state == .mixed ? "部分开启" : "", width: 48)
+        let partial = fixedLabel(state == .mixed ? L10n.text("部分开启") : "", width: 48)
         partial.font = .systemFont(ofSize: 11)
         partial.alignment = .left
         let row = NSStackView(views: [toggle, partial])
@@ -1496,6 +1590,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private func formLabel(_ title: String) -> NSTextField {
         let label = fixedLabel(title, width: CGFloat(SettingsFormRowLayout.labelColumnWidth))
         label.alignment = .left
+        label.maximumNumberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.cell?.wraps = true
         return label
     }
 
@@ -1572,9 +1669,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         peerHostField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         peerPortField.widthAnchor.constraint(equalToConstant: 96).isActive = true
         let row = NSStackView(views: [
-            formLabel("对端地址"),
+            formLabel(L10n.text("对端地址")),
             peerHostField,
-            fixedLabel("端口", width: 36),
+            fixedLabel(L10n.text("端口"), width: 36),
             peerPortField
         ])
         row.orientation = .horizontal
@@ -1603,7 +1700,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if sender === usbArrivalSwitchCheckbox {
             if sender.state == .on, !selectedCollaborationWakeProfileIsValid() {
                 sender.state = .off
-                showValidationError("请选择一个已开启、完整且已建立连接的协同配置。")
+                showValidationError(L10n.text("请选择一个已开启、完整且已建立连接的协同配置。"))
                 return
             }
             persistDocument(feedbackScope: .usb) { $0.usbSwitch.collaborationWakeEnabled = sender.state == .on }
@@ -1614,7 +1711,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             if sender.state == .on,
                !DisplayConfigurationStore.isCompleteUSBConfiguration(document.usbSwitch, displays: document.displays) {
                 sender.state = .off
-                showValidationError("请先学习一个 USB 设备，并至少配置一台显示器的目标输入源。")
+                showValidationError(L10n.text("请先学习一个 USB 设备，并至少配置一台显示器的目标输入源。"))
                 return
             }
             persistDocument(feedbackScope: .usb) { $0.usbSwitch.enabled = sender.state == .on }
@@ -1625,7 +1722,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 try updateLaunchAtLogin()
             } catch {
                 reloadLaunchAtLoginState()
-                showValidationError("登录启动设置失败：\n\(error.localizedDescription)\n\n请确认 App 已放入“应用程序”文件夹。")
+                showValidationError(L10n.format("登录启动设置失败：\n{0}\n\n请确认 App 已放入“应用程序”文件夹。", String(describing: error.localizedDescription)))
             }
         }
     }
@@ -1682,7 +1779,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
               displayFeatureSwitches[index]?[command]?.state == .on else { return }
         let value = sender.integerValue
         displayValueLabels[index]?[command]?.stringValue = "\(value)"
-        displayStatusLabels[index]?.stringValue = "正在应用"
+        ddcStatusPresentations[display.id.lowercased()] = { L10n.text("正在应用") }
+        displayStatusLabels[index]?.stringValue = L10n.text("正在应用")
         onWriteDDC?(display.id, command, value)
     }
 
@@ -1696,7 +1794,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let targetIDs = Set(entry.targets.map { $0.stableID.lowercased() })
         for (offset, display) in (configurationDocument?.displays ?? []).enumerated()
             where targetIDs.contains(display.id.lowercased()) {
-            displayStatusLabels[offset + 1]?.stringValue = "正在应用"
+            ddcStatusPresentations[display.id.lowercased()] = { L10n.text("正在应用") }
+            displayStatusLabels[offset + 1]?.stringValue = L10n.text("正在应用")
         }
         onWriteLinkedDDC?(command, value)
     }
@@ -1717,7 +1816,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         displayReadButtons.values.forEach { $0.isEnabled = false }
         for (offset, display) in (configurationDocument?.displays ?? []).enumerated()
             where stableIDs.contains(where: { $0.caseInsensitiveCompare(display.id) == .orderedSame }) {
-            displayStatusLabels[offset + 1]?.stringValue = "正在读取"
+            displayStatusLabels[offset + 1]?.stringValue = L10n.text("正在读取")
         }
         onReadDDC(stableIDs) { [weak self] completed in
             guard let self else { return }
@@ -1729,7 +1828,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             if !completed {
                 for (offset, display) in (self.configurationDocument?.displays ?? []).enumerated()
                     where stableIDs.contains(where: { $0.caseInsensitiveCompare(display.id) == .orderedSame }) {
-                    self.displayStatusLabels[offset + 1]?.stringValue = "当前无法读取"
+                    self.displayStatusLabels[offset + 1]?.stringValue = L10n.text("当前无法读取")
                 }
             }
         }
@@ -1763,10 +1862,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "删除离线显示器“\(display.name)”？"
-        alert.informativeText = "将移除此显示器配置、USB 映射、所有协同映射，以及仅属于该显示器的 DDC 缓存和托盘偏好。此操作不会执行 DDC、USB、网络、唤醒或输入源切换。"
-        alert.addButton(withTitle: "删除")
-        alert.addButton(withTitle: "取消")
+        alert.messageText = L10n.format("删除离线显示器“{0}”？", String(describing: display.name))
+        alert.informativeText = L10n.text("将移除此显示器配置、USB 映射、所有协同映射，以及仅属于该显示器的 DDC 缓存和托盘偏好。此操作不会执行 DDC、USB、网络、唤醒或输入源切换。")
+        alert.addButton(withTitle: L10n.text("删除"))
+        alert.addButton(withTitle: L10n.text("取消"))
         alert.buttons.first?.hasDestructiveAction = true
         alert.beginSheetModal(for: window) { [weak self] response in
             guard DisplayDeletionConfirmationPolicy.shouldProceed(
@@ -1837,7 +1936,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             case .valid(let value):
                 mappings.append(USBDisplayInputMapping(displayID: display.id, targetInput: value))
             case .invalid:
-                showValidationError("对端输入源可留空，填写时必须为 1–65535；0 不会保存或写入显示器。")
+                showValidationError(L10n.text("对端输入源可留空，填写时必须为 1–65535；0 不会保存或写入显示器。"))
                 return nil
             }
         }
@@ -1856,7 +1955,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             case .valid(let value):
                 mappings.append(DisplayInputMapping(displayID: display.id, peerInput: value))
             case .invalid:
-                showValidationError("对端输入源可留空，填写时必须为 1–65535；0 不会保存或写入显示器。")
+                showValidationError(L10n.text("对端输入源可留空，填写时必须为 1–65535；0 不会保存或写入显示器。"))
                 return nil
             }
         }
@@ -1889,7 +1988,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             value.collaborationProfiles[self.selectedProfileIndex] = decision.profile
         }
         if didSave, decision.disabledBecauseIncomplete {
-            showValidationError("配置不完整，已自动停用并保存当前输入。请补全所有字段后重新启用。")
+            showValidationError(L10n.text("配置不完整，已自动停用并保存当前输入。请补全所有字段后重新启用。"))
         }
     }
 
@@ -1921,13 +2020,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             onConfigurationSaveFailure?(error)
             reloadValues()
             saveFeedbackController.recordPersistenceResult(.failed, scope: feedbackScope)
-            showValidationError("设置未保存，已恢复最后有效值：\n\(error.localizedDescription)")
+            showValidationError(L10n.format("设置未保存，已恢复最后有效值：\n{0}", String(describing: error.localizedDescription)))
             return false
         } catch {
             onConfigurationSaveFailure?(.writeFailed)
             reloadValues()
             saveFeedbackController.recordPersistenceResult(.failed, scope: feedbackScope)
-            showValidationError("设置未保存，已恢复最后有效值。")
+            showValidationError(L10n.text("设置未保存，已恢复最后有效值。"))
             return false
         }
     }
@@ -1946,7 +2045,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     @objc private func refreshDiagnosticPreview() {
         diagnosticTextView.string = diagnosticReportProvider?().text
-            ?? "诊断状态暂不可用。"
+            ?? L10n.text("诊断状态暂不可用。")
         diagnosticCopyStatusLabel.stringValue = ""
     }
 
@@ -1963,7 +2062,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(preview, forType: .string)
-        diagnosticCopyStatusLabel.stringValue = "已复制当前预览"
+        diagnosticCopyStatusLabel.stringValue = L10n.text("已复制当前预览")
     }
 
     private func reloadLaunchAtLoginState() {
@@ -1979,7 +2078,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         editingProfiles = loaded.collaborationProfiles
         if editingProfiles.isEmpty {
             editingProfiles = [CollaborationProfile(
-                id: UUID().uuidString, name: "配置 1", peerHost: "", peerPort: 49731,
+                id: UUID().uuidString, name: L10n.text("配置 1"), peerHost: "", peerPort: 49731,
                 pairingCode: "", peerEndpointID: nil, peerProtocolVersion: nil,
                 coordinationEnabled: false, displayInputs: [], triggerDevices: []
             )]
@@ -1990,7 +2089,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         linkedCheckbox.state = loaded.document.linkAllDisplays ? .on : .off
         usbAutomationCheckbox.state = loaded.document.usbSwitch.enabled ? .on : .off
         usbArrivalSwitchCheckbox.state = loaded.document.usbSwitch.collaborationWakeEnabled ? .on : .off
-        usbStatusLabel.stringValue = loaded.document.usbSwitch.enabled ? "等待设备状态" : "USB 切换未启用"
+        usbStatusSource = nil
+        usbStatusLabel.stringValue = loaded.document.usbSwitch.enabled ? L10n.text("等待设备状态") : L10n.text("USB 切换未启用")
         usbStatusLabel.textColor = .secondaryLabelColor
         reloadUSBControls(document: loaded.document)
         refreshSelectedCollaborationStatus()
@@ -2030,7 +2130,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         } else {
             launchAtLoginCheckbox.state = .off
             launchAtLoginCheckbox.isEnabled = false
-            launchAtLoginCheckbox.toolTip = "需要 macOS 13 或更高版本"
+            launchAtLoginCheckbox.toolTip = L10n.text("需要 macOS 13 或更高版本")
         }
     }
 
@@ -2127,7 +2227,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     private func reloadUSBControls(document: DisplayConfigurationStoreV5Document) {
         updateUSBDeviceLabel()
         usbCollaborationProfilePopup.removeAllItems()
-        usbCollaborationProfilePopup.addItem(withTitle: "未选择")
+        usbCollaborationProfilePopup.addItem(withTitle: L10n.text("未选择"))
         usbCollaborationProfilePopup.lastItem?.representedObject = nil
         for profile in document.collaborationProfiles {
             usbCollaborationProfilePopup.addItem(withTitle: profile.name)
@@ -2177,8 +2277,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         pairingCodeField.stringValue = profile.pairingCode
         peerCoordinationCheckbox.state = profile.coordinationEnabled ? .on : .off
         peerTriggerDeviceStatusLabel.stringValue = profile.triggerDevices.isEmpty
-            ? "未引用本机触发设备"
-            : "已引用 \(profile.triggerDevices.count) 个本机触发设备"
+            ? L10n.text("未引用本机触发设备")
+            : L10n.format("已引用 {0} 个本机触发设备", String(describing: profile.triggerDevices.count))
         rebuildProfileMappings(profile: profile)
     }
 
@@ -2266,9 +2366,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     @objc private func addProfile() {
         var counter = editingProfiles.count + 1
-        var name = "配置 \(counter)"
+        var name = L10n.format("配置 {0}", String(describing: counter))
         let names = Set(editingProfiles.map { $0.name.lowercased() })
-        while names.contains(name.lowercased()) { counter += 1; name = "配置 \(counter)" }
+        while names.contains(name.lowercased()) { counter += 1; name = L10n.format("配置 {0}", String(describing: counter)) }
         editingProfiles.append(CollaborationProfile(id: UUID().uuidString, name: name, peerHost: "", peerPort: 49731,
             pairingCode: "", peerEndpointID: nil, peerProtocolVersion: nil, coordinationEnabled: false,
             displayInputs: [], triggerDevices: []))
@@ -2281,10 +2381,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     @objc private func removeProfile() {
         guard editingProfiles.count > 1, editingProfiles.indices.contains(selectedProfileIndex) else { return }
         let alert = NSAlert()
-        alert.messageText = "删除协同配置？"
-        alert.informativeText = "此操作会取消该配置尚未完成的本机操作。"
-        alert.addButton(withTitle: "删除")
-        alert.addButton(withTitle: "取消")
+        alert.messageText = L10n.text("删除协同配置？")
+        alert.informativeText = L10n.text("此操作会取消该配置尚未完成的本机操作。")
+        alert.addButton(withTitle: L10n.text("删除"))
+        alert.addButton(withTitle: L10n.text("取消"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let removedProfileID = editingProfiles[selectedProfileIndex].id
         editingProfiles.remove(at: selectedProfileIndex)
@@ -2314,7 +2414,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                                                                   ddcAvailableDisplayIDs: localIDs)
         guard inspection.isComplete else {
             let alert = NSAlert()
-            alert.messageText = "本机配置需要检查"
+            alert.messageText = L10n.text("本机配置需要检查")
             var messages = inspection.issues.map(\.userFacingDescription)
             if !inspection.ddcUnavailableDisplayIDs.isEmpty {
                 messages.append(DDCController.backendSummaryWithoutHardwareAccess)
@@ -2329,14 +2429,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             showPeerInspectionResult(.noResponse, profileID: profile.id)
             return
         }
+        peerInspectionPending = true
         inspectProfileButton.isEnabled = false
         requestLocalNetworkPermissionButton.isEnabled = false
         updateLocalNetworkPermissionPresentation(.notChecked)
-        peerStatusLabel.stringValue = "正在检测 \(profile.name)…"
+        peerStatusLabel.stringValue = L10n.format("正在检测 {0}…", String(describing: profile.name))
         LocalNetworkPermissionInspectionAction.perform(using: { completion in
             onInspectPeer(profile, completion)
         }) { [weak self] result, permissionEvidence in
             DispatchQueue.main.async {
+                self?.peerInspectionPending = false
                 self?.inspectProfileButton.isEnabled = true
                 self?.requestLocalNetworkPermissionButton.isEnabled = true
                 guard let self, self.editingProfiles.indices.contains(self.selectedProfileIndex),
@@ -2351,6 +2453,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func updateLocalNetworkPermissionPresentation(_ evidence: LocalNetworkPermissionEvidence) {
+        permissionEvidence = evidence
         let presentation = LocalNetworkPermissionPresentation.make(for: evidence)
         localNetworkPermissionDetailLabel.stringValue = presentation.detailText
         localNetworkPermissionDetailLabel.isHidden = presentation.detailText.isEmpty
@@ -2376,13 +2479,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                 for: .connected, profileName: profile.name
             )
         case .authenticationFailed:
-            peerStatusLabel.stringValue = "\(profile.name)：配对码不匹配"
+            peerStatusLabel.stringValue = L10n.format("{0}：配对码不匹配", String(describing: profile.name))
         case .noResponse:
-            peerStatusLabel.stringValue = "\(profile.name)：无响应"
+            peerStatusLabel.stringValue = L10n.format("{0}：无响应", String(describing: profile.name))
         case .listenerFailed(let error):
-            peerStatusLabel.stringValue = "\(profile.name)：监听失败（系统码：\(systemErrorCode(error))）"
+            peerStatusLabel.stringValue = L10n.format("{0}：监听失败（系统码：{1}）", String(describing: profile.name), String(describing: systemErrorCode(error)))
         case .sendFailed(let error):
-            peerStatusLabel.stringValue = "\(profile.name)：发送失败（系统码：\(systemErrorCode(error))）"
+            peerStatusLabel.stringValue = L10n.format("{0}：发送失败（系统码：{1}）", String(describing: profile.name), String(describing: systemErrorCode(error)))
         }
     }
 
@@ -2420,7 +2523,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     @objc private func learnUSBDevice() {
         usbLearningPending = true
-        usbDeviceLabel.stringValue = "等待 USB 变化，请按一次切换器…"
+        usbDeviceLabel.stringValue = L10n.text("等待 USB 变化，请按一次切换器…")
         learnUSBButton.isEnabled = false
         onLearnUSB?()
     }
@@ -2443,11 +2546,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         devices.forEach { popup.addItem(withTitle: $0.displayName) }
 
         let alert = NSAlert()
-        alert.messageText = "选择 USB 触发设备"
-        alert.informativeText = "以下设备在切换动作中发生了变化。请选择一个稳定存在于键鼠链路上的设备。"
+        alert.messageText = L10n.text("选择 USB 触发设备")
+        alert.informativeText = L10n.text("以下设备在切换动作中发生了变化。请选择一个稳定存在于键鼠链路上的设备。")
         alert.accessoryView = popup
-        alert.addButton(withTitle: "使用此设备")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: L10n.text("使用此设备"))
+        alert.addButton(withTitle: L10n.text("取消"))
         alert.beginSheetModal(for: window!) { [weak self] response in
             guard let self else { return }
             defer {
@@ -2473,7 +2576,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func updateUSBDeviceLabel() {
-        usbDeviceLabel.stringValue = configurationDocument?.usbSwitch.triggerDevice?.displayName ?? "未选择触发设备"
+        usbDeviceLabel.stringValue = configurationDocument?.usbSwitch.triggerDevice?.displayName ?? L10n.text("未选择触发设备")
     }
 
     func windowWillClose(_ notification: Notification) {

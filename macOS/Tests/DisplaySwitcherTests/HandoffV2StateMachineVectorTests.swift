@@ -2,6 +2,23 @@ import Foundation
 import XCTest
 
 final class HandoffV2StateMachineVectorTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        previousLanguagePreference = UserDefaults.standard.object(forKey: L10n.preferenceKey)
+        L10n.preference = .simplifiedChinese
+    }
+
+    private var previousLanguagePreference: Any?
+
+    override func tearDown() {
+        if let previousLanguagePreference {
+            UserDefaults.standard.set(previousLanguagePreference, forKey: L10n.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: L10n.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     func testAllSixV2OnlyPublicStateMachineVectors() throws {
         let url = try XCTUnwrap(Bundle(for: HandoffV2StateMachineVectorTests.self).resourceURL)
             .appendingPathComponent("contracts/protocol-v2/state-machine-vectors.json")

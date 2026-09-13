@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "Controller.h"
 #include "AutoStart.h"
 #include "Diagnostics.h"
@@ -92,7 +93,7 @@ namespace DisplaySwitcher::Native
             if (auto self = weak.lock())
             {
                 self->SetStatus(error);
-                self->SetPeerConnectionStatus(L"连接错误：" + error, false);
+                self->SetPeerConnectionStatus(UiMessage(L"连接错误：{error}", {{L"error", error}}), false);
             }
         });
         trayIcon_ = std::make_unique<TrayIcon>(
@@ -203,11 +204,11 @@ namespace DisplaySwitcher::Native
         v2HealthProbes_.clear();
         if (!config.displayConfigurationSafeMode) sideEffectGate_.Allow();
         auto listenerPort = config.V2ListenerPort();
-        if (!listenerPort) SetPeerConnectionStatus(!config.ReadonlyEnabledProfiles().empty() ? L"协同配置不完整" : L"协同未启用", false);
+        if (!listenerPort) SetPeerConnectionStatus(!config.ReadonlyEnabledProfiles().empty() ? UiMessage(L"协同配置不完整") : UiMessage(L"协同未启用"), false);
         if (hasUnboundV2 && !hasV2)
             SetPeerConnectionStatus(std::any_of(bootstrapProfiles.begin(), bootstrapProfiles.end(),
                 [](auto const& profile) { return profile.coordinationEnabled; })
-                ? L"已开启，正在等待对端并自动连接" : L"协同未启用", false);
+                ? UiMessage(L"已开启，正在等待对端并自动连接") : UiMessage(L"协同未启用"), false);
         // Every complete profile may answer authenticated status probes. Enabled
         // profiles also probe proactively even before a peer route is cached.
         if (listenerPort && EnsurePeerListening(*listenerPort))
@@ -217,14 +218,14 @@ namespace DisplaySwitcher::Native
         if (applyAutoStart)
         {
             try { ApplyAutoStart(config.startWithWindows); }
-            catch (hresult_error const& error) { ShowError(L"登录启动设置失败", error.message().c_str()); }
+            catch (hresult_error const& error) { ShowError(::DisplaySwitcher::Native::UiText(L"登录启动设置失败"), error.message().c_str()); }
         }
-        if (config.usbSwitch.enabled && !usbConfigured) SetStatus(L"USB 自动切换未配置");
-        else if (config.usbSwitch.enabled && !hasUsbMapping) SetStatus(L"USB 显示器输入映射未配置");
-        else if (!config.usbSwitch.enabled) SetStatus(L"USB 自动切换未开启");
+        if (config.usbSwitch.enabled && !usbConfigured) SetStatus(::DisplaySwitcher::Native::UiText(L"USB 自动切换未配置"));
+        else if (config.usbSwitch.enabled && !hasUsbMapping) SetStatus(::DisplaySwitcher::Native::UiText(L"USB 显示器输入映射未配置"));
+        else if (!config.usbSwitch.enabled) SetStatus(::DisplaySwitcher::Native::UiText(L"USB 自动切换未开启"));
         else
         {
-            SetStatus(L"USB 自动切换已开启");
+            SetStatus(::DisplaySwitcher::Native::UiText(L"USB 自动切换已开启"));
         }
     }
 
@@ -254,8 +255,8 @@ namespace DisplaySwitcher::Native
             peer_->Stop();
         }
         usbWatcher_->Reconfigure(-1, -1, L"", usbObservationGeneration_.BeginConfiguration());
-        SetPeerConnectionStatus(L"USB 学习中，协同已暂停", false);
-        SetStatus(L"正在学习 USB 设备；自动协同和硬件操作已暂停");
+        SetPeerConnectionStatus(UiMessage(L"USB 学习中，协同已暂停"), false);
+        SetStatus(::DisplaySwitcher::Native::UiText(L"正在学习 USB 设备；自动协同和硬件操作已暂停"));
     }
 
     void Controller::EndUsbLearning()
@@ -350,7 +351,7 @@ namespace DisplaySwitcher::Native
                     current->Enqueue([weak, generation, result]
                     {
                         if (auto value = weak.lock(); value && value->AllowsSideEffects(generation))
-                            value->SetStatus(result.success ? L"USB 已离开，显示器已切换" : L"USB 显示器切换部分失败：" + result.error);
+                            value->SetStatus(result.success ? ::DisplaySwitcher::Native::UiText(L"USB 已离开，显示器已切换") : UiFormat(L"USB 显示器切换部分失败：{error}", {{L"error", result.error}}));
                     });
             }).detach();
         }
@@ -380,7 +381,7 @@ namespace DisplaySwitcher::Native
                         EqualId(candidate.peerEndpointId, endpointId);
                 });
             return profile != config.collaborationProfiles.end() && !profile->name.empty()
-                ? L"已和对端（" + profile->name + L"）建立连接" : L"已和对端建立连接";
+                ? UiMessage(L"已和对端（{name}）建立连接", {{L"name", profile->name}}) : UiMessage(L"已和对端建立连接");
         };
         if (!sideEffectGate_.AllowsSideEffects() || !v2StateMachine_) return;
         for (auto const& action : actions)
@@ -416,10 +417,10 @@ namespace DisplaySwitcher::Native
             }
             case V2Action::Kind::SetPeerReachable:
                 v2StateMachine_->SetTargetReachable(action.endpointId, action.value);
-                SetPeerConnectionStatus(action.value ? connectedText(action.endpointId) : L"连接已中断", action.value);
+                SetPeerConnectionStatus(action.value ? connectedText(action.endpointId) : UiMessage(L"连接已中断"), action.value);
                 break;
             case V2Action::Kind::PromptManualSelection:
-                SetStatus(L"对端不可用，请检查协同配置");
+                SetStatus(::DisplaySwitcher::Native::UiText(L"对端不可用，请检查协同配置"));
                 break;
             case V2Action::Kind::IgnoreMessage:
                 WriteDiagnostic("protocol.v2 message_ignored=1");
@@ -442,7 +443,7 @@ namespace DisplaySwitcher::Native
                 {
                     v2StateMachine_->SetTargetReachable(item->first, false);
                     item = v2PeerLastSeenMs_.erase(item);
-                    SetPeerConnectionStatus(L"连接已中断", false);
+                    SetPeerConnectionStatus(UiMessage(L"连接已中断"), false);
                 }
                 else ++item;
             }
@@ -457,7 +458,7 @@ namespace DisplaySwitcher::Native
         StopPeerHealthCheck();
         if (!sideEffectGate_.AllowsSideEffects()) return;
         auto config = Config();
-        if (!config.EnabledStatusProbeProfiles().empty()) SetPeerConnectionStatus(L"正在连接对端…", false);
+        if (!config.EnabledStatusProbeProfiles().empty()) SetPeerConnectionStatus(UiMessage(L"正在连接对端…"), false);
         std::weak_ptr<Controller> weak = shared_from_this();
         peerHealthThread_ = std::jthread([weak](std::stop_token token)
         {
@@ -624,7 +625,7 @@ namespace DisplaySwitcher::Native
                         current->v2StateMachine_->SetTargetReachable(message.sourceEndpointId, true);
                     current->v2PeerLastSeenMs_[message.sourceEndpointId] = now;
                     current->diagnosticHeartbeats_.Observe(profileId, message.sourceEndpointId, now);
-                    current->SetPeerConnectionStatus(L"已和对端（" + appliedProfile->name + L"）建立连接", true);
+                    current->SetPeerConnectionStatus(UiMessage(L"已和对端（{name}）建立连接", {{L"name", appliedProfile->name}}), true);
                 });
             }).detach();
             return;
@@ -704,7 +705,7 @@ namespace DisplaySwitcher::Native
             v2StateMachine_->SetTargetReachable(message.sourceEndpointId, true);
             v2PeerLastSeenMs_[message.sourceEndpointId] = now;
             diagnosticHeartbeats_.Observe(profile->id, message.sourceEndpointId, now);
-            SetPeerConnectionStatus(L"已和对端（" + profile->name + L"）建立连接", true);
+            SetPeerConnectionStatus(UiMessage(L"已和对端（{name}）建立连接", {{L"name", profile->name}}), true);
             return;
         }
         if (message.type == L"wake_display")
@@ -721,7 +722,7 @@ namespace DisplaySwitcher::Native
             v2StateMachine_->SetTargetReachable(message.sourceEndpointId, true);
             v2PeerLastSeenMs_[message.sourceEndpointId] = now;
             diagnosticHeartbeats_.Observe(profile->id, message.sourceEndpointId, now);
-            SetPeerConnectionStatus(L"已和对端（" + profile->name + L"）建立连接", true);
+            SetPeerConnectionStatus(UiMessage(L"已和对端（{name}）建立连接", {{L"name", profile->name}}), true);
         }
         if (message.type == L"status_probe") actions = v2StateMachine_->OnStatusProbe(now, message.sourceEndpointId, message.eventId, true);
         else if (message.type == L"handover_request") actions = v2StateMachine_->OnHandoverRequest(now, message.sourceEndpointId, message.eventId, true, message.intent.value_or(L"manual"));
@@ -886,7 +887,7 @@ namespace DisplaySwitcher::Native
         catch (...)
         {
             EnterSafeStateAfterSaveFailure();
-            SetPeerConnectionStatus(L"连接信息保存失败", false);
+            SetPeerConnectionStatus(UiMessage(L"连接信息保存失败"), false);
             return false;
         }
         {
@@ -973,11 +974,11 @@ namespace DisplaySwitcher::Native
         if (!config.CanCoordinateWithProfile(profileId))
         {
             SetStatus(profile && profile->coordinationEnabled
-                ? L"正在连接对端，请稍后重试" : L"协同配置不可用");
+                ? ::DisplaySwitcher::Native::UiText(L"正在连接对端，请稍后重试") : ::DisplaySwitcher::Native::UiText(L"协同配置不可用"));
             return;
         }
         auto name = profile->name;
-        SetStatus(L"正在切换到 " + name + L"…");
+        SetStatus(UiFormat(L"正在切换到 {name}…", {{L"name", name}}));
         auto generation = sideEffectGeneration_.load();
         std::weak_ptr<Controller> weak = shared_from_this();
         std::thread([weak, config, profileId, name, generation, eventId]
@@ -994,7 +995,7 @@ namespace DisplaySwitcher::Native
                 auto selection = plan.config.SelectProfileDisplays(profileId);
                 missing = selection.missingDisplayIds.size();
                 if (selection.mappedDisplays.empty())
-                    result = { false, L"该配置没有可用的显示器映射" };
+                    result = { false, ::DisplaySwitcher::Native::UiText(L"该配置没有可用的显示器映射") };
                 else
                 {
                     auto actionConfig = plan.config;
@@ -1021,10 +1022,10 @@ namespace DisplaySwitcher::Native
                     {
                         if (eventId && value->v2StateMachine_)
                             value->ApplyV2Actions(value->v2StateMachine_->OnSwitchCompleted(NowMilliseconds(), *eventId, result.success));
-                        auto text = result.success ? L"已切换到 " + name : L"切换到 " + name + L" 失败：" + result.error;
-                        if (missing) text += L"；有 " + std::to_wstring(missing) + L" 台显示器缺少映射";
+                        auto text = result.success ? UiFormat(L"已切换到 {name}", {{L"name", name}}) : UiFormat(L"切换到 {name} 失败：{error}", {{L"name", name}, {L"error", result.error}});
+                        if (missing) text += UiFormat(L"；有 {count} 台显示器缺少映射", {{L"count", std::to_wstring(missing)}});
                         value->SetStatus(text);
-                        if (!result.success) value->ShowError(L"显示器切换失败", result.error.empty() ? L"未知错误" : result.error);
+                        if (!result.success) value->ShowError(::DisplaySwitcher::Native::UiText(L"显示器切换失败"), result.error.empty() ? ::DisplaySwitcher::Native::UiText(L"未知错误") : result.error);
                     }
                 });
         }).detach();
@@ -1032,7 +1033,7 @@ namespace DisplaySwitcher::Native
 
     void Controller::ManualSwitch(std::wstring const& profileId)
     {
-        if (profileDetectionActive_) { SetStatus(L"正在检测协同配置，请稍候"); return; }
+        if (profileDetectionActive_) { SetStatus(::DisplaySwitcher::Native::UiText(L"正在检测协同配置，请稍候")); return; }
         auto config = Config(); auto profile = config.FindCollaborationProfile(profileId);
         if (profile && profile->coordinationEnabled && profile->peerProtocolVersion == 2 && IsValidDisplayId(profile->peerEndpointId) && v2StateMachine_)
         {
@@ -1040,7 +1041,7 @@ namespace DisplaySwitcher::Native
                 std::count_if(config.collaborationProfiles.begin(), config.collaborationProfiles.end(), [&](auto const& candidate)
                 { return candidate.coordinationEnabled && candidate.peerProtocolVersion == 2 && EqualId(candidate.peerEndpointId, profile->peerEndpointId); }) != 1)
             {
-                SetStatus(L"协同 endpoint 配置有冲突，未执行切换");
+                SetStatus(::DisplaySwitcher::Native::UiText(L"协同 endpoint 配置有冲突，未执行切换"));
                 return;
             }
             ApplyV2Actions(v2StateMachine_->OnManualSelect(NowMilliseconds(), profile->peerEndpointId, NewEventId()));
@@ -1298,7 +1299,7 @@ namespace DisplaySwitcher::Native
             !IsValidDisplayId(workingConfig.localEndpointId) ||
             workingConfig.listenPort < 1 || workingConfig.listenPort > 65535)
         {
-            if (completed) completed(false, L"本机协同配置不完整，未启动网络监听。");
+            if (completed) completed(false, ::DisplaySwitcher::Native::UiText(L"本机协同配置不完整，未启动网络监听。"));
             return;
         }
         auto port = workingConfig.listenPort;
@@ -1310,7 +1311,7 @@ namespace DisplaySwitcher::Native
             if (ready) self->networkAccessPrepared_ = true;
             auto message = ready
                 ? L""
-                : L"无法启动网络服务，请检查端口占用或网络权限。";
+                : ::DisplaySwitcher::Native::UiText(L"无法启动网络服务，请检查端口占用或网络权限。");
             if (self && !self->disposed_)
                 self->Enqueue([completed = std::move(completed), ready, message = std::move(message)]() mutable
                 {
@@ -1496,7 +1497,7 @@ namespace DisplaySwitcher::Native
                     catch (...)
                     {
                         self->EnterSafeStateAfterSaveFailure();
-                        self->ShowError(L"保存设置失败", L"无法写入设置文件；自动协同和硬件操作已安全停用。");
+                        self->ShowError(::DisplaySwitcher::Native::UiText(L"保存设置失败"), ::DisplaySwitcher::Native::UiText(L"无法写入设置文件；自动协同和硬件操作已安全停用。"));
                         return false;
                     }
                     { std::scoped_lock lock(self->configMutex_); self->config_ = published; }
@@ -1509,7 +1510,7 @@ namespace DisplaySwitcher::Native
             {
                 if (auto self = weak.lock())
                     return EnumerateDdcMonitors(self->ddcBackends_.Lookup(NativeDdcBackendKey));
-                return DdcEnumerationResult{ false, DdcErrorKind::Canceled, L"应用正在退出", {}, false };
+                return DdcEnumerationResult{ false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"应用正在退出"), {}, false };
             },
             [weak](AppConfig& config, std::vector<std::wstring> const& displayIds,
                 DdcCancellationToken const& cancellation)
@@ -1555,7 +1556,7 @@ namespace DisplaySwitcher::Native
                 catch (...)
                 {
                     self->EnterSafeStateAfterSaveFailure();
-                    self->ShowError(L"保存 DDC 缓存失败", L"无法安全保存 DDC 估计值；自动协同和硬件操作已停用。");
+                    self->ShowError(::DisplaySwitcher::Native::UiText(L"保存 DDC 缓存失败"), ::DisplaySwitcher::Native::UiText(L"无法安全保存 DDC 估计值；自动协同和硬件操作已停用。"));
                     return false;
                 }
                 { std::scoped_lock lock(self->configMutex_); self->config_ = std::move(config); }
@@ -1603,6 +1604,16 @@ namespace DisplaySwitcher::Native
             get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->SetConnectionStatus(
                 peerConnectionStatus_, peerConnected_);
         }
+        get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->SetLanguageChanged([weak]
+        {
+            if (auto self = weak.lock())
+            {
+                self->RefreshTrayDdcControls();
+                auto config = self->Config();
+                self->SetStatus(UsbTrayStatusText(config.usbSwitch.enabled));
+
+            }
+        });
         get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->ShowWindow();
     }
 
@@ -1616,7 +1627,7 @@ namespace DisplaySwitcher::Native
         });
     }
 
-    void Controller::SetPeerConnectionStatus(std::wstring const& text, bool connected)
+    void Controller::SetPeerConnectionStatus(UiMessage const& text, bool connected)
     {
         if (disposed_) return;
         if (!dispatcher_.HasThreadAccess())

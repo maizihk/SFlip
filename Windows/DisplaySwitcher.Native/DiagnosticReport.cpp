@@ -1,61 +1,62 @@
 #include "pch.h"
+#include "Localization.h"
 #include "DiagnosticReport.h"
 
 namespace
 {
     using namespace DisplaySwitcher::Native;
 
-    wchar_t const* YesNo(bool value) { return value ? L"是" : L"否"; }
+    wchar_t const* YesNo(bool value) { return value ? ::DisplaySwitcher::Native::UiText(L"是") : ::DisplaySwitcher::Native::UiText(L"否"); }
     wchar_t const* Availability(DdcAvailability value)
     {
         switch (value)
         {
-        case DdcAvailability::Available: return L"可用";
-        case DdcAvailability::Unsupported: return L"不支持";
-        default: return L"暂时不可用";
+        case DdcAvailability::Available: return ::DisplaySwitcher::Native::UiText(L"可用");
+        case DdcAvailability::Unsupported: return ::DisplaySwitcher::Native::UiText(L"不支持");
+        default: return ::DisplaySwitcher::Native::UiText(L"暂时不可用");
         }
     }
     wchar_t const* Binding(DisplayBindingStatus value)
     {
         switch (value)
         {
-        case DisplayBindingStatus::Resolved: return L"已唯一绑定";
-        case DisplayBindingStatus::Ambiguous: return L"匹配歧义";
-        case DisplayBindingStatus::NeedsConfirmation: return L"需要确认";
-        default: return L"离线";
+        case DisplayBindingStatus::Resolved: return ::DisplaySwitcher::Native::UiText(L"已唯一绑定");
+        case DisplayBindingStatus::Ambiguous: return ::DisplaySwitcher::Native::UiText(L"匹配歧义");
+        case DisplayBindingStatus::NeedsConfirmation: return ::DisplaySwitcher::Native::UiText(L"需要确认");
+        default: return ::DisplaySwitcher::Native::UiText(L"离线");
         }
     }
     wchar_t const* Heartbeat(DiagnosticHeartbeatState value)
     {
         switch (value)
         {
-        case DiagnosticHeartbeatState::Recent: return L"最近合法";
-        case DiagnosticHeartbeatState::Expired: return L"已过期";
-        default: return L"尚未收到";
+        case DiagnosticHeartbeatState::Recent: return ::DisplaySwitcher::Native::UiText(L"最近合法");
+        case DiagnosticHeartbeatState::Expired: return ::DisplaySwitcher::Native::UiText(L"已过期");
+        default: return ::DisplaySwitcher::Native::UiText(L"尚未收到");
         }
     }
     wchar_t const* OperationKind(DiagnosticOperationKind value)
     {
         switch (value)
         {
-        case DiagnosticOperationKind::Enumerate: return L"枚举";
-        case DiagnosticOperationKind::Read: return L"读取";
-        case DiagnosticOperationKind::Write: return L"写入";
-        case DiagnosticOperationKind::InputSource: return L"输入源";
-        default: return L"无";
+        case DiagnosticOperationKind::Enumerate: return ::DisplaySwitcher::Native::UiText(L"枚举");
+        case DiagnosticOperationKind::Read: return ::DisplaySwitcher::Native::UiText(L"读取");
+        case DiagnosticOperationKind::Write: return ::DisplaySwitcher::Native::UiText(L"写入");
+        case DiagnosticOperationKind::InputSource: return ::DisplaySwitcher::Native::UiText(L"输入源");
+        default: return ::DisplaySwitcher::Native::UiText(L"无");
         }
     }
     wchar_t const* OperationState(DiagnosticOperationState value)
     {
         switch (value)
         {
-        case DiagnosticOperationState::Success: return L"成功";
-        case DiagnosticOperationState::Failed: return L"失败";
-        case DiagnosticOperationState::Ambiguous: return L"安全拒绝（歧义）";
-        case DiagnosticOperationState::NeedsConfirmation: return L"安全拒绝（待确认）";
-        case DiagnosticOperationState::Offline: return L"不可用（离线）";
-        case DiagnosticOperationState::Stale: return L"已失效";
-        default: return L"尚未操作";
+        case DiagnosticOperationState::Success: return ::DisplaySwitcher::Native::UiText(L"成功");
+        case DiagnosticOperationState::Failed: return ::DisplaySwitcher::Native::UiText(L"失败");
+        case DiagnosticOperationState::Ambiguous: return ::DisplaySwitcher::Native::UiText(L"安全拒绝（歧义）");
+        case DiagnosticOperationState::NeedsConfirmation: return ::DisplaySwitcher::Native::UiText(L"安全拒绝（待确认）");
+        case DiagnosticOperationState::Offline: return ::DisplaySwitcher::Native::UiText(L"不可用（离线）");
+        case DiagnosticOperationState::Stale: return ::DisplaySwitcher::Native::UiText(L"已失效");
+        default: return ::DisplaySwitcher::Native::UiText(L"尚未操作");
         }
     }
     wchar_t const* TopologyTrust(DisplayTopologyTrust value)
@@ -93,56 +94,56 @@ namespace DisplaySwitcher::Native
 
     std::wstring DescribeBasicDdcResult(DdcControlItemResult const& item, bool write)
     {
-        if (item.success && item.trusted) return write ? L"硬件 DDC 写入成功" : L"硬件 DDC 回读成功";
-        if (item.error == DdcErrorKind::AmbiguousMonitor) return L"硬件 DDC 操作失败：显示器匹配不唯一";
-        return write ? L"硬件 DDC 写入失败" : L"硬件 DDC 读取失败";
+        if (item.success && item.trusted) return write ? ::DisplaySwitcher::Native::UiText(L"硬件 DDC 写入成功") : ::DisplaySwitcher::Native::UiText(L"硬件 DDC 回读成功");
+        if (item.error == DdcErrorKind::AmbiguousMonitor) return ::DisplaySwitcher::Native::UiText(L"硬件 DDC 操作失败：显示器匹配不唯一");
+        return write ? ::DisplaySwitcher::Native::UiText(L"硬件 DDC 写入失败") : ::DisplaySwitcher::Native::UiText(L"硬件 DDC 读取失败");
     }
 
     std::wstring BuildDiagnosticPreview(DiagnosticSnapshot const& snapshot)
     {
         std::wostringstream out;
-        out << L"SFlip 诊断预览\r\n"
-            << L"应用：" << snapshot.about.applicationName << L"\r\n"
-            << L"版本/构建：" << snapshot.about.publicVersion << L"\r\n"
-            << L"架构：" << snapshot.about.architecture << L"\r\n"
-            << L"协议：v2\r\n"
-            << L"配置 schemaVersion：" << snapshot.schemaVersion << L"\r\n"
-            << L"detailed-recording=" << (snapshot.detailedRecordingEnabled ? L"true（开启）" : L"false（关闭）") << L"\r\n"
-            << L"安全状态：" << (snapshot.safeMode ? L"已阻断副作用" : L"正常") << L"\r\n\r\n";
+        out << ::DisplaySwitcher::Native::UiText(L"SFlip 诊断预览\r\n")
+            << ::DisplaySwitcher::Native::UiText(L"应用：") << snapshot.about.applicationName << L"\r\n"
+            << ::DisplaySwitcher::Native::UiText(L"版本/构建：") << snapshot.about.publicVersion << L"\r\n"
+            << ::DisplaySwitcher::Native::UiText(L"架构：") << snapshot.about.architecture << L"\r\n"
+            << ::DisplaySwitcher::Native::UiText(L"协议：v2\r\n")
+            << ::DisplaySwitcher::Native::UiText(L"配置 schemaVersion：") << snapshot.schemaVersion << L"\r\n"
+            << ::DisplaySwitcher::Native::UiText(L"detailed-recording=") << (snapshot.detailedRecordingEnabled ? ::DisplaySwitcher::Native::UiText(L"true（开启）") : ::DisplaySwitcher::Native::UiText(L"false（关闭）")) << L"\r\n"
+            << ::DisplaySwitcher::Native::UiText(L"安全状态：") << (snapshot.safeMode ? ::DisplaySwitcher::Native::UiText(L"已阻断副作用") : ::DisplaySwitcher::Native::UiText(L"正常")) << L"\r\n\r\n";
 
-        out << L"协同配置：" << snapshot.profiles.size() << L"\r\n";
+        out << ::DisplaySwitcher::Native::UiText(L"协同配置：") << snapshot.profiles.size() << L"\r\n";
         for (size_t index = 0; index < snapshot.profiles.size(); ++index)
         {
             auto const& profile = snapshot.profiles[index];
-            out << L"P" << (profile.anonymousIndex ? profile.anonymousIndex : index + 1) << L"：启用=" << YesNo(profile.enabled)
-                << L"，endpoint 已绑定=" << YesNo(profile.endpointBound)
-                << L"，连接=" << (profile.connected ? L"在线" : L"离线")
-                << L"，最后合法心跳=" << Heartbeat(profile.heartbeat) << L"\r\n";
+            out << L"P" << (profile.anonymousIndex ? profile.anonymousIndex : index + 1) << ::DisplaySwitcher::Native::UiText(L"：启用=") << YesNo(profile.enabled)
+                << ::DisplaySwitcher::Native::UiText(L"，endpoint 已绑定=") << YesNo(profile.endpointBound)
+                << ::DisplaySwitcher::Native::UiText(L"，连接=") << (profile.connected ? ::DisplaySwitcher::Native::UiText(L"在线") : ::DisplaySwitcher::Native::UiText(L"离线"))
+                << ::DisplaySwitcher::Native::UiText(L"，最后合法心跳=") << Heartbeat(profile.heartbeat) << L"\r\n";
         }
-        out << L"\r\nUSB：启用=" << YesNo(snapshot.usb.enabled)
-            << L"，触发设备已选择=" << YesNo(snapshot.usb.triggerSelected)
-            << L"，显示器映射=" << snapshot.usb.mappingCount
-            << L"，协同唤醒=" << YesNo(snapshot.usb.collaborationWakeEnabled) << L"\r\n\r\n";
+        out << ::DisplaySwitcher::Native::UiText(L"\r\nUSB：启用=") << YesNo(snapshot.usb.enabled)
+            << ::DisplaySwitcher::Native::UiText(L"，触发设备已选择=") << YesNo(snapshot.usb.triggerSelected)
+            << ::DisplaySwitcher::Native::UiText(L"，显示器映射=") << snapshot.usb.mappingCount
+            << ::DisplaySwitcher::Native::UiText(L"，协同唤醒=") << YesNo(snapshot.usb.collaborationWakeEnabled) << L"\r\n\r\n";
 
-        out << L"原生 Dxva2：" << Availability(snapshot.backend.availability)
+        out << ::DisplaySwitcher::Native::UiText(L"原生 Dxva2：") << Availability(snapshot.backend.availability)
             << L"，topology=" << TopologyTrust(snapshot.backend.topologyTrust)
-            << L"，枚举=" << YesNo(snapshot.backend.enumerateSupported)
-            << L"，读取=" << YesNo(snapshot.backend.readSupported)
-            << L"，写入=" << YesNo(snapshot.backend.writeSupported) << L"\r\n";
+            << ::DisplaySwitcher::Native::UiText(L"，枚举=") << YesNo(snapshot.backend.enumerateSupported)
+            << ::DisplaySwitcher::Native::UiText(L"，读取=") << YesNo(snapshot.backend.readSupported)
+            << ::DisplaySwitcher::Native::UiText(L"，写入=") << YesNo(snapshot.backend.writeSupported) << L"\r\n";
         for (size_t index = 0; index < snapshot.displays.size(); ++index)
         {
             auto const& display = snapshot.displays[index];
-            out << L"D" << (display.anonymousIndex ? display.anonymousIndex : index + 1) << L"：绑定=" << Binding(display.binding)
-                << L"，亮度=" << (display.brightnessEnabled ? L"开启" : L"关闭")
-                << L"，对比度=" << (display.contrastEnabled ? L"开启" : L"关闭")
-                << L"，音量=" << (display.volumeEnabled ? L"开启" : L"关闭")
-                << L"，最后操作=" << DescribeDiagnosticOperation(display) << L"\r\n";
+            out << L"D" << (display.anonymousIndex ? display.anonymousIndex : index + 1) << ::DisplaySwitcher::Native::UiText(L"：绑定=") << Binding(display.binding)
+                << ::DisplaySwitcher::Native::UiText(L"，亮度=") << (display.brightnessEnabled ? ::DisplaySwitcher::Native::UiText(L"开启") : ::DisplaySwitcher::Native::UiText(L"关闭"))
+                << ::DisplaySwitcher::Native::UiText(L"，对比度=") << (display.contrastEnabled ? ::DisplaySwitcher::Native::UiText(L"开启") : ::DisplaySwitcher::Native::UiText(L"关闭"))
+                << ::DisplaySwitcher::Native::UiText(L"，音量=") << (display.volumeEnabled ? ::DisplaySwitcher::Native::UiText(L"开启") : ::DisplaySwitcher::Native::UiText(L"关闭"))
+                << ::DisplaySwitcher::Native::UiText(L"，最后操作=") << DescribeDiagnosticOperation(display) << L"\r\n";
         }
 
-        out << L"\r\n会话内详细事件："
+        out << ::DisplaySwitcher::Native::UiText(L"\r\n会话内详细事件：")
             << (snapshot.detailedRecordingEnabled ? snapshot.sessions.size() : 0) << L"\r\n";
         if (!snapshot.detailedRecordingEnabled)
-            out << L"详细记录已关闭；仅显示配置、能力和基本运行状态。\r\n";
+            out << ::DisplaySwitcher::Native::UiText(L"详细记录已关闭；仅显示配置、能力和基本运行状态。\r\n");
         else
             for (size_t index = 0; index < snapshot.sessions.size(); ++index)
                 out << L"S" << index + 1 << L" / O" << index + 1 << L"：" << WidenSafeAscii(snapshot.sessions[index]) << L"\r\n";

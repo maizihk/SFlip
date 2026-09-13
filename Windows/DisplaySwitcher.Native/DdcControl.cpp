@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "DdcControl.h"
 
 namespace
@@ -70,9 +71,9 @@ namespace
 
     wchar_t const* ControlLabel(DdcVcpCode code) noexcept
     {
-        if (code == DdcVcpCode::Brightness) return L"亮度";
-        if (code == DdcVcpCode::Contrast) return L"对比度";
-        return L"音量";
+        if (code == DdcVcpCode::Brightness) return ::DisplaySwitcher::Native::UiText(L"亮度");
+        if (code == DdcVcpCode::Contrast) return ::DisplaySwitcher::Native::UiText(L"对比度");
+        return ::DisplaySwitcher::Native::UiText(L"音量");
     }
 
     std::wstring CanonicalIdentity(std::wstring const& value)
@@ -374,7 +375,7 @@ namespace DisplaySwitcher::Native
                     || display.bindingStatus == DisplayBindingStatus::NeedsConfirmation;
                 auto error = ambiguous ? DdcErrorKind::AmbiguousMonitor : DdcErrorKind::MonitorUnavailable;
                 auto message = display.bindingMessage.empty()
-                    ? (ambiguous ? L"显示器绑定不明确，需要重新确认" : L"显示器当前离线")
+                    ? (ambiguous ? ::DisplaySwitcher::Native::UiText(L"显示器绑定不明确，需要重新确认") : ::DisplaySwitcher::Native::UiText(L"显示器当前离线"))
                     : display.bindingMessage;
                 for (auto code : ControlCodes()) if (FeatureEnabled(display, code))
                     batch.items.push_back(Failure(display, code,
@@ -385,7 +386,7 @@ namespace DisplaySwitcher::Native
             DdcBackendStatus status;
             if (!backend)
             {
-                status = { DdcAvailability::Unsupported, L"未选择可用的硬件 DDC 后端" };
+                status = { DdcAvailability::Unsupported, ::DisplaySwitcher::Native::UiText(L"未选择可用的硬件 DDC 后端") };
                 for (auto code : ControlCodes()) if (FeatureEnabled(display, code))
                     batch.items.push_back(Failure(display, code, status, DdcErrorKind::BackendUnavailable, status.message));
                 continue;
@@ -410,7 +411,7 @@ namespace DisplaySwitcher::Native
                 if (!capabilities.CanRead(code))
                 {
                     displayResults.push_back(Failure(display, code, capabilities.status, DdcErrorKind::Unsupported,
-                        capabilities.status.message.empty() ? L"显示器未报告该硬件 DDC 功能" : capabilities.status.message));
+                        capabilities.status.message.empty() ? ::DisplaySwitcher::Native::UiText(L"显示器未报告该硬件 DDC 功能") : capabilities.status.message));
                     continue;
                 }
                 auto value = backend->Read(monitorId, code, cancellation);
@@ -445,7 +446,7 @@ namespace DisplaySwitcher::Native
                 if (allThreeZero)
                 {
                     item.trusted = false;
-                    item.message = L"三项硬件 DDC 遥测均为零，结果不可信";
+                    item.message = ::DisplaySwitcher::Native::UiText(L"三项硬件 DDC 遥测均为零，结果不可信");
                     auto cached = CachedValue(display, item.code);
                     auto cachedMax = CachedMaximum(display, item.code);
                     item.estimated = cached.has_value(); item.current = cached;
@@ -473,20 +474,20 @@ namespace DisplaySwitcher::Native
         if (!IsDdcControlVcpCode(code))
         {
             batch.items.push_back({ displayId, code, false, false, false, false, {}, {}, DdcAvailability::Unsupported,
-                DdcErrorKind::Unsupported, L"普通 DDC 控制不支持该 VCP 项" });
+                DdcErrorKind::Unsupported, ::DisplaySwitcher::Native::UiText(L"普通 DDC 控制不支持该 VCP 项") });
             return batch;
         }
         if (value < 0 || value > 65535)
         {
             batch.items.push_back({ displayId, code, false, false, false, false, {}, {}, DdcAvailability::Available,
-                DdcErrorKind::InvalidValue, L"调节值超出有效范围" });
+                DdcErrorKind::InvalidValue, ::DisplaySwitcher::Native::UiText(L"调节值超出有效范围") });
             return batch;
         }
         auto backend = Backend();
         if (!backend)
         {
             batch.items.push_back({ displayId, code, false, false, false, false, {}, {}, DdcAvailability::Unsupported,
-                DdcErrorKind::BackendUnavailable, L"未选择可用的硬件 DDC 后端" });
+                DdcErrorKind::BackendUnavailable, ::DisplaySwitcher::Native::UiText(L"未选择可用的硬件 DDC 后端") });
             return batch;
         }
         if (backend->TopologyTrust() != DisplayTopologyTrust::LocalPhysicalAuthoritative)
@@ -513,7 +514,7 @@ namespace DisplaySwitcher::Native
             auto const& display = config.displays[*outOfRange];
             batch.items.push_back({ display.id, code, false, false, false, false, {},
                 SafeMaximum(display, code), DdcAvailability::Available, DdcErrorKind::InvalidValue,
-                L"调节值超出联动目标的共同安全范围" });
+                ::DisplaySwitcher::Native::UiText(L"调节值超出联动目标的共同安全范围") });
             return batch;
         }
 
@@ -535,23 +536,23 @@ namespace DisplaySwitcher::Native
             if (!capabilities.CanWrite(code))
             {
                 batch.items.push_back(Failure(display, code, capabilities.status, DdcErrorKind::Unsupported,
-                    capabilities.status.message.empty() ? L"显示器未报告该硬件 DDC 功能" : capabilities.status.message));
+                    capabilities.status.message.empty() ? ::DisplaySwitcher::Native::UiText(L"显示器未报告该硬件 DDC 功能") : capabilities.status.message));
                 continue;
             }
             if (linkAllDisplays && value > SafeMaximum(display, code))
             {
                 batch.items.push_back(Failure(display, code, status, DdcErrorKind::InvalidValue,
-                    L"调节值超出显示器安全范围"));
+                    ::DisplaySwitcher::Native::UiText(L"调节值超出显示器安全范围")));
                 continue;
             }
             auto result = Allowed(config, cancellation)
                 ? WriteNativeWithOneRefresh(*backend, monitorId, code, value, cancellation)
-                : DdcWriteResult{ false, DdcErrorKind::Canceled, L"操作已取消" };
+                : DdcWriteResult{ false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
             auto topologyChangedDuringWrite = !TopologyUnchanged(*backend, topologyGeneration);
             if (topologyChangedDuringWrite || (result.success && result.topologyGeneration != 0
                 && result.topologyGeneration != backend->TopologyGeneration()))
             {
-                result = { false, DdcErrorKind::TopologyChanged, L"显示拓扑已变化，旧句柄结果已丢弃" };
+                result = { false, DdcErrorKind::TopologyChanged, ::DisplaySwitcher::Native::UiText(L"显示拓扑已变化，旧句柄结果已丢弃") };
                 topologyChangedDuringWrite = true;
             }
             if (topologyChangedDuringWrite)

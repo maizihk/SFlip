@@ -1,3 +1,4 @@
+#include "Localization.h"
 #pragma once
 
 #include <algorithm>
@@ -341,27 +342,27 @@ namespace DisplaySwitcher::Native
         {
             {
                 {
-                    L"自动切换",
+                    ::DisplaySwitcher::Native::UiText(L"自动切换"),
                     {
                         {
-                            L"自动切换",
+                            ::DisplaySwitcher::Native::UiText(L"自动切换"),
                             {
-                                L"自动切换开关",
-                                L"触发设备",
-                                L"当前状态",
-                                L"对端输入源显示器列表",
+                                ::DisplaySwitcher::Native::UiText(L"自动切换开关"),
+                                ::DisplaySwitcher::Native::UiText(L"触发设备"),
+                                ::DisplaySwitcher::Native::UiText(L"当前状态"),
+                                ::DisplaySwitcher::Native::UiText(L"对端输入源显示器列表"),
                             },
                         }
                     },
                 },
                 {
-                    L"联动协同",
+                    ::DisplaySwitcher::Native::UiText(L"联动协同"),
                     {
                         {
-                            L"联动协同",
+                            ::DisplaySwitcher::Native::UiText(L"联动协同"),
                             {
-                                L"联动目标",
-                                L"联动开关",
+                                ::DisplaySwitcher::Native::UiText(L"联动目标"),
+                                ::DisplaySwitcher::Native::UiText(L"联动开关"),
                             },
                         },
                     },
@@ -376,40 +377,40 @@ namespace DisplaySwitcher::Native
         {
             {
                 {
-                    L"协同状态",
+                    ::DisplaySwitcher::Native::UiText(L"协同状态"),
                     {
                         {
-                            L"协同状态",
+                            ::DisplaySwitcher::Native::UiText(L"协同状态"),
                             {
-                                L"当前连接/权限状态",
-                                L"检查网络权限",
-                                L"检测连接",
-                                L"原有安全说明",
+                                ::DisplaySwitcher::Native::UiText(L"当前连接/权限状态"),
+                                ::DisplaySwitcher::Native::UiText(L"检查网络权限"),
+                                ::DisplaySwitcher::Native::UiText(L"检测连接"),
+                                ::DisplaySwitcher::Native::UiText(L"原有安全说明"),
                             },
                         },
                     },
                 },
                 {
-                    L"配置",
+                    ::DisplaySwitcher::Native::UiText(L"配置"),
                     {
                         {
-                            L"配置选择",
+                            ::DisplaySwitcher::Native::UiText(L"配置选择"),
                             {
-                                L"当前配置",
-                                L"添加配置",
+                                ::DisplaySwitcher::Native::UiText(L"当前配置"),
+                                ::DisplaySwitcher::Native::UiText(L"添加配置"),
                             },
                         },
                         {
-                            L"配置详情",
+                            ::DisplaySwitcher::Native::UiText(L"配置详情"),
                             {
-                                L"配置名称",
-                                L"启用开关",
-                                L"对端地址",
-                                L"端口",
-                                L"配对密码",
-                                L"对端输入源显示器列表",
-                                L"本机触发设备引用状态",
-                                L"删除配置",
+                                ::DisplaySwitcher::Native::UiText(L"配置名称"),
+                                ::DisplaySwitcher::Native::UiText(L"启用开关"),
+                                ::DisplaySwitcher::Native::UiText(L"对端地址"),
+                                ::DisplaySwitcher::Native::UiText(L"端口"),
+                                ::DisplaySwitcher::Native::UiText(L"配对密码"),
+                                ::DisplaySwitcher::Native::UiText(L"对端输入源显示器列表"),
+                                ::DisplaySwitcher::Native::UiText(L"本机触发设备引用状态"),
+                                ::DisplaySwitcher::Native::UiText(L"删除配置"),
                             },
                         },
                     },

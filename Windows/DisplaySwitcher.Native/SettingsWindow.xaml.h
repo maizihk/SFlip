@@ -34,13 +34,15 @@ namespace winrt::DisplaySwitcher::Native::implementation
             std::function<::DisplaySwitcher::Native::DiagnosticSnapshot()> diagnosticSnapshot,
             std::shared_ptr<::DisplaySwitcher::Native::DisplayOperationTracker> displayDiagnostics,
             std::function<void()> closed);
-        void SetConnectionStatus(std::wstring const& status, bool connected);
+        void SetConnectionStatus(::DisplaySwitcher::Native::UiMessage const& status, bool connected);
         void ReloadConfiguration(::DisplaySwitcher::Native::AppConfig const& config);
         void SynchronizePeerRoutes(::DisplaySwitcher::Native::AppConfig const& config);
         void ShowWindow();
         void CloseForExit();
+        void SetLanguageChanged(std::function<void()> callback) { languageChanged_ = std::move(callback); }
 
     private:
+        void ChangeLanguage(::DisplaySwitcher::Native::UiLanguagePreference preference);
         Microsoft::UI::Xaml::UIElement BuildContent();
         Microsoft::UI::Xaml::Controls::Border CreateSection(
             ::DisplaySwitcher::Native::SettingsCardContract const& contract,
@@ -124,6 +126,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         std::function<void()> closed_;
         ::DisplaySwitcher::Native::DdcCancellationSource ddcCancellation_;
         bool ddcReadPending_{};
+        size_t ddcWritesPending_{};
         std::vector<std::pair<Microsoft::UI::Xaml::Controls::Button, bool>> ddcReadButtons_;
         ::DisplaySwitcher::Native::UsbLearningSession usbLearning_;
         Microsoft::UI::Dispatching::DispatcherQueueTimer usbLearningTimer_{ nullptr };
@@ -202,6 +205,10 @@ namespace winrt::DisplaySwitcher::Native::implementation
         Microsoft::UI::Xaml::Controls::ToggleSwitch detailedDiagnostics_{ nullptr };
         Microsoft::UI::Xaml::Controls::TextBox diagnosticPreview_{ nullptr };
         ::DisplaySwitcher::Native::DiagnosticPreviewModel diagnosticPreviewModel_;
+        ::DisplaySwitcher::Native::UiMessage connectionMessage_{ L"协同未启用" };
+        bool connectionConnected_{};
+        std::function<void()> languageChanged_;
+        Microsoft::UI::Xaml::Controls::ComboBox languagePicker_{ nullptr };
         bool initialized_{};
         bool loading_{};
         bool windowClosed_{};

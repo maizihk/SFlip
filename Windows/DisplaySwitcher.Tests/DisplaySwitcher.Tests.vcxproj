@@ -45,6 +45,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Tests.cpp" />
+    <ClCompile Include="..\DisplaySwitcher.Native\Localization.cpp"><Link>Native\Localization.cpp</Link></ClCompile>
     <ClCompile Include="V2ProtocolTests.cpp" />
     <ClCompile Include="..\DisplaySwitcher.Native\AppConfig.cpp"><Link>Native\AppConfig.cpp</Link></ClCompile>
     <ClCompile Include="..\DisplaySwitcher.Native\AboutInfo.cpp"><Link>Native\AboutInfo.cpp</Link></ClCompile>

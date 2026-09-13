@@ -1,3 +1,4 @@
+#include "Localization.h"
 #pragma once
 #include "DisplayModel.h"
 
@@ -34,7 +35,7 @@ namespace DisplaySwitcher::Native
         bool linkAllDisplays{ false };
         std::vector<DisplayConfig> displays;
         std::wstring localEndpointId;
-        std::wstring localDeviceName{ L"本机" };
+        std::wstring localDeviceName{ ::DisplaySwitcher::Native::UiText(L"本机") };
         int listenPort{ 49731 };
         std::vector<CollaborationProfile> collaborationProfiles;
         bool startWithWindows{ false };
