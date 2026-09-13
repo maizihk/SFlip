@@ -597,3 +597,11 @@
 - [x] 用户授权发布；版本统一为 2.4.0、构建 24，仅更新版本和发布文档，不改协议及配置格式。
 - [x] 发布代码 81dd2be：297 项 XCTest、Debug/Release、严格签名及打包验证通过；CI 34753517785，包内版本 2.4.0（24）。下载包 SHA-256 与 CI 一致。
 - 发布入口：[v2.4.0](https://github.com/maizihk/SFlip/releases/tag/v2.4.0)。本次仅验证版本及打包，既有 GUI/实机待验项不改勾选。
+
+### DS-049 Mac 无终端安装与手动放行（2026-09-13）
+
+- [x] 用户要求安装不依赖 xattr，允许系统设置中手动放行；不新增 Developer ID、公证或自动清理用户隔离属性的安装流程。
+- [x] 中英文 README、macOS/INSTALL.md 和 DMG 安装说明补充从 Applications 启动及“隐私与安全性 → 仍要打开”路径。
+- [x] 核对当前发布 ZIP 无 AppleDouble 元数据；既有签名完整性不等同 Gatekeeper 放行。早先 AppSandbox 报错可能涉及下载来源限制，尚未确认当前失败原因。
+- [ ] 用户报告 Chrome 或其他浏览器下载后“无法打开”；等待 Safari 直下载及手动放行对照，不宣称问题已解决。
+- [ ] DMG 说明构建检查、完整 XCTest/Release 及真实首次安装验证待完成。

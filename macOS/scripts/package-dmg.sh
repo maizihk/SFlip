@@ -44,11 +44,17 @@ cat > "$CONTENTS/安装说明.txt" <<'INSTRUCTIONS'
 2. 如果替换旧版，请先退出正在运行的应用，再确认替换。
    从 DisplaySwitcher 改名版本升级时，安装确认后可移除旧 DisplaySwitcher.app。
 3. 复制完成后推出此磁盘映像，从“应用程序”打开 SFlip。
-4. 在设置中按需要配置显示器、USB 与协同，并申请所需权限。
+4. 如提示无法验证开发者，打开“系统设置 → 隐私与安全性”，选择“仍要打开”，再确认“打开”。
+5. 在设置中按需要配置显示器、USB 与协同，并申请所需权限。
    改名升级后如已启用登录启动，请在新应用中关闭再开启一次。
 
 请勿直接从磁盘映像运行应用。
-DMG 不会自动安装、申请权限或改变系统设置。
+如仅提示“应用程序无法打开”，且手动允许后仍失败，请用 Safari 从 GitHub 重新下载。
+安装说明：https://github.com/maizihk/SFlip/blob/main/macOS/INSTALL.md
+
+First launch: open SFlip from Applications. If macOS cannot verify the developer, use
+System Settings > Privacy & Security > Open Anyway, then confirm Open.
+If it still cannot open, download a fresh copy directly from GitHub using Safari.
 INSTRUCTIONS
 /usr/bin/xcrun swift "$PROJECT_DIR/scripts/dmg/render-background.swift" "$WORK_DIR/background.tiff"
 "$TOOLS_DIR/bin/dmgbuild" -s "$PROJECT_DIR/scripts/dmg/settings.py" \
