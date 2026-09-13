@@ -442,3 +442,9 @@
 - W-047 托盘状态补充：TrayStatusPresentation 持有 UiMessage 模板与复制的具名参数，语言刷新仅重新生成现有 tooltip，不把成功/失败操作改成 USB 开关提示。缺失映射数量使用完整结果模板；新增失败→双向重绘→后续成功、参数副本及原始外部文本保留模拟测试。自动编译/完整测试已通过 Windows CI 验证。
 
 - 最终验证：提交 `9faa523` / [PR #104](https://github.com/maizihk/DisplaySwitch/pull/104)，[Windows CI run 34751479197](https://github.com/maizihk/DisplaySwitch/actions/runs/34751479197) / job `103708672810` 全部成功：535 项原生检查、61 项安装器检查、x64 Release、绿色目录验证及上传。artifact `10316116464` 已下载为 `Windows/outputs/english-9faa523/SFlip-Windows-x64-portable.zip`，SHA-256 `58d9e88b12ee44c3eac02a73d19820e954a2f4e4f9efc12ada1138f8ae41db6e` 校验一致；产物保存在 ignored outputs，不提交。GUI/语言切换/高 DPI 等实机状态仍待验证。
+
+## W-048 统一版本发布
+
+- 分支 codex/windows-release-2-4-0，基线 3ff778a；用户授权双端正式发布 2.4.0（构建 24）。
+- 版本配置、双语 README 和发布说明已更新；平台构建、测试、包校验、Release 待完成。
+

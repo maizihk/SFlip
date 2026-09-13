@@ -17,22 +17,21 @@ SFlip is a macOS menu bar and Windows system tray app for computers that share e
 
 ## Download and install
 
-Current releases: Windows **v2.3.2**, macOS **v2.3.0**. See the [release notes](https://github.com/maizihk/SFlip/releases) for changes in each version.
+Current releases: Windows **v2.4.0**, macOS **v2.4.0**. See the [release notes](https://github.com/maizihk/SFlip/releases) for changes in each version.
 
 | Platform | Requirements | Download |
 | --- | --- | --- |
-| macOS | Apple Silicon, macOS 12 or later | [DMG](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.zip) |
-| Windows | x64, Windows 10 1809 or later | [Installer](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-Setup.exe) · [Portable ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-portable.zip) |
+| macOS | Apple Silicon, macOS 12 or later | [DMG](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-macOS-arm64.zip) |
+| Windows | x64, Windows 10 1809 or later | [Installer](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-Windows-x64-Setup.exe) · [Portable ZIP](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-Windows-x64-portable.zip) |
 
 - **macOS**: Open the DMG, drag `SFlip.app` into `Applications`, then launch it from Applications. For the ZIP, extract it and move the app to Applications.
 - **Windows installer**: Run the installer and follow the setup wizard. If a required runtime is missing, install it and retry.
 - **Windows portable version**: Install [Windows App Runtime 2.4 x64](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads), extract the entire ZIP and run `SFlip.exe`. Keep the adjacent `runtime` folder.
 
-Quit the previous version before upgrading. Checksums: [Windows](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SHA256SUMS.txt) · [macOS](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SHA256SUMS.txt).
+Quit the previous version before upgrading. Checksums: [Windows](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SHA256SUMS.txt) · [macOS](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SHA256SUMS.txt).
 
 ## Basic usage
 
-The instructions below describe the current source code. Language selection, automatic connection using a pairing code and recent settings improvements are not included in the releases listed above. For downloaded versions, also consult their release notes.
 
 ### Interface language
 

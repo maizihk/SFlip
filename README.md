@@ -17,22 +17,21 @@ SFlip 是 macOS 菜单栏和 Windows 托盘工具，适合多台电脑共用显�
 
 ## 下载与安装
 
-当前正式版：Windows **v2.3.2**，macOS **v2.3.0**。各版本的改动见 [发布说明](https://github.com/maizihk/SFlip/releases)。
+当前正式版：Windows **v2.4.0**，macOS **v2.4.0**。各版本的改动见 [发布说明](https://github.com/maizihk/SFlip/releases)。
 
 | 平台 | 系统要求 | 下载 |
 | --- | --- | --- |
-| macOS | Apple Silicon，macOS 12 或更高版本 | [DMG](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SFlip-v2.3.0-macOS-arm64.zip) |
-| Windows | x64，Windows 10 1809 或更高版本 | [安装版](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-Setup.exe) · [绿色版 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SFlip-v2.3.2-Windows-x64-portable.zip) |
+| macOS | Apple Silicon，macOS 12 或更高版本 | [DMG](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-macOS-arm64.zip) |
+| Windows | x64，Windows 10 1809 或更高版本 | [安装版](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-Windows-x64-Setup.exe) · [绿色版 ZIP](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-Windows-x64-portable.zip) |
 
 - **macOS**：打开 DMG，把 `SFlip.app` 拖入 `Applications`，再从“应用程序”启动；ZIP 解压后同样放入“应用程序”。
 - **Windows 安装版**：运行安装程序，按向导完成安装。若提示缺少运行库，安装后返回重试。
 - **Windows 绿色版**：安装 [Windows App Runtime 2.4 x64](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads)，完整解压 ZIP，运行 `SFlip.exe`，保留旁边的 `runtime` 文件夹。
 
-升级前先退出旧版。文件校验值：[Windows](https://github.com/maizihk/SFlip/releases/download/v2.3.2/SHA256SUMS.txt) · [macOS](https://github.com/maizihk/SFlip/releases/download/v2.3.0/SHA256SUMS.txt)。
+升级前先退出旧版。文件校验值：[Windows](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SHA256SUMS.txt) · [macOS](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SHA256SUMS.txt)。
 
 ## 基础使用
 
-下面介绍当前源码的配置方式。语言选择、配对码自动连接及近期设置改进尚未进入上述正式版，下载版请同时参考对应发布说明。
 
 ### 界面语言
 
