@@ -325,7 +325,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     )
     private var usbLearningPending = false { didSet { updateLanguagePickerAvailability() } }
     private var peerInspectionPending = false { didSet { updateLanguagePickerAvailability() } }
-    private let languagePopup = NSPopUpButton()
+    private let languagePopup: NSPopUpButton = {
+        let popup = NSPopUpButton()
+        popup.widthAnchor.constraint(equalToConstant: 140).isActive = true
+        popup.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return popup
+    }()
     private var permissionEvidence: LocalNetworkPermissionEvidence = .notChecked
     private var usbStatusSource: (String, Bool)?
     private var ddcStatusPresentations: [String: () -> String] = [:]
@@ -655,7 +660,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         tabView.addTabViewItem(makePage(label: L10n.text("常规"), views: [
             module(title: L10n.text("常规"), views: [
-                labeledControlRow(title: L10n.text("语言"), control: languagePopup),
+                iconSettingRow(
+                    control: languagePopup,
+                    title: L10n.text("语言"),
+                    description: "",
+                    symbolName: "character.bubble"
+                ),
                 separator(),
                 switchRow(
                     button: launchAtLoginCheckbox,
@@ -1281,6 +1291,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         description: String,
         symbolName: String
     ) -> NSView {
+        iconSettingRow(control: button, title: title, description: description, symbolName: symbolName)
+    }
+
+    private func iconSettingRow(
+        control button: NSControl,
+        title: String,
+        description: String,
+        symbolName: String
+    ) -> NSView {
         button.controlSize = .regular
         button.setAccessibilityLabel(title)
         button.setContentHuggingPriority(.required, for: .horizontal)
@@ -1298,7 +1317,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         descriptionLabel.textColor = .secondaryLabelColor
         descriptionLabel.maximumNumberOfLines = 2
 
-        let labels = NSStackView(views: [titleLabel, descriptionLabel])
+        let labels = NSStackView(views: description.isEmpty ? [titleLabel] : [titleLabel, descriptionLabel])
         labels.orientation = .vertical
         labels.alignment = .leading
         labels.spacing = 2

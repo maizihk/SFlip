@@ -479,14 +479,16 @@
 - [x] 提交 `5699eaa`、PR [#101](https://github.com/maizihk/SFlip/pull/101)（base：`docs-refresh`）的 macOS CI run `34682847024`、job `103524550707` 通过 290 项 XCTest（零失败）、Debug/Release 构建、严格签名验证与打包。
 - [ ] 真实窄窗口、混合状态、联动切换布局和显示器调节仍待 GUI/实机验证。自动验证未执行真实 DDC、USB、网络或唤醒。
 
-### DS-047 中英双语与本机语言选择（自动验证完成，GUI/实机待验）
+### DS-047 中英双语与本机语言选择（初版自动验证完成，验收布局修复待 CI/GUI）
 
 - [x] 常规页提供跟随系统、简体中文、English，默认跟随系统；系统首选语言为中文时使用简体中文，其他语言使用英文。选择仅保存到独立本机 UserDefaults，不修改配置 schema 或 v2 协议。
 - [x] 中央目录覆盖 303 个界面/错误模板及语言选择文字；设置、托盘、状态、弹窗、权限引导、辅助功能描述和新生成名称均使用精确模板与独立参数，已有名称和硬件/路由标识不翻译。
 - [x] 切换语言仅从内存重建 AppKit 界面和菜单，保留当前页、配置、显示器可信样本和回调；读取、USB 学习及连接检测期间禁用选择，避免重建影响进行中交互。没有配置运行时重载、设备枚举、网络探测或硬件操作。
 - [x] 英文导航宽度和长表单标签换行已适配；InfoPlist.strings 提供 en/zh-Hans 本地网络用途说明并接入 Xcode。系统权限弹窗语言由 macOS 的 bundle 本地化决定，不承诺随 App 选择立即变化。
 - [x] 新增语言解析、缺失/未知偏好安全回退、全目录翻译与占位符一致性、用户参数原样保留、配置序列化不变及稳定诊断分类测试；既有中文测试显式固定并恢复原语言偏好。静态目录覆盖无遗漏、git diff --check 通过。
-- [x] 最终代码 `9faa523`、PR [#104](https://github.com/maizihk/SFlip/pull/104) 的 macOS CI [run 34751479215](https://github.com/maizihk/SFlip/actions/runs/34751479215) 通过 297 项 XCTest（零失败）、Debug/Release 构建、严格签名校验及产物验证。arm64 测试 DMG 已下载并校验，artifact `10316206336`，SHA-256：`3bc18a5ed0fa05d29fe203bfc567237b454c3c988a478e1bbcae35007bd3eeee`。
+- [x] 初版代码 `9faa523`、PR [#104](https://github.com/maizihk/SFlip/pull/104) 的 macOS CI [run 34751479215](https://github.com/maizihk/SFlip/actions/runs/34751479215) 通过 297 项 XCTest（零失败）、Debug/Release 构建、严格签名校验及产物验证。arm64 测试 DMG 已下载并校验，artifact `10316206336`，SHA-256：`3bc18a5ed0fa05d29fe203bfc567237b454c3c988a478e1bbcae35007bd3eeee`。
+- [x] 用户验收发现语言行没有图标、标题左边距不同且选择框铺满整行；现改为复用常规图标设置行，22 点语言图标、13 点 medium 标题和相同左右边距，右侧选择框固定 140 点，不增加解释文案，不修改语言解析/保存/重建逻辑。
+- [ ] 此次低风险语言行视觉修复待 macOS CI 构建及用户 GUI 复验；不新增自证测试。初版 CI 结果不作为此次未提交修复的验证结果。
 - [ ] 真实 macOS 六页、托盘、长名称/错误、浅深主题、切换语言、系统默认解析、重启持久化和系统授权弹窗仍待 GUI 验证。未运行真实 App、USB、DDC、局域网或唤醒操作。
 
 ### DS-046 联动控制列对齐与集中读取（自动验证完成，GUI/实机待验）
