@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "AppConfig.h"
 
 #include <algorithm>
@@ -223,7 +224,7 @@ namespace
         if (!config.collaborationProfiles.empty()) return;
         DisplaySwitcher::Native::CollaborationProfile profile;
         profile.id = DisplaySwitcher::Native::GenerateIdentifier();
-        profile.name = L"配置 1";
+        profile.name = ::DisplaySwitcher::Native::UiText(L"配置 1");
         config.collaborationProfiles.push_back(std::move(profile));
     }
 
@@ -705,25 +706,25 @@ namespace DisplaySwitcher::Native
     {
         ProfileInspectionResult result;
         auto profile = FindCollaborationProfile(profileId);
-        if (!profile) { result.problems.push_back(L"配置不存在"); return result; }
-        if (!VisibleText(profile->name, 1, 32)) result.problems.push_back(L"名称无效");
-        if (profile->peerHost.empty()) result.problems.push_back(L"未填写对端主机");
-        if (profile->peerPort < 1 || profile->peerPort > 65535) result.problems.push_back(L"端口无效");
-        if (!IsValidPairingCode(profile->pairingCode)) result.problems.push_back(L"配对密码无效");
+        if (!profile) { result.problems.push_back(::DisplaySwitcher::Native::UiText(L"配置不存在")); return result; }
+        if (!VisibleText(profile->name, 1, 32)) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"名称无效"));
+        if (profile->peerHost.empty()) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"未填写对端主机"));
+        if (profile->peerPort < 1 || profile->peerPort > 65535) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"端口无效"));
+        if (!IsValidPairingCode(profile->pairingCode)) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"配对密码无效"));
         bool hasValidMapping{};
         for (auto const& mapping : profile->displayInputs)
         {
-            if (!IsValidInputSourceValue(mapping.peerInput)) result.problems.push_back(L"显示器输入源无效");
-            else if (!FindDisplayById(displays, mapping.displayId)) result.problems.push_back(L"显示器映射已不可用");
+            if (!IsValidInputSourceValue(mapping.peerInput)) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"显示器输入源无效"));
+            else if (!FindDisplayById(displays, mapping.displayId)) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"显示器映射已不可用"));
             else hasValidMapping = true;
         }
-        if (!hasValidMapping) result.problems.push_back(L"未配置显示器输入映射");
+        if (!hasValidMapping) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"未配置显示器输入映射"));
         if (!observedEndpointId.empty())
         {
-            if (!IsValidDisplayId(observedEndpointId)) result.problems.push_back(L"检测到的 endpointID 无效");
+            if (!IsValidDisplayId(observedEndpointId)) result.problems.push_back(::DisplaySwitcher::Native::UiText(L"检测到的 endpointID 无效"));
         }
         if (observedProtocolVersion && *observedProtocolVersion != 2)
-            result.problems.push_back(L"检测到未知协议版本");
+            result.problems.push_back(::DisplaySwitcher::Native::UiText(L"检测到未知协议版本"));
         result.complete = result.problems.empty();
         return result;
     }

@@ -3,6 +3,23 @@ import Foundation
 import XCTest
 
 final class PeerTransportTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        previousLanguagePreference = UserDefaults.standard.object(forKey: L10n.preferenceKey)
+        L10n.preference = .simplifiedChinese
+    }
+
+    private var previousLanguagePreference: Any?
+
+    override func tearDown() {
+        if let previousLanguagePreference {
+            UserDefaults.standard.set(previousLanguagePreference, forKey: L10n.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: L10n.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     func testConfiguredHostnameMatchesResolvedDatagramAddressAndPort() {
         let resolver = MockPeerHostAddressResolver(addresses: [
             "peer.example": ["198.51.100.20"]

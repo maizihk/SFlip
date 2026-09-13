@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "DdcBackends.h"
 #include "Diagnostics.h"
 #include <devpkey.h>
@@ -274,7 +275,7 @@ namespace
             item.gdiName = source.viewGdiDeviceName;
             item.monitorDevicePath = target.monitorDevicePath;
             item.friendlyName = target.monitorFriendlyDeviceName;
-            if (item.friendlyName.empty()) item.friendlyName = L"显示器";
+            if (item.friendlyName.empty()) item.friendlyName = ::DisplaySwitcher::Native::UiText(L"未命名显示器");
             if (std::none_of(targets.begin(), targets.end(), [&](auto const& value)
                 { return EqualInsensitive(value.logicalTargetId, item.logicalTargetId); }))
                 targets.push_back(std::move(item));
@@ -504,8 +505,8 @@ namespace
         {
             error = DdcErrorKind::BackendUnavailable;
             message = native.topologyTrust == DisplayTopologyTrust::RemoteSessionLimited
-                ? L"远程桌面会话中，已保留本地物理显示器配置，返回本地后重新检测"
-                : L"Windows 当前显示拓扑不完整或不可用";
+                ? ::DisplaySwitcher::Native::UiText(L"远程桌面会话中，已保留本地物理显示器配置，返回本地后重新检测")
+                : ::DisplaySwitcher::Native::UiText(L"Windows 当前显示拓扑不完整或不可用");
             return nullptr;
         }
         std::vector<NativeMonitor*> matches;
@@ -515,8 +516,8 @@ namespace
             || matches.front()->handles.Handles().size() != 1)
         {
             error = matches.empty() ? DdcErrorKind::MonitorUnavailable : DdcErrorKind::AmbiguousMonitor;
-            message = matches.empty() ? L"已绑定显示器当前未连接"
-                : L"当前逻辑显示目标无法唯一解析到一个物理 DDC 句柄";
+            message = matches.empty() ? ::DisplaySwitcher::Native::UiText(L"已绑定显示器当前未连接")
+                : ::DisplaySwitcher::Native::UiText(L"当前逻辑显示目标无法唯一解析到一个物理 DDC 句柄");
             return nullptr;
         }
         return matches.front();
@@ -527,8 +528,8 @@ namespace
     public:
         explicit NativeDdcBackend(std::shared_ptr<NativeMonitorSession> session) : session_(std::move(session)) {}
         std::wstring Key() const override { return NativeDdcBackendKey; }
-        std::wstring DisplayName() const override { return L"Windows 原生 DDC/CI"; }
-        DdcBackendStatus Status() const override { return { DdcAvailability::Available, L"Windows 物理显示器 DDC/CI" }; }
+        std::wstring DisplayName() const override { return ::DisplaySwitcher::Native::UiText(L"Windows 原生 DDC/CI"); }
+        DdcBackendStatus Status() const override { return { DdcAvailability::Available, ::DisplaySwitcher::Native::UiText(L"Windows 物理显示器 DDC/CI") }; }
         uint64_t TopologyGeneration() const noexcept override { return SessionGeneration(*session_); }
         DisplayTopologyTrust TopologyTrust() const noexcept override
         { return session_->topologyTrust.load(std::memory_order_acquire); }
@@ -541,21 +542,21 @@ namespace
 
         DdcEnumerationResult Enumerate(DdcCancellationToken const& cancellation) override
         {
-            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, L"操作已取消", {}, false };
+            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消"), {}, false };
             std::scoped_lock lock(nativeDdcMutex);
             auto& native = ::RefreshLocked(*session_, true);
-            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, L"操作已取消", {}, false };
+            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消"), {}, false };
             if (native.topologyTrust == DisplayTopologyTrust::RemoteSessionLimited)
                 return { true, DdcErrorKind::None,
-                    L"远程桌面会话中，已保留本地物理显示器配置，返回本地后重新检测",
+                    ::DisplaySwitcher::Native::UiText(L"远程桌面会话中，已保留本地物理显示器配置，返回本地后重新检测"),
                     {}, false, DisplayTopologyTrust::RemoteSessionLimited };
             if (!native.success || (native.partialFailure && native.monitors.empty()))
                 return { false, DdcErrorKind::BackendUnavailable,
-                    L"Windows 当前显示拓扑枚举失败，错误 " + std::to_wstring(native.error), {}, false,
+                    ::DisplaySwitcher::Native::UiFormat(L"Windows 当前显示拓扑枚举失败，错误 {code}", {{L"code", std::to_wstring(native.error)}}), {}, false,
                     DisplayTopologyTrust::IncompleteOrUnavailable };
             auto monitors = PublicMonitorInfo(native, TopologyGeneration());
             return { true, DdcErrorKind::None,
-                native.partialFailure ? L"部分显示目标无法完整解析；已阻止不明确的 DDC 操作" : L"",
+                native.partialFailure ? ::DisplaySwitcher::Native::UiText(L"部分显示目标无法完整解析；已阻止不明确的 DDC 操作") : L"",
                 std::move(monitors), native.topologyTrust == DisplayTopologyTrust::LocalPhysicalAuthoritative,
                 native.topologyTrust };
         }
@@ -564,21 +565,21 @@ namespace
             DdcCancellationToken const& cancellation) override
         {
             if (cancellation.IsCanceled())
-                return { { DdcAvailability::TemporarilyUnavailable, L"操作已取消" }, true, {}, {} };
+                return { { DdcAvailability::TemporarilyUnavailable, ::DisplaySwitcher::Native::UiText(L"操作已取消") }, true, {}, {} };
             std::scoped_lock lock(nativeDdcMutex);
             auto& native = ::RefreshLocked(*session_, false);
             DdcErrorKind error{}; std::wstring message;
             auto monitor = ::ResolveLocked(native, monitorId, error, message);
             if (!monitor) return { { DdcAvailability::TemporarilyUnavailable, std::move(message) }, true, {}, {} };
-            return { { DdcAvailability::Available, L"原生硬件 DDC/CI 可用" }, false, {}, {} };
+            return { { DdcAvailability::Available, ::DisplaySwitcher::Native::UiText(L"原生硬件 DDC/CI 可用") }, false, {}, {} };
         }
 
         DdcValueResult Read(std::wstring const& monitorId, DdcVcpCode code,
             DdcCancellationToken const& cancellation) override
         {
             if (!IsDdcControlVcpCode(code))
-                return { false, 0, 0, DdcErrorKind::Unsupported, L"普通 DDC 控制不支持该 VCP 项" };
-            if (cancellation.IsCanceled()) return { false, 0, 0, DdcErrorKind::Canceled, L"操作已取消" };
+                return { false, 0, 0, DdcErrorKind::Unsupported, ::DisplaySwitcher::Native::UiText(L"普通 DDC 控制不支持该 VCP 项") };
+            if (cancellation.IsCanceled()) return { false, 0, 0, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
             std::scoped_lock lock(nativeDdcMutex);
             auto& native = ::RefreshLocked(*session_, false);
             auto operationGeneration = TopologyGeneration();
@@ -589,14 +590,14 @@ namespace
             auto success = GetVCPFeatureAndVCPFeatureReply(monitor->handles.Handles().front(),
                 static_cast<BYTE>(code), &type, &current, &maximum) != FALSE;
             auto nativeError = GetLastError();
-            if (cancellation.IsCanceled()) return { false, 0, 0, DdcErrorKind::Canceled, L"操作已取消" };
+            if (cancellation.IsCanceled()) return { false, 0, 0, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
             if (operationGeneration != TopologyGeneration())
-                return { false, 0, 0, DdcErrorKind::TopologyChanged, L"显示拓扑已变化，旧句柄结果已丢弃" };
+                return { false, 0, 0, DdcErrorKind::TopologyChanged, ::DisplaySwitcher::Native::UiText(L"显示拓扑已变化，旧句柄结果已丢弃") };
             if (!success)
             {
                 ::InvalidateLocked(*session_);
                 return { false, 0, 0, DdcErrorKind::ReadFailed,
-                    L"原生硬件 DDC/CI 读取失败，错误 " + std::to_wstring(nativeError) };
+                    ::DisplaySwitcher::Native::UiFormat(L"原生硬件 DDC/CI 读取失败，错误 {code}", {{L"code", std::to_wstring(nativeError)}}) };
             }
             return { true, static_cast<int>(current), static_cast<int>(maximum), DdcErrorKind::None, {}, operationGeneration };
         }
@@ -605,8 +606,8 @@ namespace
             DdcCancellationToken const& cancellation) override
         {
             if (!IsDdcControlVcpCode(code))
-                return { false, DdcErrorKind::Unsupported, L"普通 DDC 控制不支持该 VCP 项" };
-            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, L"操作已取消" };
+                return { false, DdcErrorKind::Unsupported, ::DisplaySwitcher::Native::UiText(L"普通 DDC 控制不支持该 VCP 项") };
+            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
             std::scoped_lock lock(nativeDdcMutex);
             auto& native = ::RefreshLocked(*session_, false);
             auto operationGeneration = TopologyGeneration();
@@ -617,14 +618,14 @@ namespace
             auto success = SetVCPFeature(monitor->handles.Handles().front(),
                 static_cast<BYTE>(code), static_cast<DWORD>(value)) != FALSE;
             auto nativeError = GetLastError();
-            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, L"操作已取消" };
+            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
             if (operationGeneration != TopologyGeneration())
-                return { false, DdcErrorKind::TopologyChanged, L"显示拓扑已变化，旧句柄结果已丢弃" };
+                return { false, DdcErrorKind::TopologyChanged, ::DisplaySwitcher::Native::UiText(L"显示拓扑已变化，旧句柄结果已丢弃") };
             if (!success)
             {
                 ::InvalidateLocked(*session_);
                 return { false, DdcErrorKind::WriteFailed,
-                    L"原生硬件 DDC/CI 写入失败，错误 " + std::to_wstring(nativeError) };
+                    ::DisplaySwitcher::Native::UiFormat(L"原生硬件 DDC/CI 写入失败，错误 {code}", {{L"code", std::to_wstring(nativeError)}}) };
             }
             return { true, DdcErrorKind::None, {}, operationGeneration };
         }
@@ -640,7 +641,7 @@ namespace
 
         DdcBackendStatus Status() const override
         {
-            return { DdcAvailability::Available, L"Windows 原生输入源传输" };
+            return { DdcAvailability::Available, ::DisplaySwitcher::Native::UiText(L"Windows 原生输入源传输") };
         }
 
         uint64_t TopologyGeneration() const noexcept override { return SessionGeneration(*session_); }
@@ -656,9 +657,9 @@ namespace
         InputSourceWriteResult WriteInputSource(std::wstring const& monitorId, int value,
             DdcCancellationToken const& cancellation) override
         {
-            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, L"操作已取消" };
+            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
             if (!IsValidNativeInputSourceValue(value))
-                return { false, DdcErrorKind::InvalidValue, L"输入源值超出有效范围" };
+                return { false, DdcErrorKind::InvalidValue, ::DisplaySwitcher::Native::UiText(L"输入源值超出有效范围") };
             std::scoped_lock lock(nativeDdcMutex);
             auto& native = RefreshLocked(*session_, false);
             auto operationGeneration = TopologyGeneration();
@@ -671,14 +672,14 @@ namespace
             auto success = SetVCPFeature(monitor->handles.Handles().front(),
                 InputSourceVcpCode, static_cast<DWORD>(value)) != FALSE;
             auto nativeError = GetLastError();
-            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, L"操作已取消" };
+            if (cancellation.IsCanceled()) return { false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
             if (operationGeneration != TopologyGeneration())
-                return { false, DdcErrorKind::TopologyChanged, L"显示拓扑已变化，旧句柄结果已丢弃" };
+                return { false, DdcErrorKind::TopologyChanged, ::DisplaySwitcher::Native::UiText(L"显示拓扑已变化，旧句柄结果已丢弃") };
             if (!success)
             {
                 InvalidateLocked(*session_);
                 return { false, DdcErrorKind::WriteFailed,
-                    L"原生硬件输入源写入失败，错误 " + std::to_wstring(nativeError) };
+                    ::DisplaySwitcher::Native::UiFormat(L"原生硬件输入源写入失败，错误 {code}", {{L"code", std::to_wstring(nativeError)}}) };
             }
             return { true, DdcErrorKind::None, {}, operationGeneration };
         }

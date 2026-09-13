@@ -100,12 +100,12 @@ enum PeerTransportError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidPort(let port): return "通信端口无效：\(port)"
-        case .notStarted: return "UDP 发送失败：网络监听尚未启动"
+        case .invalidPort(let port): return L10n.format("通信端口无效：{0}", String(describing: port))
+        case .notStarted: return L10n.text("UDP 发送失败：网络监听尚未启动")
         case .socketOperation(let operation, let code):
-            return "UDP \(operation)失败（系统错误 \(code)）"
+            return L10n.format("UDP {0}失败（系统错误 {1}）", L10n.text(operation), String(describing: code))
         case .addressResolution(let code):
-            return "UDP 目标地址解析失败（系统错误 \(code)）"
+            return L10n.format("UDP 目标地址解析失败（系统错误 {0}）", String(describing: code))
         }
     }
 

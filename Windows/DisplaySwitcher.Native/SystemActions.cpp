@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "DdcBackends.h"
 #include "SystemActions.h"
 
@@ -21,7 +22,7 @@ namespace DisplaySwitcher::Native
         DdcCancellationSource cancellation;
         if (!backend) backend = ownedBackends.Lookup(NativeDdcBackendKey);
         return backend ? backend->Enumerate(cancellation.Begin()) :
-            DdcEnumerationResult{ false, DdcErrorKind::BackendUnavailable, L"Windows 原生 DDC 后端不可用", {}, false };
+            DdcEnumerationResult{ false, DdcErrorKind::BackendUnavailable, ::DisplaySwitcher::Native::UiText(L"Windows 原生 DDC 后端不可用"), {}, false };
     }
 
 }

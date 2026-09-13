@@ -1,5 +1,18 @@
 # macOS 交接记录
 
+## 当前任务：DS-047 中英双语与本机语言选择
+
+- 日期：2026-09-13；分支：`codex/windows-english-localization`；基线：`main@7aa467d`，跨端任务由协调端统一提交、推送和 PR。
+- 原界面只含中文硬编码文字，且展示静态 let/缓存状态会阻止即时切换。新增 `Localization.swift`，以独立 UserDefaults 本机偏好解析 System/zh-Hans/en，精确模板分别接收参数；用户命名、协议字段、存储键、旧名称识别和 UDP 诊断分类保持稳定。
+- 常规页选择默认跟随系统，中文系统选简体中文，其他选英文。语言修改仅重建同一 SettingsWindowController 的展示；保留内存配置、选中页/配置、DDC 样本和回调；读取/学习/检测期间禁用。菜单与媒体/USB/DDC 状态从模型或原模板重新生成，不执行 reloadSettings、检测、保存配置或硬件动作。
+- 修改 Mac 目录：中央语言实现；`SettingsWindowController.swift`、`main.swift`、DDC/输入源/USB/媒体/协同展示与错误来源；Xcode 工程、`Info.plist`、en/zh-Hans `InfoPlist.strings`；`LocalizationTests.swift` 和既有 11 个测试文件的可恢复中文语言 fixture；本机清单及此交接文件。Windows 和共享文档由协调端负责。
+- 静态确认：303 个界面/错误模板都有英文，无缺失调用键；新目录占位符匹配；剩余源码汉字只为兼容旧名称正则、稳定 UDP 日志/操作 tag，以及展示时再本地化的原状态模板。临时库存文件已删除。`git diff --check` 通过。
+- 新测试覆盖系统语言/显式选择、缺失/未知偏好、全目录英文及占位符、含中文与 `{1}`/`%` 的用户名称原样保留、语言切换不改变序列化配置、动态标题更新、诊断分类跨语言稳定。初版代码 `9faa523`、PR [#104](https://github.com/maizihk/SFlip/pull/104) 的 macOS CI [run 34751479215](https://github.com/maizihk/SFlip/actions/runs/34751479215) 通过 297 项 XCTest（零失败）、Debug/Release 构建、严格签名校验及产物验证。
+- arm64 测试包已下载：`macOS/outputs/english-9faa523/package/SFlip-macOS-arm64.dmg`（不提交）；artifact `10316206336`，SHA-256：`3bc18a5ed0fa05d29fe203bfc567237b454c3c988a478e1bbcae35007bd3eeee`。
+- DS-047 用户验收布局修复：语言行原用无图标的 `labeledControlRow`，左标题列及扩展控件不同于常规图标行。提取原 `switchRow` 的既有图标设置行布局为 `iconSettingRow`，旧 switchRow 仅转调保持原效果；语言行使用相同 22 点图标、13 点 medium 标题、8/12/16 点边距及原分隔线，右侧 NSPopUpButton 固定 140 点，空描述不生成额外文本行。System/简体中文/English 选择和语言逻辑保持。
+- 此次仅修改 `SettingsWindowController.swift`、Mac 清单和本交接文件。代码 `2f121e4` 通过 CI [34752734642](https://github.com/maizihk/SFlip/actions/runs/34752734642)：297 项 XCTest、Debug/Release、严格签名和产物验证。测试 DMG：`macOS/outputs/language-row-2f121e4/package/SFlip-macOS-arm64.dmg`；artifact `10315872798`，下载 ZIP SHA-256 `9cb7f74e62f13b17ddc0d96564dd8783b04fe8ce7255105927472c42e5c8f263` 已校验。语言行 GUI 待用户复验，未执行真实硬件流程。
+- 尚需 GUI：六页及托盘英文布局/长错误、浅深模式、即时语言切换和重启持久化、System 回退、授权用途说明。系统权限弹窗由 macOS 选择 bundle 本地化，不宣称 App 偏好能即时改变系统弹窗；没有触发任何真实权限、网络、USB、DDC、睡眠或唤醒测试。
+
 ## 当前任务：DS-046 联动控制列对齐与集中读取
 
 - 日期：2026-09-12；分支：`codex/windows-linked-controls-alignment`；基线：`36b3b5a`，主任务已确认 `origin/main@f12a224`。

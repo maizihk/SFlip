@@ -34,9 +34,9 @@ final class DDCController {
 
     static var backendSummaryWithoutHardwareAccess: String {
 #if arch(arm64)
-        return "Apple Silicon 原生 DDC"
+        return L10n.text("Apple Silicon 原生 DDC")
 #else
-        return "Intel Mac 不支持 Apple Silicon 原生 DDC"
+        return L10n.text("Intel Mac 不支持 Apple Silicon 原生 DDC")
 #endif
     }
 
@@ -141,13 +141,13 @@ enum DDCError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .detectionFailed:
-            return "Apple Silicon 原生 DDC 没有返回可用的外接显示器。"
+            return L10n.text("Apple Silicon 原生 DDC 没有返回可用的外接显示器。")
         case let .invalidValue(value):
-            return "DDC 数值超出有效范围：\(value)"
+            return L10n.format("DDC 数值超出有效范围：{0}", String(describing: value))
         case let .inputNotConfigured(displayName):
-            return "\(displayName) 尚未配置输入源，未执行切屏。"
+            return L10n.format("{0} 尚未配置输入源，未执行切屏。", String(describing: displayName))
         case let .nativeWriteFailed(command, value):
-            return "原生 DDC 写入失败：VCP 0x\(String(format: "%02X", command.rawValue)) = \(value)。"
+            return L10n.format("原生 DDC 写入失败：VCP 0x{0} = {1}。", String(describing: String(format: "%02X", command.rawValue)), String(describing: value))
         }
     }
 }

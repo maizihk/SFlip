@@ -291,12 +291,12 @@ enum DisplayConfigurationStoreError: Error, Equatable, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .corruptedData: return "显示器配置数据已损坏或格式不完整。"
-        case .unsupportedSchemaVersion(let version): return "显示器配置版本 \(version) 不受当前 App 支持。"
-        case .encodingFailed: return "无法编码本机配置。"
-        case .writeFailed: return "无法安全写入本机配置。"
-        case .previousFailureRequiresReview: return "上次配置迁移或保存失败，需要用户检查。"
-        case .invalidConfiguration: return "配置包含重复标识、重复名称或非法字段。"
+        case .corruptedData: return L10n.text("显示器配置数据已损坏或格式不完整。")
+        case .unsupportedSchemaVersion(let version): return L10n.format("显示器配置版本 {0} 不受当前 App 支持。", String(describing: version))
+        case .encodingFailed: return L10n.text("无法编码本机配置。")
+        case .writeFailed: return L10n.text("无法安全写入本机配置。")
+        case .previousFailureRequiresReview: return L10n.text("上次配置迁移或保存失败，需要用户检查。")
+        case .invalidConfiguration: return L10n.text("配置包含重复标识、重复名称或非法字段。")
         }
     }
 }
@@ -362,17 +362,17 @@ enum LocalProfileIssue: String, Equatable, Hashable {
     var userFacingDescription: String {
         switch self {
         case .missingName:
-            return "请填写配置名称。"
+            return L10n.text("请填写配置名称。")
         case .missingHost:
-            return "请填写对端地址。"
+            return L10n.text("请填写对端地址。")
         case .invalidPort:
-            return "通信端口必须在 1–65535 之间。"
+            return L10n.text("通信端口必须在 1–65535 之间。")
         case .invalidPairingCode:
-            return "配对码必须为 8–128 个 UTF-8 字节。"
+            return L10n.text("配对码必须为 8–128 个 UTF-8 字节。")
         case .missingDisplayMapping:
-            return "请至少为一台显示器填写 1–65535 的对端输入源。"
+            return L10n.text("请至少为一台显示器填写 1–65535 的对端输入源。")
         case .orphanedDisplayMapping:
-            return "存在不再对应当前显示器的旧输入源映射，请重新保存配置。"
+            return L10n.text("存在不再对应当前显示器的旧输入源映射，请重新保存配置。")
         }
     }
 }
@@ -589,7 +589,7 @@ enum DisplayConfigurationStore {
     }
 
     static func defaultConfiguration(index: Int) -> DisplayConfiguration {
-        DisplayConfiguration(index: index, name: "显示器 \(index)", selector: "\(index)",
+        DisplayConfiguration(index: index, name: L10n.format("显示器 {0}", String(describing: index)), selector: "\(index)",
             localInput: nil, targetInput: nil, readEnabled: false)
     }
 
@@ -769,11 +769,11 @@ enum DisplayConfigurationStore {
 
     private static func freshDocument() -> DisplayConfigurationStoreV5Document {
         DisplayConfigurationStoreV5Document(schemaVersion: currentSchemaVersion, localEndpointID: UUID().uuidString,
-            localDeviceName: "本机", listenPort: defaultPort,
+            localDeviceName: L10n.text("本机"), listenPort: defaultPort,
             linkAllDisplays: false, displays: [], collaborationProfiles: [defaultProfile()], usbSwitch: .disabled)
     }
 
-    private static func defaultProfile(name: String = "配置 1") -> CollaborationProfile {
+    private static func defaultProfile(name: String = L10n.text("配置 1")) -> CollaborationProfile {
         CollaborationProfile(id: UUID().uuidString, name: name, peerHost: "", peerPort: defaultPort,
             pairingCode: "", peerEndpointID: nil, peerProtocolVersion: nil, coordinationEnabled: false,
             displayInputs: [], triggerDevices: [])

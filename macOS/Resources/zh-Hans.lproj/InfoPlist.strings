@@ -1,0 +1,1 @@
+"NSLocalNetworkUsageDescription" = "用于检测并连接局域网中的 SFlip 设备，协同唤醒显示输出和执行用户配置的显示器切换；不会同步原始 USB 或显示器硬件标识。";

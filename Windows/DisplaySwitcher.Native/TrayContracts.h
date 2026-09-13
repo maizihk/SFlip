@@ -1,7 +1,26 @@
+#include "Localization.h"
 #pragma once
 
 namespace DisplaySwitcher::Native
 {
+    class TrayStatusPresentation {
+    public:
+        void Set(UiMessage const& message) { message_ = message; }
+        std::wstring Text() const { return message_.Render(); }
+    private:
+        UiMessage message_{ L"正在初始化…" };
+    };
+
+    inline UiMessage TraySwitchOutcomeMessage(std::wstring const& name, std::wstring const& error,
+        bool succeeded, size_t missingMappings)
+    {
+        if (!missingMappings) return succeeded ? UiMessage(L"已切换到 {name}", {{L"name", name}}) :
+            UiMessage(L"切换到 {name} 失败：{error}", {{L"name", name}, {L"error", error}});
+        auto count = std::to_wstring(missingMappings);
+        return succeeded ? UiMessage(L"已切换到 {name}；有 {count} 台显示器缺少映射", {{L"name", name}, {L"count", count}}) :
+            UiMessage(L"切换到 {name} 失败：{error}；有 {count} 台显示器缺少映射", {{L"name", name}, {L"error", error}, {L"count", count}});
+    }
+
     enum class TraySemanticIcon
     {
         Usb,
@@ -79,7 +98,7 @@ namespace DisplaySwitcher::Native
 
     inline std::wstring UsbTrayStatusText(bool active)
     {
-        return active ? L"USB 切换已开启" : L"USB 切换已关闭";
+        return active ? ::DisplaySwitcher::Native::UiText(L"USB 切换已开启") : ::DisplaySwitcher::Native::UiText(L"USB 切换已关闭");
     }
 
     struct UsbTrayRuntimeConditions

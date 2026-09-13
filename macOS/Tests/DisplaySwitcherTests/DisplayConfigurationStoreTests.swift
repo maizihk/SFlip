@@ -19,10 +19,23 @@ private final class MemoryConfigurationStorage: DisplayConfigurationStorage {
 }
 
 final class DisplayConfigurationStoreTests: XCTestCase {
+    private var previousLanguagePreference: Any?
+
+    override func tearDown() {
+        if let previousLanguagePreference {
+            UserDefaults.standard.set(previousLanguagePreference, forKey: L10n.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: L10n.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     private var storage: MemoryConfigurationStorage!
 
     override func setUp() {
         super.setUp()
+        previousLanguagePreference = UserDefaults.standard.object(forKey: L10n.preferenceKey)
+        L10n.preference = .simplifiedChinese
         storage = MemoryConfigurationStorage()
     }
 

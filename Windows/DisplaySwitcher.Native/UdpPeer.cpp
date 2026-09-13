@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "Diagnostics.h"
 #include "UdpPeer.h"
 
@@ -9,7 +10,7 @@ namespace
 {
     std::wstring SocketError(int code)
     {
-        return L"Winsock 错误 " + std::to_wstring(code);
+        return ::DisplaySwitcher::Native::UiFormat(L"Winsock 错误 {code}", {{L"code", std::to_wstring(code)}});
     }
 }
 
@@ -20,7 +21,7 @@ namespace DisplaySwitcher::Native
     {
         WSADATA data{};
         winsockStarted_ = WSAStartup(MAKEWORD(2, 2), &data) == 0;
-        if (!winsockStarted_) Report(L"无法初始化网络组件");
+        if (!winsockStarted_) Report(::DisplaySwitcher::Native::UiText(L"无法初始化网络组件"));
     }
 
     UdpPeer::~UdpPeer()
@@ -36,7 +37,7 @@ namespace DisplaySwitcher::Native
         auto socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket == INVALID_SOCKET)
         {
-            Report(L"无法创建 UDP socket：" + SocketError(WSAGetLastError()));
+            Report(::DisplaySwitcher::Native::UiFormat(L"无法创建 UDP socket：{error}", {{L"error", SocketError(WSAGetLastError())}}));
             return;
         }
         sockaddr_in address{};
@@ -47,7 +48,7 @@ namespace DisplaySwitcher::Native
         {
             auto error = WSAGetLastError();
             closesocket(socket);
-            Report(L"无法监听端口 " + std::to_wstring(port) + L"：" + SocketError(error));
+            Report(::DisplaySwitcher::Native::UiFormat(L"无法监听端口 {port}：{error}", {{L"port", std::to_wstring(port)}, {L"error", SocketError(error)}}));
             return;
         }
         {
@@ -102,7 +103,7 @@ namespace DisplaySwitcher::Native
             if (selected == 0) continue;
             if (selected == SOCKET_ERROR)
             {
-                if (!token.stop_requested()) Report(L"接收失败：" + SocketError(WSAGetLastError()));
+                if (!token.stop_requested()) Report(::DisplaySwitcher::Native::UiFormat(L"接收失败：{error}", {{L"error", SocketError(WSAGetLastError())}}));
                 break;
             }
             char buffer[8192]{};
@@ -111,7 +112,7 @@ namespace DisplaySwitcher::Native
                 reinterpret_cast<sockaddr*>(&sender), &senderLength);
             if (received == SOCKET_ERROR)
             {
-                if (!token.stop_requested()) Report(L"接收失败：" + SocketError(WSAGetLastError()));
+                if (!token.stop_requested()) Report(::DisplaySwitcher::Native::UiFormat(L"接收失败：{error}", {{L"error", SocketError(WSAGetLastError())}}));
                 break;
             }
             wchar_t address[INET_ADDRSTRLEN]{};
@@ -163,7 +164,7 @@ namespace DisplaySwitcher::Native
         if (result != 0)
         {
             if (trace) WriteDiagnostic("udp.send resolve_ok=0 resolve_ms=" + std::to_string(resolvedMilliseconds));
-            Report(L"发送失败：无法解析主机 " + host);
+            Report(::DisplaySwitcher::Native::UiFormat(L"发送失败：无法解析主机 {host}", {{L"host", host}}));
             return false;
         }
         if (stillValid && !stillValid())
@@ -180,7 +181,7 @@ namespace DisplaySwitcher::Native
             " total_ms=" + std::to_string(totalMilliseconds));
         if (sent == SOCKET_ERROR)
         {
-            Report(L"发送失败：" + SocketError(WSAGetLastError()));
+            Report(::DisplaySwitcher::Native::UiFormat(L"发送失败：{error}", {{L"error", SocketError(WSAGetLastError())}}));
             return false;
         }
         return true;

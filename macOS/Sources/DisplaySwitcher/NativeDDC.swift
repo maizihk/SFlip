@@ -100,7 +100,7 @@ final class NativeDDCBackend: DDCBackend {
 #if arch(arm64)
         return .available
 #else
-        return .unavailable("Apple Silicon 原生 DDC 在 Intel Mac 上不可用")
+        return .unavailable(L10n.text("Apple Silicon 原生 DDC 在 Intel Mac 上不可用"))
 #endif
     }
 
@@ -565,7 +565,7 @@ final class NativeDDCBackend: DDCBackend {
             let transport = matches[identity.systemUUID].flatMap { transportByLocation[$0] }
             let savedName = knownBySelector[identity.systemUUID.uppercased()]?.name ?? ""
             let name = !identity.productName.isEmpty ? identity.productName
-                : (!savedName.isEmpty ? savedName : "外接显示器")
+                : (!savedName.isEmpty ? savedName : L10n.text("外接显示器"))
             return NativeDDCDisplay(
                 name: name,
                 systemUUID: identity.systemUUID,

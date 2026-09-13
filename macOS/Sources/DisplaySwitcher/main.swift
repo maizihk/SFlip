@@ -10,9 +10,9 @@ private enum DisplayControl: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .luminance: return "亮度"
-        case .contrast: return "对比度"
-        case .volume: return "音量"
+        case .luminance: return L10n.text("亮度")
+        case .contrast: return L10n.text("对比度")
+        case .volume: return L10n.text("音量")
         }
     }
 
@@ -223,7 +223,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
     private var mediaKeyRouter = MediaKeyDDCRouter()
     private var mediaKeyMonitorState: MediaKeyMonitorState = .unavailable
     private var mediaKeyLastRoute: MediaKeyDDCRouteOutcome?
-    private var mediaKeyLastStatusText: String?
+    private var mediaKeyLastStatusSource: String?
+    private var mediaKeyLastStatusText: String? { mediaKeyLastStatusSource.map { L10n.text($0) } ?? mediaKeyLastRoute?.userFacingValue }
     private var mediaKeyRuntimeGeneration: UInt64 = 0
     private var mediaKeyRuntimeStageTrace = MediaKeyRuntimeStageTrace()
     private var mediaKeyPhysicalEvidence = DDCPhysicalEnumerationEvidence.untrusted
@@ -299,6 +300,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
 
     private lazy var settingsWindowController: SettingsWindowController = {
         let controller = SettingsWindowController()
+        controller.onLanguageChanged = { [weak self] in
+            guard let self else { return }
+            self.settingsItem.title = L10n.text("设置…")
+            self.quitItem.title = L10n.text("退出")
+            TrayImageFactory.apply(role: .settings, accessibilityDescription: L10n.text("设置"), to: self.settingsItem)
+            TrayImageFactory.apply(role: .quit, accessibilityDescription: L10n.text("退出"), to: self.quitItem)
+            self.statusItem.button?.image = TrayImageFactory.statusImage(accessibilityDescription: L10n.text("显示器控制"))
+            self.refreshTrayUSBStatus()
+            if let menu = self.statusItem.menu { self.rebuildProfileSwitchItems(in: menu) }
+            self.rebuildDisplayMenuItems()
+            self.updateConfigurationSafetyUI()
+            self.settingsWindowController.updateMediaKeyShortcutPresentation(self.mediaKeyShortcutPresentation())
+            self.settingsWindowController.updateMediaKeyVolumeTakeoverPresentation(self.mediaKeyVolumeTakeoverPresentation())
+        }
         controller.onSave = { [weak self] in
             self?.reloadSettings()
         }
@@ -355,7 +370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         }
         controller.diagnosticReportProvider = { [weak self] in
             self?.makeDiagnosticReport()
-                ?? DiagnosticReport(text: "诊断状态暂不可用。")
+                ?? DiagnosticReport(text: L10n.text("诊断状态暂不可用。"))
         }
         controller.onDetailedDiagnosticRecordingChanged = { [weak self] _ in
             self?.clearDetailedDiagnostics()
@@ -406,16 +421,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
     }()
 
     private lazy var settingsItem: NSMenuItem = {
-        let item = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
+        let item = NSMenuItem(title: L10n.text("设置…"), action: #selector(showSettings), keyEquivalent: ",")
         item.target = self
-        TrayImageFactory.apply(role: .settings, accessibilityDescription: "设置", to: item)
+        TrayImageFactory.apply(role: .settings, accessibilityDescription: L10n.text("设置"), to: item)
         return item
     }()
 
     private lazy var quitItem: NSMenuItem = {
-        let item = NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q")
+        let item = NSMenuItem(title: L10n.text("退出"), action: #selector(quit), keyEquivalent: "q")
         item.target = self
-        TrayImageFactory.apply(role: .quit, accessibilityDescription: "退出", to: item)
+        TrayImageFactory.apply(role: .quit, accessibilityDescription: L10n.text("退出"), to: item)
         return item
     }()
 
@@ -470,7 +485,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                         value: nil, error: error
                     )
                     if case .user = request.origin {
-                        self.showError(title: "显示器调节失败", error: error)
+                        self.showError(title: L10n.text("显示器调节失败"), error: error)
                     }
                 }
             }
@@ -504,7 +519,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         }
 
         if let button = statusItem.button {
-            button.image = TrayImageFactory.statusImage(accessibilityDescription: "显示器控制")
+            button.image = TrayImageFactory.statusImage(accessibilityDescription: L10n.text("显示器控制"))
             button.imagePosition = .imageOnly
         }
 
@@ -567,19 +582,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
            let endpointID = profile.peerEndpointID.flatMap(V2Crypto.normalizedUUID),
            v2RoutingTable.route(for: endpointID)?.profileID == profile.id {
             if !handoffV2StateMachine.handleManualSelect(endpointID: endpointID, eventID: nextEventID()) {
-                showError(title: "对端不可用，未执行切换", error: NSError(
+                showError(title: L10n.text("对端不可用，未执行切换"), error: NSError(
                     domain: "DisplaySwitcher.Collaboration", code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "请检查对端连接后重试。"]
+                    userInfo: [NSLocalizedDescriptionKey: L10n.text("请检查对端连接后重试。")]
                 ))
             }
             return
         }
         showError(
-            title: "协同配置尚未连接",
+            title: L10n.text("协同配置尚未连接"),
             error: NSError(
                 domain: "DisplaySwitcher.Collaboration",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "应用会自动连接；请检查地址、端口和配对码。"]
+                userInfo: [NSLocalizedDescriptionKey: L10n.text("应用会自动连接；请检查地址、端口和配对码。")]
             )
         )
     }
@@ -614,11 +629,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                     && self?.usbLearningSafetyGate.allows(.ddc) == true
             }
             if let firstFailure = result.firstFailure {
-                self?.finishSwitch(message: "部分切换失败", activeMenuItem: nil)
-                self?.showError(title: "显示器输入源切换失败", error: firstFailure)
+                self?.finishSwitch(message: L10n.text("部分切换失败"), activeMenuItem: nil)
+                self?.showError(title: L10n.text("显示器输入源切换失败"), error: firstFailure)
                 DispatchQueue.main.async { completion?(false) }
             } else {
-                self?.finishSwitch(message: "切换完成", activeMenuItem: nil)
+                self?.finishSwitch(message: L10n.text("切换完成"), activeMenuItem: nil)
                 DispatchQueue.main.async { completion?(true) }
             }
         }
@@ -627,7 +642,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
     private func detectDisplays(showFailure: Bool) {
         guard configurationSafetyGate.allows(.ddc), usbLearningSafetyGate.allows(.ddc) else {
             if showFailure, case .requiresUserReview(let error) = configurationSafetyGate.state {
-                showError(title: "配置安全模式已启用", error: error)
+                showError(title: L10n.text("配置安全模式已启用"), error: error)
             }
             return
         }
@@ -688,12 +703,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                     } catch let error as DisplayConfigurationStoreError {
                         self.enterConfigurationSafetyState(error)
                         if showFailure {
-                            self.showError(title: "显示器配置保存失败", error: error)
+                            self.showError(title: L10n.text("显示器配置保存失败"), error: error)
                         }
                     } catch {
                         self.enterConfigurationSafetyState(.writeFailed)
                         if showFailure {
-                            self.showError(title: "显示器配置保存失败", error: error)
+                            self.showError(title: L10n.text("显示器配置保存失败"), error: error)
                         }
                     }
                 }
@@ -708,7 +723,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                         self?.settingsWindowController.refreshDisplayConfigurationProjection()
                     }
                     if showFailure {
-                        self?.showError(title: "显示器检测失败", error: error)
+                        self?.showError(title: L10n.text("显示器检测失败"), error: error)
                     }
                 }
             }
@@ -952,7 +967,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         override: String? = nil
     ) {
         mediaKeyLastRoute = outcome
-        mediaKeyLastStatusText = override ?? outcome?.userFacingValue
+        mediaKeyLastStatusSource = override
         if settingsWindowHasBeenShown {
             settingsWindowController.updateMediaKeyShortcutPresentation(
                 .make(
@@ -1888,7 +1903,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         let configurationBlocked = configurationSafetyGate.state != .ready
         if configurationBlocked {
             settingsWindowController.updatePeerConnectionStatus(
-                "配置安全模式：网络交接已停用", connected: false
+                L10n.text("配置安全模式：网络交接已停用"), connected: false
             )
         } else {
             refreshPeerConnectionStatus()
@@ -2022,7 +2037,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             }) else { continue }
             let row = SliderRowView(
                 control: control,
-                accessibilityPrefix: "统一",
+                accessibilityPrefix: L10n.text("统一"),
                 usesLinkedPresentation: true
             )
             row.onChange = { [weak self] value in
@@ -2317,7 +2332,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
     func promptV2ManualSelection() {
         guard settingsWindowHasBeenShown else { return }
         settingsWindowController.updatePeerConnectionStatus(
-            "未检测到已认证目标，请从菜单手动选择配置",
+            L10n.text("未检测到已认证目标，请从菜单手动选择配置"),
             connected: false
         )
     }
@@ -2341,7 +2356,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         }
         let configurationBlocked = configurationSafetyGate.state != .ready
         if configurationBlocked {
-            settingsWindowController.updatePeerConnectionStatus("配置安全模式：网络交接已停用", connected: false)
+            settingsWindowController.updatePeerConnectionStatus(L10n.text("配置安全模式：网络交接已停用"), connected: false)
         } else {
             settingsWindowController.refreshSelectedCollaborationStatus()
         }

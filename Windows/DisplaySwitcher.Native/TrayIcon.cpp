@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "TrayIcon.h"
 #include "TrayMonochromeIcon.h"
 #include "TrayRecoveryPolicy.h"
@@ -198,7 +199,7 @@ namespace
                 auto valueBounds = item.bounds;
                 valueBounds.left = track.right + state.layout.sliderGap;
                 valueBounds.right -= state.layout.rightPadding;
-                auto value = item.ddc.mixed ? L"混合" : item.ddc.known ? std::to_wstring(item.ddc.value) : L"—";
+                auto value = item.ddc.mixed ? ::DisplaySwitcher::Native::UiText(L"混合") : item.ddc.known ? std::to_wstring(item.ddc.value) : L"—";
                 DrawTextW(dc, value.c_str(), static_cast<int>(value.size()), &valueBounds, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
                 continue;
             }
@@ -460,15 +461,21 @@ namespace DisplaySwitcher::Native
         data.uCallbackMessage = CallbackMessage;
         data.hIcon = icon_;
         data.guidItem = TrayGuid;
-        auto tip = Limit(L"SFlip · " + status_, 127);
+        auto tip = Limit(L"SFlip · " + status_.Text(), 127);
         wcscpy_s(data.szTip, tip.c_str());
         return data;
     }
 
-    void TrayIcon::SetStatus(std::wstring const& status)
+    void TrayIcon::SetStatus(UiMessage const& status)
     {
         if (disposed_) return;
-        status_ = status;
+        status_.Set(status);
+        RefreshLanguage();
+    }
+
+    void TrayIcon::RefreshLanguage()
+    {
+        if (disposed_) return;
         auto data = Data(NIF_TIP);
         if (!Shell_NotifyIconW(NIM_MODIFY, &data)) BeginShellRecovery(false);
     }
@@ -652,7 +659,7 @@ namespace DisplaySwitcher::Native
             { 0, L"", true, false },
         };
         for (size_t index = 0; index < profiles_.size(); ++index)
-            state->items.push_back({ FirstProfileCommand + static_cast<UINT>(index), L"切换到 " + profiles_[index].second,
+            state->items.push_back({ FirstProfileCommand + static_cast<UINT>(index), UiFormat(L"切换到 {name}", {{L"name", profiles_[index].second}}),
                 false, true, false, TraySemanticIcon::SwitchProfile });
         if (!profiles_.empty()) state->items.push_back({ 0, L"", true, false });
         for (auto const& ddc : ddcItems_)
@@ -664,9 +671,9 @@ namespace DisplaySwitcher::Native
             state->items.push_back(std::move(item));
         }
         if (!ddcItems_.empty()) state->items.push_back({ 0, L"", true, false });
-        state->items.push_back({ SettingsCommand, L"设置…", false, true, false, TraySemanticIcon::Settings });
+        state->items.push_back({ SettingsCommand, ::DisplaySwitcher::Native::UiText(L"设置…"), false, true, false, TraySemanticIcon::Settings });
         state->items.push_back({ 0, L"", true, false });
-        state->items.push_back({ ExitCommand, L"退出", false, true, false, TraySemanticIcon::Exit });
+        state->items.push_back({ ExitCommand, ::DisplaySwitcher::Native::UiText(L"退出"), false, true, false, TraySemanticIcon::Exit });
 
         auto rowHeight = ScaleForDpi(32, state->dpi);
         auto separatorHeight = ScaleForDpi(1, state->dpi);

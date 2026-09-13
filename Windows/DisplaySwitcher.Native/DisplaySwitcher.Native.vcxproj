@@ -102,6 +102,7 @@
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="App.xaml.cpp"><DependentUpon>App.xaml</DependentUpon></ClCompile>
     <ClCompile Include="SettingsWindow.xaml.cpp"><DependentUpon>SettingsWindow.xaml</DependentUpon></ClCompile>
+    <ClCompile Include="Localization.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="AboutInfo.cpp" />
     <ClCompile Include="AppConfig.cpp" />
     <ClCompile Include="AutoStart.cpp" />

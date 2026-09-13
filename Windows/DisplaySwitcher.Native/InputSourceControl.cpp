@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Localization.h"
 #include "Diagnostics.h"
 #include "InputSourceControl.h"
 
@@ -10,14 +11,14 @@ namespace DisplaySwitcher::Native
         InputSourceActionPlan plan{ config };
         if (config.displayConfigurationSafeMode)
         {
-            plan.error = L"显示器配置处于安全状态";
+            plan.error = ::DisplaySwitcher::Native::UiText(L"显示器配置处于安全状态");
             return plan;
         }
         if (!enumeration.IsTrustedNonEmptySnapshot())
         {
             plan.error = enumeration.topologyTrust == DisplayTopologyTrust::RemoteSessionLimited
-                ? L"远程桌面会话中不执行物理显示器输入源切换"
-                : L"当前物理显示拓扑不完整，未执行输入源切换";
+                ? ::DisplaySwitcher::Native::UiText(L"远程桌面会话中不执行物理显示器输入源切换")
+                : ::DisplaySwitcher::Native::UiText(L"当前物理显示拓扑不完整，未执行输入源切换");
             return plan;
         }
 
@@ -32,7 +33,7 @@ namespace DisplaySwitcher::Native
         std::wstring const& monitorId, int value, DdcCancellationToken const& cancellation)
     {
         if (!IsValidInputSourceValue(value))
-            return { false, DdcErrorKind::InvalidValue, L"缺少有效输入源映射" };
+            return { false, DdcErrorKind::InvalidValue, ::DisplaySwitcher::Native::UiText(L"缺少有效输入源映射") };
         auto result = transport.WriteInputSource(monitorId, value, cancellation);
         if (!result.success && !cancellation.IsCanceled()
             && (result.error == DdcErrorKind::WriteFailed || result.error == DdcErrorKind::MonitorUnavailable))
@@ -58,9 +59,9 @@ namespace DisplaySwitcher::Native
     {
         auto started = GetTickCount64();
         if (!config.HasDisplayConfiguration())
-            return { false, L"显示器配置不完整，未执行切换" };
+            return { false, ::DisplaySwitcher::Native::UiText(L"显示器配置不完整，未执行切换") };
         if (!Allowed(config, cancellation))
-            return { false, L"输入源切换已取消或被安全状态阻断" };
+            return { false, ::DisplaySwitcher::Native::UiText(L"输入源切换已取消或被安全状态阻断") };
 
         std::wstring errors;
         bool topologyChanged{};
@@ -81,12 +82,12 @@ namespace DisplaySwitcher::Native
                     || display.bindingStatus == DisplayBindingStatus::NeedsConfirmation
                     ? DdcErrorKind::AmbiguousMonitor : DdcErrorKind::MonitorUnavailable;
                 item = { false, display.bindingMessage.empty()
-                    ? L"显示器未唯一绑定到当前物理目标" : display.bindingMessage };
+                    ? ::DisplaySwitcher::Native::UiText(L"显示器未唯一绑定到当前物理目标") : display.bindingMessage };
             }
             else if (!transport_)
             {
                 itemError = DdcErrorKind::BackendUnavailable;
-                item = { false, L"Windows 原生输入源传输不可用" };
+                item = { false, ::DisplaySwitcher::Native::UiText(L"Windows 原生输入源传输不可用") };
             }
             else
             {
@@ -96,21 +97,21 @@ namespace DisplaySwitcher::Native
                     itemError = status.availability == DdcAvailability::Unsupported
                         ? DdcErrorKind::Unsupported : DdcErrorKind::BackendUnavailable;
                     item = { false, status.message.empty()
-                        ? L"Windows 原生输入源传输暂时不可用" : status.message };
+                        ? ::DisplaySwitcher::Native::UiText(L"Windows 原生输入源传输暂时不可用") : status.message };
                 }
                 else
                 {
                     auto write = Allowed(config, cancellation)
                         ? WriteInputSourceWithOneRefresh(*transport_, display.nativeMonitorId,
                             display.macInput, cancellation)
-                        : InputSourceWriteResult{ false, DdcErrorKind::Canceled, L"操作已取消" };
+                        : InputSourceWriteResult{ false, DdcErrorKind::Canceled, ::DisplaySwitcher::Native::UiText(L"操作已取消") };
                     auto currentGeneration = transport_->TopologyGeneration();
                     topologyChanged = write.error == DdcErrorKind::TopologyChanged
                         || (write.success && write.topologyGeneration != 0
                             && write.topologyGeneration != currentGeneration);
                     itemError = topologyChanged ? DdcErrorKind::TopologyChanged : write.error;
                     item = topologyChanged
-                        ? ActionResult{ false, L"显示拓扑已变化，旧句柄结果已丢弃" }
+                        ? ActionResult{ false, ::DisplaySwitcher::Native::UiText(L"显示拓扑已变化，旧句柄结果已丢弃") }
                         : ActionResult{ write.success, write.message };
                 }
             }
@@ -119,18 +120,18 @@ namespace DisplaySwitcher::Native
             if (!item.success)
             {
                 if (!errors.empty()) errors += L"；";
-                errors += (display.name.empty() ? L"显示器" : display.name) + L"：" + item.error;
+                errors += UiFormat(L"{name}：{error}", {{L"name", display.name.empty() ? UiFormat(L"显示器 {number}", {{L"number", L"1"}}) : display.name}, {L"error", item.error}});
             }
         }
         if (topologyChanged && completed < config.displays.size())
         {
             if (!errors.empty()) errors += L"；";
-            errors += L"显示拓扑已变化，剩余操作已停止";
+            errors += ::DisplaySwitcher::Native::UiText(L"显示拓扑已变化，剩余操作已停止");
         }
         else if (!Allowed(config, cancellation) && completed < config.displays.size())
         {
             if (!errors.empty()) errors += L"；";
-            errors += L"输入源切换已取消，剩余操作已停止";
+            errors += ::DisplaySwitcher::Native::UiText(L"输入源切换已取消，剩余操作已停止");
         }
         auto result = ActionResult{ errors.empty() && completed == config.displays.size(), std::move(errors) };
         WriteDiagnostic("display.switch_complete success=" + std::to_string(result.success ? 1 : 0)

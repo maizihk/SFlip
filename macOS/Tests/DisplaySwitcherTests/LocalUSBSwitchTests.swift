@@ -2,6 +2,23 @@ import Foundation
 import XCTest
 
 final class LocalUSBSwitchTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        previousLanguagePreference = UserDefaults.standard.object(forKey: L10n.preferenceKey)
+        L10n.preference = .simplifiedChinese
+    }
+
+    private var previousLanguagePreference: Any?
+
+    override func tearDown() {
+        if let previousLanguagePreference {
+            UserDefaults.standard.set(previousLanguagePreference, forKey: L10n.preferenceKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: L10n.preferenceKey)
+        }
+        super.tearDown()
+    }
+
     func testAllSixteenPublicUSBSwitchVectors() throws {
         let url = try XCTUnwrap(Bundle(for: LocalUSBSwitchTests.self).resourceURL)
             .appendingPathComponent("contracts/usb-switch-v1/usb-switch-vectors.json")
