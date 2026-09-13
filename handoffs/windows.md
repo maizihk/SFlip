@@ -432,11 +432,13 @@
 
 - 基线：main 7aa467d，任务分支 codex/windows-english-localization；本次与 macOS 端由根任务协调，Windows 仅修改正式原生应用、启动器、模拟测试和 Windows 文档。
 - 根因：WinUI/托盘与状态服务将中文文案分散写在固定字面量中，动态配置名称又通过片段拼接，缺少独立本机语言偏好。
-- 新增 Localization.h/.cpp 与 LocalizationCatalog.inc（388 项），集中精确静态文案和具名占位符；UiMessage 保存拥有参数的文案模板，设置页与 Controller 分别保留最新连接结果，语言重绘不将无响应/断开改成正在连接、不覆盖用户名称。
+- 新增 Localization.h/.cpp 与 LocalizationCatalog.inc（390 项），集中精确静态文案和具名占位符；UiMessage 保存拥有参数的文案模板，设置页与 Controller 分别保留最新连接结果，语言重绘不将无响应/断开改成正在连接、不覆盖用户名称。
 - 语言偏好单独原子保存在本机 ui-language.txt；读损坏/未知设置安全回退跟随系统，Windows GetUserDefaultUILanguage 读取界面语言，地区格式不影响选择；无协议或配置 schemaVersion 更改。
 - General 选择器重建现有内存 UI 并保留页面/焦点/映射/检测状态，复用 USB 库存与拓扑投影，刷新托盘标签与 tooltip；不走 Initialize/ReloadConfiguration，不调用枚举、探测或硬件。异步 DDC 读写、USB 学习及检测进行时拒绝更改语言。
 - 固定列为英文语言选择器保留 180 DIP；托盘现有文字实测宽度布局继续生效。绑定状态从枚举码投影，避免旧缓存中文。已有生成显示器名称识别同时支持历史中文与英文，保持语言无关的匹配规则。
-- 新增 16 项左右实际语言回归，覆盖系统/明确选择、文件往返/坏数据/失败保留、目录与占位符、静态生产入口、用户名字和嵌套占位符不替换、未知键回退、检测失败双向重绘、配置保存字节不变；旧测试入口显式固定中文。
-- 静态验证：目录 388 项无重复、英文列无中文、具名占位符一致，git diff --check 通过。构建尝试 Windows/build-windows.ps1 使用 pwsh，因当前主机缺少 64 位 MSBuild/Visual Studio 在环境发现阶段停止；等待 Windows CI 编译与完整测试。构建日志仅在 ignored outputs，不提交。
+- 新增实际语言回归，覆盖系统/明确选择、文件往返/坏数据/失败保留、目录与占位符、静态生产入口、用户名字和嵌套占位符不替换、未知键回退、检测失败双向重绘、配置保存字节不变；旧测试入口显式固定中文。
+- 静态验证：目录 390 项无重复、英文列无中文、具名占位符一致，git diff --check 通过。构建尝试 Windows/build-windows.ps1 使用 pwsh，因当前主机缺少 64 位 MSBuild/Visual Studio 在环境发现阶段停止；最终提交 `9faa523` 的 Windows CI 已完成编译与完整测试。构建日志仅在 ignored outputs，不提交。
 - 实机仍待：语言切换和重启保持、英文/长名/DPI/辅助功能及 0/1/多显示器视觉验证。未运行实际应用、网络探测、USB、DDC、输入源、唤醒或系统设置。
-- W-047 托盘状态补充：TrayStatusPresentation 持有 UiMessage 模板与复制的具名参数，语言刷新仅重新生成现有 tooltip，不把成功/失败操作改成 USB 开关提示。缺失映射数量使用完整结果模板；新增失败→双向重绘→后续成功、参数副本及原始外部文本保留模拟测试。自动编译/完整测试由 Windows CI 验证。
+- W-047 托盘状态补充：TrayStatusPresentation 持有 UiMessage 模板与复制的具名参数，语言刷新仅重新生成现有 tooltip，不把成功/失败操作改成 USB 开关提示。缺失映射数量使用完整结果模板；新增失败→双向重绘→后续成功、参数副本及原始外部文本保留模拟测试。自动编译/完整测试已通过 Windows CI 验证。
+
+- 最终验证：提交 `9faa523` / [PR #104](https://github.com/maizihk/DisplaySwitch/pull/104)，[Windows CI run 34751479197](https://github.com/maizihk/DisplaySwitch/actions/runs/34751479197) / job `103708672810` 全部成功：535 项原生检查、61 项安装器检查、x64 Release、绿色目录验证及上传。artifact `10316116464` 已下载为 `Windows/outputs/english-9faa523/SFlip-Windows-x64-portable.zip`，SHA-256 `58d9e88b12ee44c3eac02a73d19820e954a2f4e4f9efc12ada1138f8ae41db6e` 校验一致；产物保存在 ignored outputs，不提交。GUI/语言切换/高 DPI 等实机状态仍待验证。
