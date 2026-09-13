@@ -826,3 +826,9 @@
 - 根据日志区分：listener 未启动、sendto 失败、完全零收包、来源端口不符、event 不符、endpoint/HMAC/时间窗/重放拒绝或迟到响应。
 - 本任务没有继续处理 C2C、DDC 原生读取或其他协同状态机行为。
 - 多显示器同时切换已由用户实机确认通过；该结论与本次网络诊断分开记录。
+
+## DS-048 统一版本发布
+
+- 分支 codex/windows-release-2-4-0，基线 3ff778a；用户授权双端正式发布 2.4.0（构建 24）。
+- 版本配置、双语 README 和发布说明已更新；发布代码 81dd2be。297 项 XCTest、Debug/Release、严格签名及打包验证通过；CI 34753517785，包内版本 2.4.0（24）。下载包哈希校验通过。
+- 发布 PR #105；Release：https://github.com/maizihk/SFlip/releases/tag/v2.4.0。文件含 Mac DMG/ZIP、Windows 安装版/绿色版及 SHA256SUMS.txt。未执行真实硬件流程。
