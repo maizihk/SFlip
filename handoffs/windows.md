@@ -446,4 +446,5 @@
 ## W-048 统一版本发布
 
 - 分支 codex/windows-release-2-4-0，基线 3ff778a；用户授权双端正式发布 2.4.0（构建 24）。
-- 版本配置、双语 README 和发布说明已更新；平台构建、测试、包校验、Release 待完成。
+- 版本配置、双语 README 和发布说明已更新；发布代码 81dd2be。535 项原生检查、61 项安装器检查、x64 Release 和绿色包验证通过；CI 34753517787，程序/安装器版本均为 2.4.0.24。下载包哈希校验通过。
+- 发布 PR #105；Release：https://github.com/maizihk/SFlip/releases/tag/v2.4.0。文件含 Mac DMG/ZIP、Windows 安装版/绿色版及 SHA256SUMS.txt。未执行真实硬件流程。
