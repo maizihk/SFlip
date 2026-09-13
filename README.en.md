@@ -24,7 +24,7 @@ Current releases: Windows **v2.4.0**, macOS **v2.4.0**. See the [release notes](
 | macOS | Apple Silicon, macOS 12 or later | [DMG](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-macOS-arm64.dmg) · [ZIP](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-macOS-arm64.zip) |
 | Windows | x64, Windows 10 1809 or later | [Installer](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-Windows-x64-Setup.exe) · [Portable ZIP](https://github.com/maizihk/SFlip/releases/download/v2.4.0/SFlip-v2.4.0-Windows-x64-portable.zip) |
 
-- **macOS**: Open the DMG, drag `SFlip.app` into `Applications`, then launch it from Applications. For the ZIP, extract it and move the app to Applications.
+- **macOS**: Open the DMG, drag `SFlip.app` into `Applications`, then launch it from Applications. For the ZIP, extract it and move the app to Applications. If the first launch is blocked, follow the [Mac installation guide](macOS/INSTALL.md#installing-sflip-on-macos) to approve it in System Settings.
 - **Windows installer**: Run the installer and follow the setup wizard. If a required runtime is missing, install it and retry.
 - **Windows portable version**: Install [Windows App Runtime 2.4 x64](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads), extract the entire ZIP and run `SFlip.exe`. Keep the adjacent `runtime` folder.
 
