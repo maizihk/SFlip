@@ -32,7 +32,8 @@ namespace DisplaySwitcher::Native
         TrayIcon(TrayIcon const&) = delete;
         TrayIcon& operator=(TrayIcon const&) = delete;
 
-        void SetStatus(std::wstring const& status);
+        void SetStatus(UiMessage const& status);
+        void RefreshLanguage();
         void SetUsbSwitchActive(bool active);
         void SetProfiles(std::vector<std::pair<std::wstring, std::wstring>> profiles);
         void SetDdcItems(std::vector<TrayDdcItem> items);
@@ -62,7 +63,7 @@ namespace DisplaySwitcher::Native
         HWND window_{};
         std::unique_ptr<MediaKeyWatcher> mediaKeyWatcher_;
         std::wstring className_;
-        std::wstring status_{ ::DisplaySwitcher::Native::UiText(L"正在初始化…") };
+        TrayStatusPresentation status_;
         bool usbSwitchActive_{};
         std::vector<std::pair<std::wstring, std::wstring>> profiles_;
         std::vector<TrayDdcItem> ddcItems_;

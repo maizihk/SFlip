@@ -22,9 +22,11 @@ namespace DisplaySwitcher::Native {
         std::initializer_list<std::pair<std::wstring_view, std::wstring_view>> arguments);
     struct UiMessage {
         std::wstring source;
+        bool verbatim{};
         std::vector<std::pair<std::wstring, std::wstring>> arguments;
         UiMessage(wchar_t const* pattern,
             std::initializer_list<std::pair<std::wstring_view, std::wstring_view>> values = {});
+        static UiMessage Verbatim(std::wstring text) { UiMessage value(L""); value.source = std::move(text); value.verbatim = true; return value; }
         std::wstring Render() const;
     };
     bool ValidateUiCatalog();

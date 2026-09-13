@@ -100,6 +100,7 @@ UiMessage::UiMessage(wchar_t const* pattern,
     for (auto const& value : values) arguments.emplace_back(value.first, value.second);
 }
 std::wstring UiMessage::Render() const {
+    if (verbatim) return source;
     std::wstring_view pattern = UiText(source.c_str()); std::wstring result;
     for (size_t index=0; index<pattern.size();) {
         if(pattern[index]!=L'{') { result+=pattern[index++]; continue; }

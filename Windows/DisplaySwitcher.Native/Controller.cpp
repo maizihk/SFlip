@@ -92,7 +92,7 @@ namespace DisplaySwitcher::Native
         {
             if (auto self = weak.lock())
             {
-                self->SetStatus(error);
+                self->SetStatus(UiMessage::Verbatim(error));
                 self->SetPeerConnectionStatus(UiMessage(L"连接错误：{error}", {{L"error", error}}), false);
             }
         });
@@ -220,12 +220,12 @@ namespace DisplaySwitcher::Native
             try { ApplyAutoStart(config.startWithWindows); }
             catch (hresult_error const& error) { ShowError(::DisplaySwitcher::Native::UiText(L"登录启动设置失败"), error.message().c_str()); }
         }
-        if (config.usbSwitch.enabled && !usbConfigured) SetStatus(::DisplaySwitcher::Native::UiText(L"USB 自动切换未配置"));
-        else if (config.usbSwitch.enabled && !hasUsbMapping) SetStatus(::DisplaySwitcher::Native::UiText(L"USB 显示器输入映射未配置"));
-        else if (!config.usbSwitch.enabled) SetStatus(::DisplaySwitcher::Native::UiText(L"USB 自动切换未开启"));
+        if (config.usbSwitch.enabled && !usbConfigured) SetStatus(UiMessage(L"USB 自动切换未配置"));
+        else if (config.usbSwitch.enabled && !hasUsbMapping) SetStatus(UiMessage(L"USB 显示器输入映射未配置"));
+        else if (!config.usbSwitch.enabled) SetStatus(UiMessage(L"USB 自动切换未开启"));
         else
         {
-            SetStatus(::DisplaySwitcher::Native::UiText(L"USB 自动切换已开启"));
+            SetStatus(UiMessage(L"USB 自动切换已开启"));
         }
     }
 
@@ -256,7 +256,7 @@ namespace DisplaySwitcher::Native
         }
         usbWatcher_->Reconfigure(-1, -1, L"", usbObservationGeneration_.BeginConfiguration());
         SetPeerConnectionStatus(UiMessage(L"USB 学习中，协同已暂停"), false);
-        SetStatus(::DisplaySwitcher::Native::UiText(L"正在学习 USB 设备；自动协同和硬件操作已暂停"));
+        SetStatus(UiMessage(L"正在学习 USB 设备；自动协同和硬件操作已暂停"));
     }
 
     void Controller::EndUsbLearning()
@@ -351,7 +351,7 @@ namespace DisplaySwitcher::Native
                     current->Enqueue([weak, generation, result]
                     {
                         if (auto value = weak.lock(); value && value->AllowsSideEffects(generation))
-                            value->SetStatus(result.success ? ::DisplaySwitcher::Native::UiText(L"USB 已离开，显示器已切换") : UiFormat(L"USB 显示器切换部分失败：{error}", {{L"error", result.error}}));
+                            value->SetStatus(result.success ? UiMessage(L"USB 已离开，显示器已切换") : UiMessage(L"USB 显示器切换部分失败：{error}", {{L"error", result.error}}));
                     });
             }).detach();
         }
@@ -420,7 +420,7 @@ namespace DisplaySwitcher::Native
                 SetPeerConnectionStatus(action.value ? connectedText(action.endpointId) : UiMessage(L"连接已中断"), action.value);
                 break;
             case V2Action::Kind::PromptManualSelection:
-                SetStatus(::DisplaySwitcher::Native::UiText(L"对端不可用，请检查协同配置"));
+                SetStatus(UiMessage(L"对端不可用，请检查协同配置"));
                 break;
             case V2Action::Kind::IgnoreMessage:
                 WriteDiagnostic("protocol.v2 message_ignored=1");
@@ -974,11 +974,11 @@ namespace DisplaySwitcher::Native
         if (!config.CanCoordinateWithProfile(profileId))
         {
             SetStatus(profile && profile->coordinationEnabled
-                ? ::DisplaySwitcher::Native::UiText(L"正在连接对端，请稍后重试") : ::DisplaySwitcher::Native::UiText(L"协同配置不可用"));
+                ? UiMessage(L"正在连接对端，请稍后重试") : UiMessage(L"协同配置不可用"));
             return;
         }
         auto name = profile->name;
-        SetStatus(UiFormat(L"正在切换到 {name}…", {{L"name", name}}));
+        SetStatus(UiMessage(L"正在切换到 {name}…", {{L"name", name}}));
         auto generation = sideEffectGeneration_.load();
         std::weak_ptr<Controller> weak = shared_from_this();
         std::thread([weak, config, profileId, name, generation, eventId]
@@ -1022,8 +1022,7 @@ namespace DisplaySwitcher::Native
                     {
                         if (eventId && value->v2StateMachine_)
                             value->ApplyV2Actions(value->v2StateMachine_->OnSwitchCompleted(NowMilliseconds(), *eventId, result.success));
-                        auto text = result.success ? UiFormat(L"已切换到 {name}", {{L"name", name}}) : UiFormat(L"切换到 {name} 失败：{error}", {{L"name", name}, {L"error", result.error}});
-                        if (missing) text += UiFormat(L"；有 {count} 台显示器缺少映射", {{L"count", std::to_wstring(missing)}});
+                        auto text = TraySwitchOutcomeMessage(name, result.error, result.success, missing);
                         value->SetStatus(text);
                         if (!result.success) value->ShowError(::DisplaySwitcher::Native::UiText(L"显示器切换失败"), result.error.empty() ? ::DisplaySwitcher::Native::UiText(L"未知错误") : result.error);
                     }
@@ -1033,7 +1032,7 @@ namespace DisplaySwitcher::Native
 
     void Controller::ManualSwitch(std::wstring const& profileId)
     {
-        if (profileDetectionActive_) { SetStatus(::DisplaySwitcher::Native::UiText(L"正在检测协同配置，请稍候")); return; }
+        if (profileDetectionActive_) { SetStatus(UiMessage(L"正在检测协同配置，请稍候")); return; }
         auto config = Config(); auto profile = config.FindCollaborationProfile(profileId);
         if (profile && profile->coordinationEnabled && profile->peerProtocolVersion == 2 && IsValidDisplayId(profile->peerEndpointId) && v2StateMachine_)
         {
@@ -1041,7 +1040,7 @@ namespace DisplaySwitcher::Native
                 std::count_if(config.collaborationProfiles.begin(), config.collaborationProfiles.end(), [&](auto const& candidate)
                 { return candidate.coordinationEnabled && candidate.peerProtocolVersion == 2 && EqualId(candidate.peerEndpointId, profile->peerEndpointId); }) != 1)
             {
-                SetStatus(::DisplaySwitcher::Native::UiText(L"协同 endpoint 配置有冲突，未执行切换"));
+                SetStatus(UiMessage(L"协同 endpoint 配置有冲突，未执行切换"));
                 return;
             }
             ApplyV2Actions(v2StateMachine_->OnManualSelect(NowMilliseconds(), profile->peerEndpointId, NewEventId()));
@@ -1609,15 +1608,14 @@ namespace DisplaySwitcher::Native
             if (auto self = weak.lock())
             {
                 self->RefreshTrayDdcControls();
-                auto config = self->Config();
-                self->SetStatus(UsbTrayStatusText(config.usbSwitch.enabled));
+                if (self->trayIcon_) self->trayIcon_->RefreshLanguage();
 
             }
         });
         get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->ShowWindow();
     }
 
-    void Controller::SetStatus(std::wstring const& text)
+    void Controller::SetStatus(UiMessage const& text)
     {
         if (disposed_) return;
         if (dispatcher_.HasThreadAccess()) trayIcon_->SetStatus(text);

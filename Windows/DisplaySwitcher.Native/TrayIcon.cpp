@@ -461,15 +461,21 @@ namespace DisplaySwitcher::Native
         data.uCallbackMessage = CallbackMessage;
         data.hIcon = icon_;
         data.guidItem = TrayGuid;
-        auto tip = Limit(L"SFlip · " + status_, 127);
+        auto tip = Limit(L"SFlip · " + status_.Text(), 127);
         wcscpy_s(data.szTip, tip.c_str());
         return data;
     }
 
-    void TrayIcon::SetStatus(std::wstring const& status)
+    void TrayIcon::SetStatus(UiMessage const& status)
     {
         if (disposed_) return;
-        status_ = status;
+        status_.Set(status);
+        RefreshLanguage();
+    }
+
+    void TrayIcon::RefreshLanguage()
+    {
+        if (disposed_) return;
         auto data = Data(NIF_TIP);
         if (!Shell_NotifyIconW(NIM_MODIFY, &data)) BeginShellRecovery(false);
     }

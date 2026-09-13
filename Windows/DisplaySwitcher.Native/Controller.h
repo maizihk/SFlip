@@ -74,7 +74,7 @@ namespace DisplaySwitcher::Native
         void RefreshTrayDdcControls();
         DiagnosticSnapshot BuildDiagnosticSnapshot();
         void OnDisplayTopologyChanged();
-        void SetStatus(std::wstring const& text);
+        void SetStatus(UiMessage const& text);
         void SetPeerConnectionStatus(UiMessage const& text, bool connected);
         void Enqueue(std::function<void()> action);
         static std::wstring NewEventId();

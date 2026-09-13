@@ -3918,6 +3918,27 @@ namespace {
         Check(chineseStatus == L"USB 切换已开启" && UsbTrayStatusText(true) == L"USB Switching On",
             L"语言：生产投影每次按当前语言生成，不缓存首次语言");
         SetLanguageForTests(UiLanguage::Chinese);
+        TrayStatusPresentation trayStatus;
+        std::wstring destination = L"工作电脑 {error}";
+        std::wstring detail = L"Synthetic Error {name}";
+        trayStatus.Set(TraySwitchOutcomeMessage(destination, detail, false, 2));
+        destination = L"renamed"; detail = L"changed";
+        Check(trayStatus.Text() == L"切换到 工作电脑 {error} 失败：Synthetic Error {name}；有 2 台显示器缺少映射",
+            L"语言：托盘持有操作结果模板及参数副本，不引用已变化的名称或错误");
+        SetLanguageForTests(UiLanguage::English);
+        Check(trayStatus.Text() == L"Switch to 工作电脑 {error} failed: Synthetic Error {name}; 2 display(s) have no mapping" &&
+            trayStatus.Text() != UsbTrayStatusText(true) && trayStatus.Text() != UsbTrayStatusText(false),
+            L"语言：托盘重绘保留失败、目标名称和缺失映射数，不降为 USB 开关状态");
+        SetLanguageForTests(UiLanguage::Chinese);
+        Check(trayStatus.Text() == L"切换到 工作电脑 {error} 失败：Synthetic Error {name}；有 2 台显示器缺少映射",
+            L"语言：托盘双向重绘仍保留此前失败操作，用户文字不递归替换");
+        trayStatus.Set(TraySwitchOutcomeMessage(L"Destination", L"", true, 0));
+        SetLanguageForTests(UiLanguage::English);
+        Check(trayStatus.Text() == L"Switched to Destination", L"语言：后续操作成功覆盖旧失败且重绘保持成功");
+        trayStatus.Set(UiMessage::Verbatim(L"常规 {name}"));
+        SetLanguageForTests(UiLanguage::Chinese);
+        Check(trayStatus.Text() == L"常规 {name}", L"语言：原始外部错误保持原文且不解析其中占位符");
+        SetLanguageForTests(UiLanguage::Chinese);
     }
 }
 
