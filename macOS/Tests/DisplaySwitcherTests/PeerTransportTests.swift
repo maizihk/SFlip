@@ -3,6 +3,30 @@ import Foundation
 import XCTest
 
 final class PeerTransportTests: XCTestCase {
+    func testConfiguredHostnameMatchesResolvedDatagramAddressAndPort() {
+        let resolver = MockPeerHostAddressResolver(addresses: [
+            "peer.example": ["198.51.100.20"]
+        ])
+        let transport = PeerTransport(
+            factory: MockPeerTransportSocketFactory(),
+            hostResolver: resolver,
+            callbackQueue: .main
+        )
+
+        XCTAssertTrue(transport.sourceMatches(
+            PeerTransportEndpoint(host: "198.51.100.20", port: 49_731),
+            configuredHost: "peer.example", port: 49_731
+        ))
+        XCTAssertFalse(transport.sourceMatches(
+            PeerTransportEndpoint(host: "198.51.100.21", port: 49_731),
+            configuredHost: "peer.example", port: 49_731
+        ))
+        XCTAssertFalse(transport.sourceMatches(
+            PeerTransportEndpoint(host: "198.51.100.20", port: 49_732),
+            configuredHost: "peer.example", port: 49_731
+        ))
+    }
+
     func testListenerBindFailureIsReportedPrecisely() {
         let factory = MockPeerTransportSocketFactory()
         factory.onSocketCreated = { socket in
@@ -10,7 +34,10 @@ final class PeerTransportTests: XCTestCase {
         }
         let transport = PeerTransport(factory: factory, callbackQueue: .main)
 
-        XCTAssertEqual(transport.start(port: 49_731), .failure(.socketBind))
+        XCTAssertEqual(
+            transport.start(port: 49_731),
+            .failure(.socketBind, systemError: .init(domain: .posix, code: EADDRINUSE))
+        )
         XCTAssertNil(transport.listeningPort)
         XCTAssertTrue(factory.sockets[0].stopped)
     }
@@ -165,6 +192,76 @@ final class PeerTransportTests: XCTestCase {
         XCTAssertEqual(socket.sent.count, 2)
     }
 
+    func testSendFailurePreservesPosixErrorDomainAndCode() {
+        let factory = MockPeerTransportSocketFactory()
+        let transport = PeerTransport(factory: factory, callbackQueue: .main)
+        let completed = expectation(description: "send errno returned")
+        XCTAssertEqual(transport.start(port: 49_731), .success)
+        factory.sockets[0].onSend = { _, _, completion in
+            completion(PeerTransportError.socketOperation("发送", ENETUNREACH))
+        }
+
+        transport.send(Data("probe".utf8), host: "peer.example", port: 49_731) { result in
+            XCTAssertEqual(
+                result,
+                .failure(.send, systemError: .init(domain: .posix, code: ENETUNREACH))
+            )
+            completed.fulfill()
+        }
+
+        wait(for: [completed], timeout: 1)
+    }
+
+    func testSendAddressResolutionFailurePreservesGetaddrinfoCode() {
+        let factory = MockPeerTransportSocketFactory()
+        let transport = PeerTransport(factory: factory, callbackQueue: .main)
+        let completed = expectation(description: "getaddrinfo code returned")
+        XCTAssertEqual(transport.start(port: 49_731), .success)
+        factory.sockets[0].onSend = { _, _, completion in
+            completion(PeerTransportError.addressResolution(EAI_NONAME))
+        }
+
+        transport.send(Data("probe".utf8), host: "invalid.example", port: 49_731) { result in
+            XCTAssertEqual(
+                result,
+                .failure(
+                    .addressResolution,
+                    systemError: .init(domain: .addressResolution, code: EAI_NONAME)
+                )
+            )
+            completed.fulfill()
+        }
+
+        wait(for: [completed], timeout: 1)
+    }
+
+    func testUnknownSendErrorDoesNotExposeLocalizedText() {
+        let factory = MockPeerTransportSocketFactory()
+        let transport = PeerTransport(factory: factory, callbackQueue: .main)
+        let reported = expectation(description: "sanitized send error")
+        let completed = expectation(description: "unknown send result")
+        transport.onError = { message in
+            XCTAssertEqual(message, "UDP 发送失败：send-failed unknown=0")
+            XCTAssertFalse(message.contains("private-host"))
+            XCTAssertFalse(message.contains("secret-code"))
+            reported.fulfill()
+        }
+        XCTAssertEqual(transport.start(port: 49_731), .success)
+        factory.sockets[0].onSend = { _, _, completion in
+            completion(MockTransportError.sensitiveFailure)
+        }
+
+        transport.send(Data("probe".utf8), host: "peer.example", port: 49_731) { result in
+            XCTAssertEqual(
+                result,
+                .failure(.send, systemError: .init(domain: .unknown, code: 0))
+            )
+            completed.fulfill()
+        }
+
+        wait(for: [reported, completed], timeout: 1)
+    }
+
     func testStopPreventsUnboundSend() {
         let factory = MockPeerTransportSocketFactory()
         let transport = PeerTransport(factory: factory, callbackQueue: .main)
@@ -186,7 +283,21 @@ final class PeerTransportTests: XCTestCase {
 private enum MockTransportError: LocalizedError {
     case sendFailed
     case receiveFailed
-    var errorDescription: String? { "simulated transport failure" }
+    case sensitiveFailure
+    var errorDescription: String? {
+        switch self {
+        case .sensitiveFailure: return "private-host secret-code"
+        case .sendFailed, .receiveFailed: return "simulated transport failure"
+        }
+    }
+}
+
+private struct MockPeerHostAddressResolver: PeerHostAddressResolving {
+    let addresses: [String: Set<String>]
+
+    func numericIPv4Addresses(for host: String) -> Set<String> {
+        addresses[host.lowercased()] ?? []
+    }
 }
 
 private final class MockPeerTransportSocketFactory: PeerTransportSocketFactory {

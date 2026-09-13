@@ -158,10 +158,9 @@ def classify_message(
         return "wrong_target"
     if message["sourceEndpointID"].lower() != known_source_endpoint_id.lower():
         return "unknown_source"
-    if message["type"] == "status_probe":
-        if target is not None and target.lower() != local_endpoint_id.lower():
-            return "wrong_target"
-    elif target is None or target.lower() != local_endpoint_id.lower():
+    # DS-039: status probes authenticate the original target as a cache hint.
+    # Other messages must still be addressed to the current receiving instance.
+    if message["type"] != "status_probe" and (target is None or target.lower() != local_endpoint_id.lower()):
         return "wrong_target"
     if abs(message["timestamp"] - reference_time) > 10:
         return "timestamp_out_of_window"

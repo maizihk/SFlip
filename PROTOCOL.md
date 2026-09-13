@@ -1,6 +1,6 @@
 # DisplaySwitch 双端协同协议
 
-本文件是 DisplaySwitch 网络通信的唯一生效规范。当前协议只支持 `version = 2`；任何其他版本都必须安全拒绝。
+本文件是 DisplaySwitch 网络通信的唯一生效规范。当前协议只支持 `version = 2`；任何其他版本都必须安全拒绝。DS-039（2026-09-11）取消人工身份绑定，以配对码验证和自动路由缓存建立连接；完整体验需要两端升级，报文字段与 schema 不变。
 
 双端默认使用 UDP `49731`，端口可以按本机协同配置修改。所有消息都是 UTF-8 JSON。
 
@@ -20,8 +20,8 @@
 | `version` | integer | 是 | 固定为 `2` |
 | `type` | string | 是 | 必须为已知 v2 类型 |
 | `eventID` | UUID string | 是 | 比较时字母不区分大小写 |
-| `sourceEndpointID` | UUID string | 是 | 安装实例随机生成的逻辑身份 |
-| `targetEndpointID` | UUID string/null | 是 | 仅首次或未绑定的 `status_probe` 可以为 `null` |
+| `sourceEndpointID` | UUID string | 是 | 安装实例随机生成的路由标识 |
+| `targetEndpointID` | UUID string/null | 是 | 仅 `status_probe` 可以为 `null`；主动探测始终使用 `null` |
 | `sourcePlatform` | string | 是 | `macos` 或 `windows`，只用于显示和诊断 |
 | `timestamp` | integer | 是 | 非负 Unix 整秒，接收时间差绝对值不超过 10 秒，包含边界 |
 | `nonce` | base64url string | 是 | 16 个密码学安全随机字节，无 `=` 填充，共 22 个字符 |
@@ -48,21 +48,21 @@
 ## endpoint 与配置映射
 
 - 每个安装实例随机生成并持久保存一个 `endpointID`；不得从显示器、USB、网卡、主机名、用户名或其他硬件信息派生。
-- 每个本机协同配置保存预期的 `peerEndpointID`。首次检测前可以为空。
-- 初次检测可以通过已配置 host、端口和配对凭据验证响应，但只有用户确认后才能保存 endpointID。
-- 已保存 endpointID 变化时不得自动替换，必须提示用户重新确认。
-- 同一 endpoint 在本机最多对应一个已开启配置；重复映射安全拒绝。
-- 同平台设备使用 endpointID 区分，不能依赖 `sourcePlatform` 选择目标。
+- 每个本机协同配置可缓存 `peerEndpointID` 作为内部路由信息；首次连接前可以为空，不是用户需要确认的信任身份。
+- 状态请求/响应按已配置 host 的实际解析地址、端口和配对码认证唯一匹配配置。通过校验后自动原子保存新路由缓存，首次连接不要求确认。
+- 已保存 endpointID 变化不阻止连接；配对码验证通过即自动更新。保存成功后发布路由并以 `configuration_changed` 取消引用旧路由的事件；保存失败保留原数据并进入既有安全状态，不回复或报告成功。相同缓存不重复保存。
+- 同一来源地址/端口和凭据必须唯一匹配配置；重复配置不得猜测硬件映射。旧 endpoint 不得优先于地址与配对码，也不得阻止学习新缓存。
+- 同平台设备按配置地址定向，endpoint 仅用于报文和事件关联，不能依赖 `sourcePlatform` 选择目标。
 
 ## 配置检测
 
 “检测”操作按以下顺序执行：
 
 1. 先完成本机配置完整性检查。
-2. 发送 `version = 2` 的 `status_probe`；`status_response` 必须保持相同 `eventID`，且全程零硬件副作用。
+2. 主动发送 `version = 2`、`targetEndpointID = null` 的 `status_probe`，不依赖旧缓存；收到旧版携带任意合法 UUID target 的探测同样按来源地址/端口和配对码验证。`status_response` 必须保持相同 `eventID`，且全程零硬件副作用。
 3. 无响应时不得发送 v1 或其他版本探测，不得猜测兼容能力。
-4. 结果只显示 `v2 可用`、`认证失败`、`无响应` 或 `本机配置不完整`。
-5. 检测不得自动开启配置、保存或替换 endpointID、修改防火墙、执行 DDC、切换输入设备或唤醒显示器。
+4. 连接成功显示 `已连接`；失败显示配对码不匹配、无响应、本机配置不完整或连接信息保存失败等具体原因。
+5. 检测可自动更新路由缓存，但不得自动开启用户关闭的配置、修改防火墙、执行 DDC、切换输入设备或唤醒显示器。字段完整即可开启并监听/定期探测，不要求先获得缓存。关闭配置可回复探测并更新缓存，仍保持关闭。
 
 ## 认证
 
@@ -101,7 +101,7 @@ reason:{reason-or-null}
 
 使用派生密钥对上述字节计算 HMAC-SHA256。`authTag` 使用 RFC 4648 base64url 且不带 `=` 填充。接收端必须使用常量时间比较认证标签。
 
-接收端先校验 JSON 结构、`version`、消息方向、时间窗和 endpoint，再验证 HMAC。任何失败消息都不得刷新在线状态、获得回复或产生硬件副作用。
+接收端先校验 JSON 结构、`version`、时间窗和消息方向，再验证原始报文 HMAC。`status_probe` 的合法 target 仅为旧缓存提示，不限制其是否等于本机；非探测消息仍须定向当前实例。探测按实际来源地址/端口和配对码选择配置，不检查来源是否等于旧缓存；响应另须匹配当前检测事件。任何失败消息都不得刷新在线状态、获得回复或产生硬件副作用。
 
 ### nonce、重复和重放
 

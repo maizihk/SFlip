@@ -184,6 +184,24 @@ namespace DisplaySwitcher::Native
         Mixed,
     };
 
+    enum class DdcPreferenceState { Off, Partial, On };
+
+    struct LinkedDdcPreferenceControl
+    {
+        DdcVcpCode code;
+        std::wstring label;
+        DdcPreferenceState featureState{ DdcPreferenceState::Off };
+        DdcPreferenceState trayState{ DdcPreferenceState::Off };
+        bool hasDisplays{};
+        bool trayEnabled{};
+    };
+
+    std::vector<LinkedDdcPreferenceControl> BuildLinkedDdcPreferenceControls(
+        std::vector<DisplayConfig> const& displays);
+    void SetLinkedDdcFeature(std::vector<DisplayConfig>& displays, DdcVcpCode code, bool enabled);
+    void SetLinkedDdcTray(std::vector<DisplayConfig>& displays, DdcVcpCode code, bool enabled);
+    inline bool ShowPerDisplayDdcControls(bool linked) noexcept { return !linked; }
+
     struct DdcProjectedControl
     {
         std::wstring displayId;

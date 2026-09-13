@@ -1,5 +1,104 @@
 # macOS 交接记录
 
+## 当前任务：DS-046 联动控制列对齐与集中读取
+
+- 日期：2026-09-12；分支：`codex/windows-linked-controls-alignment`；基线：`36b3b5a`，主任务已确认 `origin/main@f12a224`。
+- Mac 联动行五列已有 required 固定宽度和 centerY，混合文本也固定宽度，因此没有 Windows 自适应列宽根因；实际发现联动表头默认右对齐而开关/数值靠左，最小修复为表头左对齐，列宽和一次表头保持。
+- 用户本轮新增要求将联动读取集中成一个入口：联动时公共标题旁显示一个读取按钮，单台卡仅保留结果及离线删除，关闭联动恢复单台读取。目标来自 `resolvedDisplayConfigurations` 的已解析在线配置；未猜测离线目标或新增读取码。
+- 原 `onReadDDC` / `readDDCForSettings` 收敛为多 ID 与完成回调，单台同路调用；一次串行队列 `read(targets:)` 保留安全门、原 enabledCommands、每目标 skipReason/失败和可信样本刷新。共享 pending 禁用读取按钮，完成回调在安全门拒绝、零目标、正常/取消批次返回及窗口隐藏时均释放；完成布尔值表示批次已返回，逐台成功/失败继续显示原结果。
+- 修改：`SettingsWindowController.swift`、`main.swift`、`DDCBackendTests.swift`、Mac 清单及本交接文件。新增一个模拟多目标读取测试，覆盖首台失败不阻塞另一台、启用码过滤、空码跳过及零写入。未修改协议、配置格式、USB、网络或滑杆绘制。
+- 静态审查与 `git diff --check` 通过；提交 `e33a4e6`、PR [#103](https://github.com/maizihk/SFlip/pull/103)（base：`codex/windows-collaboration-status-top`）的 macOS CI run `34685593717`、job `103531920510` 通过 291 项 XCTest（零失败）、Debug/Release 构建、严格签名验证和打包。真实 Mac 列对齐、浅/深主题已知/未知轨道端点、集中读取/取消与切换联动的 GUI 和实际统一读取仍待验证。未启动真实 DDC、USB、网络、唤醒或 App；不单独提交推送。
+
+## 当前任务：DS-045 协同状态移至顶部
+
+- 日期：2026-09-12
+- 分支：`codex/windows-collaboration-status-top`
+- 基线：`7a107af`；`origin/main@f12a224`（主任务已确认）。
+- 原顶部状态卡只有右侧按钮，唯一连接主状态和权限行动详情位于配置卡底部，检测后需向下查看。
+- 将原 `peerStatusLabel` 挂到顶部动作行左侧并启用扩展宽度，沿用 wrapping label 与按钮尺寸优先级；检测中、成功、失败、配置切换和周期刷新仍更新同一实例。权限详情移同卡下一行，空详情隐藏，配置卡移除旧挂载及其专用分隔线。
+- Mac 源码没有“已开启；连接状态见上方”类重复提示，实际配置错误保持。仅修改 `SettingsWindowController.swift`、`macOS/DEVELOPMENT_CHECKLIST.md` 和本交接文件；未修改协议、连接运行时、网络权限、USB、DDC 或系统设置。
+- 本次为最小 AppKit 布局调整，未新增自证测试；静态 diff 与 `git diff --check` 通过。提交 `fd780a6`、PR [#102](https://github.com/maizihk/SFlip/pull/102)（base：`codex/windows-linked-display-controls`）的 macOS CI run `34684156968`、job `103528077828` 全部通过：290 项 XCTest（零失败）、Debug/Release 构建、严格签名验证和打包。
+- 紧凑窗口长配置名/长错误换行、检测中/成功/失败和明确权限拒绝详情仍待真实 GUI 验证；未访问真实网络或硬件。提交、推送和 PR 由主任务统一处理。
+
+## 当前任务：DS-044 联动显示器集中控制
+
+- 日期：2026-09-12
+- 分支：`codex/windows-linked-display-controls`
+- 基线：`1634bb7`；`origin/main@f12a224`
+- 联动开启后亮度/对比度/音量固定各一行，集中功能开关、托盘开关和现有滑杆；单台卡仅保留设备与读取操作。全部功能关闭仍保留开启入口，关闭联动展示当前逐台偏好，不恢复历史快照。
+- 新增纯偏好聚合/修改策略，功能点击覆盖全部已配置显示器含离线，关闭清托盘；托盘点击仅开启该功能的显示器，禁用功能托盘保持关闭。混合显示“部分开启”，零显示器禁用开关。
+- 联动主开关不批改偏好或读写 DDC；硬件滑杆仍使用原已启用/可用目标投影，缺目标显示 unknown 且禁用。共享行列宽合计 580 点，适配现有 602 点卡内容宽；保存沿用原子写盘与失败回退。
+- 生产文件：`DS007SettingsModels.swift`、`SettingsWindowController.swift`；测试由并行代理修改 `DS007Tests.swift` 和 `PublicPresentationModelsTests.swift`。清单和本交接记录同步更新。
+- 提交 `5699eaa` 已推送；PR [#101](https://github.com/maizihk/SFlip/pull/101) 的 base 为 `docs-refresh`。macOS CI run `34682847024`、job `103524550707` 全部通过：290 项 XCTest（零失败）、Debug/Release 构建、严格签名验证与打包。
+- 真实混合状态、窗口布局、联动切换和显示器调节仍待 GUI/实机验证。自动验证未执行真实 DDC、USB、网络、唤醒或系统设置操作。
+
+## 当前任务：DS-043 配置检测状态一致性
+
+- 日期：2026-09-12
+- 分支：`codex/windows-product-flow-review`
+- 基线：`32d8299`；`origin/main@f12a224`
+- 产品审查确认：切换配置未立即刷新状态，旧配置检测回调仍能写入新配置界面；认证失败与无响应被粗化完成，旧认证时间使周期刷新继续显示已连接或断开。
+- 切换配置现在刷新当前状态并清空旧权限详情；轻量 presentation predicate 检查返回配置仍是当前配置，异步主状态与详情写入共用该限制。
+- 新增认证失败连接状态；手动认证失败和无响应复用现有 inspectionFailure 保存，优先于旧在线证据。新检测与实际认证成功清除失败，不修改网络发送或协议。
+- 生产修改：`DS007SettingsModels.swift`、`SettingsWindowController.swift`、`main.swift`；`DS007Tests.swift` 新增 2 项模拟测试，覆盖失败终态优先旧在线证据、配置隔离、恢复和迟到结果展示限制。清单与本交接记录同步更新。
+- 提交 `5f3892a494a5e70e82cf81d9815d17b8edabfb7a` 的 macOS CI run `34680288128`、job `103517589810` 全部通过：286 项 XCTest（零失败）、Debug/Release 构建打包及严格签名验证。
+- 真实配置切换、迟到回调和失败恢复界面仍待实机验证。自动验证未执行真实网络、USB、DDC、唤醒、输入源或系统设置操作。
+
+## 当前任务：DS-042 设置页说明文案清理
+
+- 日期：2026-09-11
+- 分支：`codex/windows-settings-copy-cleanup`
+- 基线：`2371f44`；`origin/main@f12a224`
+- 协同页删除重复的零副作用说明及其分隔线；权限状态只在系统明确拒绝时显示系统设置路径，其他状态的空详情标签隐藏。
+- 网络权限和连接检测按钮保持在协同页顶部右侧；配置内容后的底部删除独立网络权限状态标签，只由连接状态标签显示当前结果。连接成功仅显示“已和对端（配置名）建立连接”，不再同时出现“协同连接正常”。
+- 明确系统拒绝仍使用同一主状态显示，并保留系统设置行动路径；其他权限 evidence 不另写一行，现有连接失败终态继续由连接状态存储供周期刷新使用。
+- 诊断页保留“在常规中开启记录并复现问题”的行动提示，删除重复的内部行为清单。
+- 修改 `PublicPresentationModels.swift`、`SettingsWindowController.swift`、`PublicPresentationModelsTests.swift`、`macOS/DEVELOPMENT_CHECKLIST.md` 和本交接文件。
+- 未修改诊断导出、协议、连接、权限、网络或硬件行为；危险删除、安全模式和真实失败提示保持原样。Windows 主机无法运行 Xcode，状态合并后的自动测试与真实单一状态布局待根任务验证。
+
+## 当前任务：DS-041 协同连接成功文案统一
+
+- 日期：2026-09-11
+- 分支：`codex/macos-connection-status-copy`
+- 基线：`91d5f00`；`origin/main@f12a224`
+- 手动检测成功和周期刷新此前分别生成“配置名：已连接”与“已连接”，导致同一次成功在界面中短暂跳变。
+- 新增单一轻量展示规则，两条路径现在都显示“已和对端（配置名）建立连接”；配置名仅为空白时回退“已和对端建立连接”。其他连接与失败状态继续使用既有文案。
+- 修改 `DS007SettingsModels.swift`、`SettingsWindowController.swift`、`DS007Tests.swift`、`macOS/DEVELOPMENT_CHECKLIST.md` 和本交接文件。
+- 提交 `abf26581ec6ec101c4062a59be04028ba821ca94` 已通过 284 项 XCTest、Debug/Release 构建、应用打包和严格签名验证；macOS CI run `34612953775`、job `103307734140` 完成且零失败。
+- 仍需真实设置页确认手动成功到周期刷新时文案不再跳变。自动验证未执行真实网络、DDC、USB、唤醒或输入源动作。
+
+## 当前任务：DS-040 协同监听与发送失败终态诊断
+
+- 日期：2026-09-11
+- 分支：`codex/macos-send-failure-diagnostics`
+- 基线：`codex/windows-independent-settings@eb022c5`（PR #95 待合并）；`origin/main@f12a224`
+- 提交 / PR / CI：本轮按任务边界不提交、不推送，由根任务统一审查与运行 macOS CI。
+
+### 原因与实现
+
+- 最新实机诊断显示 listener 成功后发送完成为失败，最后却统一落到 timeout/no-response；原实现只记录粗分类，发送失败回调也没有结束对应 pending。
+- 传输结果现保留安全错误域和 `Int32` 系统码；BSD `sendto` 失败返回后立即捕获 `errno`。详细诊断输出数字域/码，不输出地址、配对码、authTag 或 endpoint 原值。
+- 监听启动失败在发送前立即完成为 `listenerFailed`；异步发送失败只按自己的 inspection ID 完成为 `sendFailed`。完成入口先移除 pending、取消 timeout 并登记 event 已结束，因此迟到回调、取消和计时器不能重复完成或误伤其他检测。
+- 手动检测的失败终态保存在连接状态存储中，周期刷新仍显示监听/发送失败和系统码；新检测开始或认证成功会清除。后台 `reportsStatus=false` 探测不写该状态。
+- 本地网络权限证据把监听和发送失败统一视为 ordinary network failure。现有 BSD UDP 路径没有公开可靠证据将任意 errno（包括 65）等价为 TCC 明确拒绝，因此不作该断言。
+
+### 修改范围与待验
+
+- 生产源码：`PeerTransport.swift`、`PeerProtocolV2.swift`、`main.swift`、`DS007SettingsModels.swift`、`PublicPresentationModels.swift`、`SettingsWindowController.swift`。
+- 测试源码由并行测试任务补充：`PeerTransportTests.swift`、`PeerProtocolV2Tests.swift`、`PublicPresentationModelsTests.swift`、`DS007Tests.swift`。
+- 文档：`macOS/DEVELOPMENT_CHECKLIST.md`、`handoffs/macos.md`。
+- Windows 主机无法运行 Xcode；自动测试、Release 构建、严格验签和 macOS CI 由根任务继续。仍需用户实机确认发送失败显示真实系统码、成功恢复状态，以及双向协同检测。未执行真实网络或硬件操作。
+
+## 当前任务：DS-039 配对码直接连接（2026-09-11）
+
+- 基线：共享分支 `codex/windows-pairing-code-connection`，已包含批准后的协议与 22 条公共消息向量；本任务只修改 macOS 源码、测试、清单和本交接文件，不改协议、schema、版本、工作流或 Windows 实现。
+- 原因：旧实现把随机 endpoint 同时作为探测 target、响应来源门和用户确认身份。首次连接或对端重装后，即使地址、端口和配对码正确，也会被旧缓存拒绝或要求人工确认。
+- 实现：主动人工与后台探测统一发送空 target；接收端按数据报实际地址、端口和配对码唯一验证，允许带旧合法 target 的已认证探测。DNS 配置由 transport 的可注入解析器映射到数值来源地址。非探测消息仍要求当前 endpoint 并校验来源地址、端口、HMAC、时间窗和重放。
+- 缓存与安全：有效状态交换自动缓存 endpoint，关闭配置保持关闭；相同缓存只刷新六秒在线状态。变化先原子保存，再用 `configuration_changed` 清理旧事件并发布新路由；保存失败进入既有安全状态且不连接、不回复。后台探测不改变手动检测状态，不会周期性闪烁或用一次超时覆盖在线窗口。
+- 界面：删除首次/变更身份确认框和旧身份检查模型；用户状态使用“未启用、正在连接、已连接、无响应”等产品文案。字段完整即可保存开启意愿，尚无路由时应用持续自动连接。
+- 自动测试源码：公共消息向量改为 22 条；覆盖任意合法旧 target、篡改 target 未重签拒绝、地址/端口/配对码唯一匹配、DNS 解析匹配、缓存替换、相同缓存幂等、关闭配置不自动开启和零硬件副作用。当前主机是 Windows，没有 Xcode，未声称运行 XCTest、构建或签名；结果待 macOS CI。
+- 待验：macOS CI 的完整 XCTest、Debug/Release、`build-app.sh` 与严格 codesign；双端升级后首次自动连接、单端重装自动恢复、错误地址/端口/配对码和重复配置，以及仅状态连接实机验证。未执行真实 UDP、DDC、USB、唤醒、切屏或系统设置修改。
+
 ## 当前任务：v2.3.0 正式发布（2026-09-07）
 
 - 用户确认已经实机测试，明确授权正式发布；基线 `main@28de478`，分支 `codex/macos-release-2-3-0`。

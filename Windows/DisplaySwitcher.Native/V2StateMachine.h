@@ -62,6 +62,9 @@ namespace DisplaySwitcher::Native
         std::vector<V2Action> OnWakeCompleted(int64_t nowMs, std::wstring const& eventId, bool success);
         std::vector<V2Action> OnSwitchCompleted(int64_t nowMs, std::wstring const& eventId, bool success);
         std::vector<V2Action> OnConfigurationChanged(int64_t nowMs);
+        std::vector<V2Action> UpdatePeerRoutesAfterAuthenticatedCacheChange(
+            std::wstring const& replacedEndpointId, bool coordinationEnabled,
+            std::vector<V2Target> enabledTargets);
         std::vector<V2Action> Advance(int64_t nowMs, bool includeExactDue = true);
         V2StateSnapshot Snapshot() const { return { state_, activeEventId_, lockedTargetEndpointId_ }; }
 

@@ -23,6 +23,16 @@ namespace
         return _wcsicmp(left.c_str(), right.c_str()) == 0;
     }
 
+    bool SamePairingCode(std::wstring const& left, std::wstring const& right)
+    {
+        try
+        {
+            return ::DisplaySwitcher::Native::NormalizeV2PairingSecret(left) ==
+                ::DisplaySwitcher::Native::NormalizeV2PairingSecret(right);
+        }
+        catch (...) { return false; }
+    }
+
     ::DisplaySwitcher::Native::UsbSwitchInitialState BuildUsbRuntimeState(
         ::DisplaySwitcher::Native::AppConfig const& config, bool learning, bool topologyAllowsUsb)
     {
@@ -105,7 +115,7 @@ namespace DisplaySwitcher::Native
         return config_;
     }
 
-    void Controller::ApplyConfiguration(bool applyAutoStart)
+    void Controller::ApplyConfiguration(bool applyAutoStart, bool preserveProbeReplay)
     {
         ++configurationGeneration_;
         v2KeyCache_.Clear();
@@ -187,19 +197,22 @@ namespace DisplaySwitcher::Native
             config.usbSwitch.enabled && automationConfigured ? config.usbSwitch.productId : -1,
             config.usbSwitch.enabled && automationConfigured ? config.usbSwitch.deviceLocalReference : L"",
             watcherGeneration);
-        v2ReplayCache_.Clear();
+        if (!preserveProbeReplay) v2ReplayCache_.Clear();
         { std::scoped_lock lock(v2OutgoingMutex_); v2OutgoingMessages_.clear(); }
         v2PeerLastSeenMs_.clear();
         v2HealthProbes_.clear();
         if (!config.displayConfigurationSafeMode) sideEffectGate_.Allow();
         auto listenerPort = config.V2ListenerPort();
         if (!listenerPort) SetPeerConnectionStatus(!config.ReadonlyEnabledProfiles().empty() ? L"协同配置不完整" : L"协同未启用", false);
-        if (hasUnboundV2 && !hasV2) SetPeerConnectionStatus(L"等待首次检测", false);
-        // A completed, enabled profile may listen automatically on later starts.
-        // An unbound draft listens only after the user explicitly checks network access.
-        if (listenerPort && (hasV2 || networkAccessPrepared_))
+        if (hasUnboundV2 && !hasV2)
+            SetPeerConnectionStatus(std::any_of(bootstrapProfiles.begin(), bootstrapProfiles.end(),
+                [](auto const& profile) { return profile.coordinationEnabled; })
+                ? L"已开启，正在等待对端并自动连接" : L"协同未启用", false);
+        // Every complete profile may answer authenticated status probes. Enabled
+        // profiles also probe proactively even before a peer route is cached.
+        if (listenerPort && EnsurePeerListening(*listenerPort))
         {
-            if (EnsurePeerListening(*listenerPort) && hasV2) StartPeerHealthCheck();
+            if (!config.EnabledStatusProbeProfiles().empty()) StartPeerHealthCheck();
         }
         if (applyAutoStart)
         {
@@ -444,7 +457,7 @@ namespace DisplaySwitcher::Native
         StopPeerHealthCheck();
         if (!sideEffectGate_.AllowsSideEffects()) return;
         auto config = Config();
-        if (!config.EnabledCompleteProfiles().empty()) SetPeerConnectionStatus(L"正在连接对端…", false);
+        if (!config.EnabledStatusProbeProfiles().empty()) SetPeerConnectionStatus(L"正在连接对端…", false);
         std::weak_ptr<Controller> weak = shared_from_this();
         peerHealthThread_ = std::jthread([weak](std::stop_token token)
         {
@@ -454,15 +467,15 @@ namespace DisplaySwitcher::Native
                 auto self = weak.lock();
                 if (!self || self->disposed_) return;
                 self->Enqueue([weak] { if (auto value = weak.lock()) value->AdvanceStateMachine(); });
-                if (elapsedSinceProbe >= 2000 && !self->Config().EnabledCompleteProfiles().empty())
+                if (elapsedSinceProbe >= 2000 && !self->Config().EnabledStatusProbeProfiles().empty())
                 {
                     self->Enqueue([weak]
                     {
                         if (auto value = weak.lock())
                         {
                             auto config = value->Config();
-                            for (auto const& profile : config.EnabledCompleteProfiles())
-                                if (profile.peerProtocolVersion == 2 && IsValidDisplayId(profile.peerEndpointId)) value->SendV2Probe(profile);
+                            for (auto const& profile : config.EnabledStatusProbeProfiles())
+                                value->SendV2Probe(profile);
                         }
                     });
                     elapsedSinceProbe = 0;
@@ -500,11 +513,23 @@ namespace DisplaySwitcher::Native
         if (!sideEffectGate_.AllowsSideEffects()) return;
         if (!IsV2Datagram(datagram.data)) return;
         V2Message message; auto parsed = ParseV2Message(datagram.data, message); if (!parsed.accepted) return;
+        if (message.type == L"status_probe") WriteDiagnostic("protocol.v2.status_probe_received");
         auto config = Config();
         auto configurationGeneration = configurationGeneration_.load();
         if (profileDetection_ && profileDetection_->session.WaitingForV2() && message.type == L"status_response" &&
             EqualId(message.eventId, profileDetection_->session.PendingEventId()))
         {
+            if (!UdpPeer::SourceMatches(datagram.source, profileDetection_->profile.peerHost,
+                profileDetection_->profile.peerPort)) return;
+            auto detectionProfiles = profileDetection_->workingConfig.UnboundBootstrapProfiles();
+            auto detectionMatches = std::count_if(
+                detectionProfiles.begin(), detectionProfiles.end(),
+                [&](auto const& candidate)
+                {
+                    return SamePairingCode(candidate.pairingCode, profileDetection_->profile.pairingCode) &&
+                        UdpPeer::SourceMatches(datagram.source, candidate.peerHost, candidate.peerPort);
+                });
+            if (detectionMatches != 1) return;
             WriteDiagnostic("profile_detection.response_received");
             auto detectionGeneration = profileDetection_->generation;
             auto localEndpointId = profileDetection_->workingConfig.localEndpointId;
@@ -539,38 +564,95 @@ namespace DisplaySwitcher::Native
             }).detach();
             return;
         }
-        if (message.type == L"status_probe" && !message.targetEndpointId)
+        if (message.type == L"status_response")
         {
-            std::vector<CollaborationProfile> candidates = config.UnboundBootstrapProfiles();
-            for (auto const& profile : config.collaborationProfiles)
-                if (!profile.peerEndpointId.empty()) candidates.push_back(profile);
-            if (profileDetection_)
+            auto now = NowMilliseconds();
+            std::vector<CollaborationProfile> responseCandidates;
+            for (auto const& profile : config.EnabledStatusProbeProfiles())
             {
-                auto const& draft = profileDetection_->profile;
-                auto inspection = profileDetection_->workingConfig.InspectProfile(draft.id);
-                if (inspection.complete && draft.peerEndpointId.empty() &&
-                    (!draft.peerProtocolVersion || *draft.peerProtocolVersion == 2))
-                {
-                    auto existing = std::find_if(candidates.begin(), candidates.end(), [&](auto const& profile)
-                    { return EqualId(profile.id, draft.id); });
-                    if (existing == candidates.end()) candidates.push_back(draft); else *existing = draft;
-                }
+                auto pending = v2HealthProbes_.find(profile.id);
+                if (pending != v2HealthProbes_.end() && pending->second.Matches(message.eventId, now) &&
+                    UdpPeer::SourceMatches(datagram.source, profile.peerHost, profile.peerPort))
+                    responseCandidates.push_back(profile);
             }
+            if (responseCandidates.size() != 1) return;
+            auto profile = responseCandidates.front();
+            auto statusProfiles = config.UnboundBootstrapProfiles();
+            auto matchingCredentials = std::count_if(
+                statusProfiles.begin(), statusProfiles.end(),
+                [&](auto const& candidate)
+                {
+                    return SamePairingCode(candidate.pairingCode, profile.pairingCode) &&
+                        UdpPeer::SourceMatches(datagram.source, candidate.peerHost, candidate.peerPort);
+                });
+            if (matchingCredentials != 1) return;
+            auto localEndpointId = config.localEndpointId;
+            std::weak_ptr<Controller> weak = shared_from_this();
+            std::thread([weak, message = std::move(message), profile = std::move(profile),
+                localEndpointId = std::move(localEndpointId), configurationGeneration]
+            {
+                auto self = weak.lock();
+                if (!self || self->disposed_ ||
+                    self->configurationGeneration_.load() != configurationGeneration) return;
+                V2ValidationResult validation;
+                try
+                {
+                    validation = ValidateV2Message(message, localEndpointId, message.sourceEndpointId,
+                        self->v2KeyCache_.Get(profile.pairingCode, message.sourceEndpointId),
+                        static_cast<int64_t>(UdpPeer::TimestampNow()), &self->v2ReplayCache_, NowMilliseconds());
+                }
+                catch (...) { return; }
+                if (!validation.accepted) return;
+                self->Enqueue([weak, message = std::move(message), profileId = profile.id,
+                    configurationGeneration]
+                {
+                    auto current = weak.lock();
+                    if (!current || current->disposed_ ||
+                        current->configurationGeneration_.load() != configurationGeneration) return;
+                    auto pending = current->v2HealthProbes_.find(profileId);
+                    auto now = NowMilliseconds();
+                    if (pending == current->v2HealthProbes_.end() ||
+                        !pending->second.MatchesAndConsume(message.eventId, now)) return;
+                    current->v2HealthProbes_.erase(pending);
+                    if (!current->ApplyAuthenticatedPeerRoute(
+                        profileId, message.sourceEndpointId, configurationGeneration)) return;
+                    auto applied = current->Config();
+                    auto appliedProfile = applied.FindCollaborationProfile(profileId);
+                    if (!appliedProfile || !appliedProfile->coordinationEnabled ||
+                        !EqualId(appliedProfile->peerEndpointId, message.sourceEndpointId)) return;
+                    if (current->v2StateMachine_)
+                        current->v2StateMachine_->SetTargetReachable(message.sourceEndpointId, true);
+                    current->v2PeerLastSeenMs_[message.sourceEndpointId] = now;
+                    current->diagnosticHeartbeats_.Observe(profileId, message.sourceEndpointId, now);
+                    current->SetPeerConnectionStatus(L"已和对端（" + appliedProfile->name + L"）建立连接", true);
+                });
+            }).detach();
+            return;
+        }
+        auto normalRouteMatches = std::count_if(config.collaborationProfiles.begin(), config.collaborationProfiles.end(),
+            [&](auto const& candidate)
+            {
+                return candidate.coordinationEnabled && candidate.peerProtocolVersion == 2 &&
+                    !EqualId(candidate.peerEndpointId, config.localEndpointId) &&
+                    EqualId(candidate.peerEndpointId, message.sourceEndpointId);
+            });
+        if (ShouldRouteUnboundStatusProbe(message, config.localEndpointId, normalRouteMatches == 1))
+        {
+            auto candidates = config.UnboundBootstrapProfiles();
+            auto sideEffectGeneration = sideEffectGeneration_.load();
             std::weak_ptr<Controller> weak = shared_from_this();
             std::thread([weak, message = std::move(message), source = datagram.source,
-                config = std::move(config), candidates = std::move(candidates), configurationGeneration]
+                config = std::move(config), candidates = std::move(candidates), configurationGeneration,
+                sideEffectGeneration]
             {
                 if (auto self = weak.lock(); self && !self->disposed_)
-                    self->HandleUnboundStatusProbe(message, source, config, candidates, configurationGeneration);
+                    self->HandleUnboundStatusProbe(message, source, config, candidates,
+                        configurationGeneration, sideEffectGeneration);
             }).detach();
             return;
         }
         if (!v2StateMachine_) return;
-        auto matches = std::count_if(config.collaborationProfiles.begin(), config.collaborationProfiles.end(), [&](auto const& candidate)
-        {
-            return candidate.coordinationEnabled && candidate.peerProtocolVersion == 2 && !EqualId(candidate.peerEndpointId, config.localEndpointId) && EqualId(candidate.peerEndpointId, message.sourceEndpointId);
-        });
-        if (matches != 1) return;
+        if (normalRouteMatches != 1) return;
         auto profile = std::find_if(config.collaborationProfiles.begin(), config.collaborationProfiles.end(), [&](auto const& candidate)
         {
             return candidate.coordinationEnabled && candidate.peerProtocolVersion == 2 && !EqualId(candidate.peerEndpointId, config.localEndpointId) && EqualId(candidate.peerEndpointId, message.sourceEndpointId);
@@ -651,42 +733,86 @@ namespace DisplaySwitcher::Native
 
     bool Controller::HandleUnboundStatusProbe(V2Message const& message, DatagramSource const& source,
         AppConfig const& config, std::vector<CollaborationProfile> const& candidates,
-        uint64_t configurationGeneration)
+        uint64_t configurationGeneration, uint64_t sideEffectGeneration)
     {
-        if (disposed_ || configurationGeneration_.load() != configurationGeneration) return false;
+        if (disposed_ || configurationGeneration_.load() != configurationGeneration ||
+            !AllowsSideEffects(sideEffectGeneration)) return false;
         auto match = MatchUnboundStatusProbe(candidates, config.localEndpointId, source, message,
             static_cast<int64_t>(UdpPeer::TimestampNow()), NowMilliseconds(),
             [](CollaborationProfile const& profile, DatagramSource const& sender)
             { return UdpPeer::SourceMatches(sender, profile.peerHost, profile.peerPort); }, &v2ReplayCache_,
             [this](std::wstring const& pairingCode, std::wstring const& endpointId)
             { return v2KeyCache_.Get(pairingCode, endpointId); });
-        if (match.status != UnboundProbeMatchStatus::Matched || !match.profileIndex) return false;
-        auto const& profile = candidates[*match.profileIndex];
-        try
+        switch (match.status)
         {
-            auto now = static_cast<int64_t>(UdpPeer::TimestampNow());
-            std::scoped_lock lock(v2OutgoingMutex_);
-            for (auto item = v2OutgoingMessages_.begin(); item != v2OutgoingMessages_.end();)
-                if (now - item->second.timestamp > 30) item = v2OutgoingMessages_.erase(item); else ++item;
-            auto cacheKey = L"unbound_status_response|" + message.eventId + L"|" + message.sourceEndpointId;
-            auto cached = v2OutgoingMessages_.find(cacheKey);
-            V2Message response;
-            if (cached != v2OutgoingMessages_.end()) response = cached->second;
-            else
-            {
-                response = CreateUnboundStatusResponse(message, config.localEndpointId, now,
-                    GenerateV2Nonce(), profile.pairingCode,
-                    [this](std::wstring const& pairingCode, std::wstring const& endpointId)
-                    { return v2KeyCache_.Get(pairingCode, endpointId); });
-                v2OutgoingMessages_.emplace(cacheKey, response);
-            }
-            if (configurationGeneration_.load() != configurationGeneration) return false;
-            peer_->SendRaw(SerializeV2Message(response), source.address, source.port, false);
-            return true;
+        case UnboundProbeMatchStatus::Matched: WriteDiagnostic("protocol.v2.bootstrap_matched"); break;
+        case UnboundProbeMatchStatus::NoMatch: WriteDiagnostic("protocol.v2.bootstrap_no_match"); break;
+        case UnboundProbeMatchStatus::AuthenticationFailed: WriteDiagnostic("protocol.v2.bootstrap_validation_rejected"); break;
+        case UnboundProbeMatchStatus::Ambiguous: WriteDiagnostic("protocol.v2.bootstrap_ambiguous"); break;
+        case UnboundProbeMatchStatus::EndpointConflict: WriteDiagnostic("protocol.v2.bootstrap_endpoint_conflict"); break;
+        case UnboundProbeMatchStatus::NotApplicable: WriteDiagnostic("protocol.v2.bootstrap_no_match"); break;
         }
-        catch (...) { return false; }
-    }
+        if (match.status != UnboundProbeMatchStatus::Matched || !match.profileIndex) return false;
+        auto profile = candidates[*match.profileIndex];
 
+        Enqueue([weak = weak_from_this(), message, source, profile,
+            configurationGeneration, sideEffectGeneration]
+        {
+            auto current = weak.lock();
+            if (!current || current->disposed_ ||
+                current->configurationGeneration_.load() != configurationGeneration ||
+                !current->AllowsSideEffects(sideEffectGeneration)) return;
+            auto latest = current->Config();
+            auto latestProfile = latest.FindCollaborationProfile(profile.id);
+            if (!latestProfile || latestProfile->peerHost != profile.peerHost ||
+                latestProfile->peerPort != profile.peerPort ||
+                !SamePairingCode(latestProfile->pairingCode, profile.pairingCode)) return;
+            if (!current->ApplyAuthenticatedPeerRoute(
+                profile.id, message.sourceEndpointId, configurationGeneration)) return;
+
+            auto active = current->Config();
+            auto activeProfile = active.FindCollaborationProfile(profile.id);
+            if (!activeProfile || !EqualId(activeProfile->peerEndpointId, message.sourceEndpointId)) return;
+            V2Message response;
+            try
+            {
+                auto now = static_cast<int64_t>(UdpPeer::TimestampNow());
+                std::scoped_lock lock(current->v2OutgoingMutex_);
+                for (auto item = current->v2OutgoingMessages_.begin();
+                    item != current->v2OutgoingMessages_.end();)
+                    if (now - item->second.timestamp > 30)
+                        item = current->v2OutgoingMessages_.erase(item);
+                    else ++item;
+                response = GetOrCreateStatusResponse(current->v2OutgoingMessages_, message,
+                    active.localEndpointId, now, GenerateV2Nonce(), activeProfile->pairingCode,
+                    [current](std::wstring const& pairingCode, std::wstring const& endpointId)
+                    { return current->v2KeyCache_.Get(pairingCode, endpointId); });
+            }
+            catch (...) { return; }
+
+            auto activeConfigurationGeneration = current->configurationGeneration_.load();
+            auto activeSideEffectGeneration = current->sideEffectGeneration_.load();
+            std::thread([weak, response = std::move(response), source,
+                activeConfigurationGeneration, activeSideEffectGeneration]
+            {
+                auto sender = weak.lock();
+                if (!sender || sender->disposed_ ||
+                    !sender->AllowsSideEffects(activeSideEffectGeneration)) return;
+                auto sent = sender->peer_->SendRaw(SerializeV2Message(response),
+                    source.address, source.port, false,
+                    [weak, activeConfigurationGeneration, activeSideEffectGeneration]
+                    {
+                        auto value = weak.lock();
+                        return value && !value->disposed_ &&
+                            value->configurationGeneration_.load() == activeConfigurationGeneration &&
+                            value->AllowsSideEffects(activeSideEffectGeneration);
+                    });
+                WriteDiagnostic(sent ? "protocol.v2.bootstrap_response_sent success=1" :
+                    "protocol.v2.bootstrap_response_sent success=0");
+            }).detach();
+        });
+        return true;
+    }
     void Controller::SendV2(V2Action const& action)
     {
         if (disposed_ || !peer_ || !sideEffectGate_.AllowsSideEffects()) return;
@@ -734,16 +860,109 @@ namespace DisplaySwitcher::Native
             }
             catch (...) { return; }
             if (self->disposed_ || self->configurationGeneration_.load() != configurationGeneration) return;
+            auto currentConfig = self->Config();
+            auto currentProfile = currentConfig.FindCollaborationProfile(profile.id);
+            if (!currentProfile || !currentProfile->coordinationEnabled ||
+                !EqualId(currentProfile->peerEndpointId, action.endpointId) ||
+                !SamePairingCode(currentProfile->pairingCode, profile.pairingCode)) return;
             self->peer_->SendRaw(SerializeV2Message(message), profile.peerHost, profile.peerPort,
                 action.type != L"status_probe" && action.type != L"status_response");
         }).detach();
     }
 
+    bool Controller::ApplyAuthenticatedPeerRoute(std::wstring const& profileId,
+        std::wstring const& endpointId, uint64_t expectedConfigurationGeneration)
+    {
+        if (disposed_ || configurationGeneration_.load() != expectedConfigurationGeneration ||
+            !IsValidDisplayId(endpointId)) return false;
+        auto config = Config();
+        auto previousProfile = config.FindCollaborationProfile(profileId);
+        if (!previousProfile) return false;
+        auto replacedEndpointId = previousProfile->peerEndpointId;
+        auto update = config.UpdateAuthenticatedPeerRoute(profileId, endpointId);
+        if (update == PeerRouteCacheUpdate::Invalid) return false;
+        if (update == PeerRouteCacheUpdate::Unchanged) return true;
+        try { config.Save(); }
+        catch (...)
+        {
+            EnterSafeStateAfterSaveFailure();
+            SetPeerConnectionStatus(L"连接信息保存失败", false);
+            return false;
+        }
+        {
+            std::scoped_lock lock(configMutex_);
+            config_ = config;
+        }
+
+        if (settingsWindow_)
+        {
+            auto projected = settingsWindow_.as<::winrt::DisplaySwitcher::Native::SettingsWindow>();
+            get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->SynchronizePeerRoutes(config);
+        }
+
+        auto completeProfiles = config.EnabledCompleteProfiles();
+        std::vector<V2Target> targets;
+        for (auto const& profile : completeProfiles)
+            if (profile.peerProtocolVersion == 2 && IsValidDisplayId(profile.peerEndpointId) &&
+                !EqualId(profile.peerEndpointId, config.localEndpointId) &&
+                std::count_if(completeProfiles.begin(), completeProfiles.end(), [&](auto const& candidate)
+                { return candidate.peerProtocolVersion == 2 && EqualId(candidate.peerEndpointId, profile.peerEndpointId); }) == 1)
+                targets.push_back({ profile.peerEndpointId, 2,
+                    v2PeerLastSeenMs_.contains(profile.peerEndpointId) });
+        auto coordinationEnabled = !targets.empty();
+        if (v2StateMachine_)
+            ApplyV2Actions(v2StateMachine_->UpdatePeerRoutesAfterAuthenticatedCacheChange(
+                replacedEndpointId, coordinationEnabled, std::move(targets)));
+        if (!replacedEndpointId.empty() && !EqualId(replacedEndpointId, endpointId))
+        {
+            v2PeerLastSeenMs_.erase(replacedEndpointId);
+            std::scoped_lock lock(v2OutgoingMutex_);
+            for (auto item = v2OutgoingMessages_.begin(); item != v2OutgoingMessages_.end();)
+                if (EqualId(item->second.sourceEndpointId, replacedEndpointId) ||
+                    (item->second.targetEndpointId && EqualId(*item->second.targetEndpointId, replacedEndpointId)))
+                    item = v2OutgoingMessages_.erase(item);
+                else ++item;
+        }
+        std::vector<std::pair<std::wstring, std::wstring>> menuProfiles;
+        for (auto const& profile : completeProfiles) menuProfiles.emplace_back(profile.id, profile.name);
+        trayIcon_->SetProfiles(std::move(menuProfiles));
+        return true;
+    }
     void Controller::SendV2Probe(CollaborationProfile const& profile)
     {
+        if (disposed_ || !peer_ || !sideEffectGate_.AllowsSideEffects()) return;
+        auto config = Config();
+        auto probeProfiles = config.EnabledStatusProbeProfiles();
+        if (!std::any_of(probeProfiles.begin(), probeProfiles.end(), [&](auto const& candidate)
+            { return EqualId(candidate.id, profile.id); })) return;
         auto eventId = NewEventId();
-        v2HealthProbes_[profile.peerEndpointId].Begin(eventId, NowMilliseconds() + 10000);
-        SendV2({ V2Action::Kind::SendMessage, L"status_probe", eventId, profile.peerEndpointId });
+        if (!v2HealthProbes_[profile.id].BeginIfNeeded(eventId, NowMilliseconds(), 10000)) return;
+        auto configurationGeneration = configurationGeneration_.load();
+        auto sideEffectGeneration = sideEffectGeneration_.load();
+        std::weak_ptr<Controller> weak = shared_from_this();
+        std::thread([weak, config = std::move(config), profile, eventId = std::move(eventId),
+            configurationGeneration, sideEffectGeneration]
+        {
+            auto self = weak.lock();
+            if (!self || self->disposed_ || !self->AllowsSideEffects(sideEffectGeneration) ||
+                self->configurationGeneration_.load() != configurationGeneration) return;
+            try
+            {
+                auto message = CreateStatusProbe(config.localEndpointId, eventId,
+                    static_cast<int64_t>(UdpPeer::TimestampNow()), GenerateV2Nonce(), profile.pairingCode,
+                    [self](std::wstring const& pairingCode, std::wstring const& endpointId)
+                    { return self->v2KeyCache_.Get(pairingCode, endpointId); });
+                self->peer_->SendRaw(SerializeV2Message(message), profile.peerHost, profile.peerPort, false,
+                    [weak, configurationGeneration, sideEffectGeneration]
+                    {
+                        auto current = weak.lock();
+                        return current && !current->disposed_ &&
+                            current->configurationGeneration_.load() == configurationGeneration &&
+                            current->AllowsSideEffects(sideEffectGeneration);
+                    });
+            }
+            catch (...) {}
+        }).detach();
     }
 
     void Controller::SwitchToProfile(std::wstring const& profileId, std::optional<std::wstring> eventId)
@@ -751,9 +970,11 @@ namespace DisplaySwitcher::Native
         if (!sideEffectGate_.AllowsSideEffects() || profileDetectionActive_) return;
         auto config = Config();
         auto profile = config.FindCollaborationProfile(profileId);
-        if (!profile || !profile->coordinationEnabled)
+        if (!config.CanCoordinateWithProfile(profileId))
         {
-            SetStatus(L"协同配置不可用"); return;
+            SetStatus(profile && profile->coordinationEnabled
+                ? L"正在连接对端，请稍后重试" : L"协同配置不可用");
+            return;
         }
         auto name = profile->name;
         SetStatus(L"正在切换到 " + name + L"…");
@@ -1088,8 +1309,8 @@ namespace DisplaySwitcher::Native
             auto ready = self && !self->disposed_ && self->EnsurePeerListening(port);
             if (ready) self->networkAccessPrepared_ = true;
             auto message = ready
-                ? L"本机 UDP 端口已就绪，可以继续检测连接。若 Windows 弹出提示，请允许专用网络访问。"
-                : L"无法启动本机 UDP 监听。请检查端口占用和 Windows 网络权限。";
+                ? L""
+                : L"无法启动网络服务，请检查端口占用或网络权限。";
             if (self && !self->disposed_)
                 self->Enqueue([completed = std::move(completed), ready, message = std::move(message)]() mutable
                 {
@@ -1169,7 +1390,7 @@ namespace DisplaySwitcher::Native
         message.type = L"status_probe";
         message.eventId = action.eventId;
         message.sourceEndpointId = config.localEndpointId;
-        if (IsValidDisplayId(profile.peerEndpointId)) message.targetEndpointId = profile.peerEndpointId;
+        message.targetEndpointId.reset();
         message.sourcePlatform = L"windows";
         message.timestamp = static_cast<int64_t>(UdpPeer::TimestampNow());
         message.nonce = GenerateV2Nonce();
@@ -1181,8 +1402,10 @@ namespace DisplaySwitcher::Native
             {
                 auto self = weak.lock();
                 if (!self || self->disposed_ || self->profileDetectionGeneration_ != generation || canceled()) return true;
-                auto key = self->v2KeyCache_.Get(profile.pairingCode, message.sourceEndpointId);
-                message = SignV2Message(std::move(message), key);
+                message = CreateStatusProbe(message.sourceEndpointId, message.eventId, message.timestamp,
+                    message.nonce, profile.pairingCode,
+                    [self](std::wstring const& pairingCode, std::wstring const& endpointId)
+                    { return self->v2KeyCache_.Get(pairingCode, endpointId); });
                 if (self->disposed_ || self->profileDetectionGeneration_ != generation || canceled()) return true;
                 return self->peer_->SendRaw(SerializeV2Message(message), profile.peerHost, profile.peerPort, false,
                     [weak, generation, canceled]
@@ -1223,17 +1446,29 @@ namespace DisplaySwitcher::Native
     void Controller::CompleteProfileDetection(ProfileDetectionResult const& result)
     {
         if (!profileDetection_) return;
+        auto finalResult = result;
+        if (finalResult.outcome == ProfileDetectionOutcome::V2Available)
+        {
+            auto activeConfig = Config();
+            auto activeProfile = activeConfig.FindCollaborationProfile(profileDetection_->profile.id);
+            if (!activeProfile || activeProfile->peerHost != profileDetection_->profile.peerHost ||
+                activeProfile->peerPort != profileDetection_->profile.peerPort ||
+                !SamePairingCode(activeProfile->pairingCode, profileDetection_->profile.pairingCode) ||
+                !IsValidDisplayId(finalResult.observedEndpointId) ||
+                !ApplyAuthenticatedPeerRoute(profileDetection_->profile.id,
+                    finalResult.observedEndpointId, configurationGeneration_.load()))
+                finalResult.outcome = ProfileDetectionOutcome::RouteSaveFailed;
+        }
         auto completed = std::move(profileDetection_->completed);
-        auto wasActive = profileDetectionActive_.load();
+        auto wasActive = profileDetectionActive_.exchange(false);
         ++profileDetectionGeneration_;
         profileDetectionProbeOperation_.Cancel();
         profileDetection_->session.Cancel();
         profileDetection_.reset();
         profileDetectionReplayCache_.Clear();
         v2KeyCache_.Clear();
-        if (wasActive) ApplyConfiguration(false);
-        profileDetectionActive_ = false;
-        if (completed) completed(result);
+        if (wasActive && !Config().EnabledStatusProbeProfiles().empty()) StartPeerHealthCheck();
+        if (completed) completed(finalResult);
     }
 
     void Controller::ShowSettings()
@@ -1252,14 +1487,19 @@ namespace DisplaySwitcher::Native
             {
                 if (auto self = weak.lock())
                 {
-                    try { config.Save(); }
+                    auto published = config;
+                    try
+                    {
+                        published = PersistSettingsForPublication(config,
+                            [](AppConfig const& candidate) { candidate.Save(); });
+                    }
                     catch (...)
                     {
                         self->EnterSafeStateAfterSaveFailure();
                         self->ShowError(L"保存设置失败", L"无法写入设置文件；自动协同和硬件操作已安全停用。");
                         return false;
                     }
-                    { std::scoped_lock lock(self->configMutex_); self->config_ = config; }
+                    { std::scoped_lock lock(self->configMutex_); self->config_ = published; }
                     if (!self->usbLearningActive_) self->ApplyConfiguration();
                     return true;
                 }

@@ -124,6 +124,55 @@ namespace DisplaySwitcher::Native
             || code == DdcVcpCode::Volume;
     }
 
+    std::vector<LinkedDdcPreferenceControl> BuildLinkedDdcPreferenceControls(
+        std::vector<DisplayConfig> const& displays)
+    {
+        auto state = [](size_t enabled, size_t total)
+        {
+            return enabled == 0 ? DdcPreferenceState::Off : enabled == total
+                ? DdcPreferenceState::On : DdcPreferenceState::Partial;
+        };
+        std::vector<LinkedDdcPreferenceControl> result;
+        for (auto code : ControlCodes())
+        {
+            size_t enabled{}, tray{};
+            for (auto const& display : displays)
+                if (DdcControlService::FeatureEnabled(display, code))
+                {
+                    ++enabled;
+                    if (ShowInTray(display, code)) ++tray;
+                }
+            result.push_back({ code, ControlLabel(code), state(enabled, displays.size()),
+                state(tray, enabled), !displays.empty(), enabled != 0 });
+        }
+        return result;
+    }
+
+    void SetLinkedDdcFeature(std::vector<DisplayConfig>& displays, DdcVcpCode code, bool enabled)
+    {
+        if (!IsDdcControlVcpCode(code)) return;
+        for (auto& display : displays)
+        {
+            auto& feature = code == DdcVcpCode::Brightness ? display.brightnessEnabled :
+                code == DdcVcpCode::Contrast ? display.contrastEnabled : display.volumeEnabled;
+            auto& tray = code == DdcVcpCode::Brightness ? display.brightnessShowInTray :
+                code == DdcVcpCode::Contrast ? display.contrastShowInTray : display.volumeShowInTray;
+            feature = enabled;
+            if (!enabled) tray = false;
+        }
+    }
+
+    void SetLinkedDdcTray(std::vector<DisplayConfig>& displays, DdcVcpCode code, bool enabled)
+    {
+        if (!IsDdcControlVcpCode(code)) return;
+        for (auto& display : displays)
+        {
+            auto& tray = code == DdcVcpCode::Brightness ? display.brightnessShowInTray :
+                code == DdcVcpCode::Contrast ? display.contrastShowInTray : display.volumeShowInTray;
+            tray = enabled && DdcControlService::FeatureEnabled(display, code);
+        }
+    }
+
     std::vector<DdcProjectedControl> BuildDdcControlProjection(AppConfig const& config,
         DisplayTopologyTrust topologyTrust, bool trayOnly)
     {

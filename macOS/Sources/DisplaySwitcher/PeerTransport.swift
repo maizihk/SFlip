@@ -19,9 +19,36 @@ enum PeerTransportFailureCategory: String, Equatable {
     case unknown = "unknown-error"
 }
 
+enum PeerTransportSystemErrorDomain: String, Equatable {
+    case posix = "errno"
+    case addressResolution = "getaddrinfo"
+    case unknown = "unknown"
+}
+
+struct PeerTransportSystemError: Equatable {
+    let domain: PeerTransportSystemErrorDomain
+    let code: Int32
+}
+
 enum PeerTransportOperationResult: Equatable {
     case success
-    case failure(PeerTransportFailureCategory)
+    case failure(PeerTransportFailureCategory, systemError: PeerTransportSystemError? = nil)
+}
+
+extension PeerTransportOperationResult {
+    var systemError: PeerTransportSystemError? {
+        guard case .failure(_, let systemError) = self else { return nil }
+        return systemError
+    }
+
+    var userFacingErrorCode: String {
+        switch self {
+        case .success: return "unknown"
+        case .failure(_, let systemError):
+            guard let systemError else { return "unknown" }
+            return "\(systemError.domain.rawValue) \(systemError.code)"
+        }
+    }
 }
 
 protocol PeerTransportDatagramSocket: AnyObject {
@@ -34,6 +61,35 @@ protocol PeerTransportDatagramSocket: AnyObject {
 
 protocol PeerTransportSocketFactory {
     func makeSocket() -> PeerTransportDatagramSocket
+}
+
+protocol PeerHostAddressResolving {
+    func numericIPv4Addresses(for host: String) -> Set<String>
+}
+
+struct BSDPeerHostAddressResolver: PeerHostAddressResolving {
+    func numericIPv4Addresses(for host: String) -> Set<String> {
+        var hints = addrinfo()
+        hints.ai_family = AF_INET
+        hints.ai_socktype = SOCK_DGRAM
+        hints.ai_protocol = IPPROTO_UDP
+        var result: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &result) == 0, let first = result else { return [] }
+        defer { freeaddrinfo(result) }
+        var addresses = Set<String>()
+        var current: UnsafeMutablePointer<addrinfo>? = first
+        while let item = current {
+            var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            if getnameinfo(
+                item.pointee.ai_addr, item.pointee.ai_addrlen,
+                &hostBuffer, socklen_t(hostBuffer.count), nil, 0, NI_NUMERICHOST
+            ) == 0 {
+                addresses.insert(String(cString: hostBuffer).lowercased())
+            }
+            current = item.pointee.ai_next
+        }
+        return addresses
+    }
 }
 
 enum PeerTransportError: LocalizedError {
@@ -67,6 +123,16 @@ enum PeerTransportError: LocalizedError {
             default: return .unknown
             }
         case .addressResolution: return .addressResolution
+        }
+    }
+
+    var diagnosticSystemError: PeerTransportSystemError? {
+        switch self {
+        case .invalidPort, .notStarted: return nil
+        case .socketOperation(_, let code):
+            return PeerTransportSystemError(domain: .posix, code: code)
+        case .addressResolution(let code):
+            return PeerTransportSystemError(domain: .addressResolution, code: code)
         }
     }
 }
@@ -140,14 +206,15 @@ private final class BSDPeerDatagramSocket: PeerTransportDatagramSocket {
             return
         }
         defer { freeaddrinfo(result) }
-        let sent = data.withUnsafeBytes { bytes in
-            Darwin.sendto(
+        let sendResult = data.withUnsafeBytes { bytes -> (count: Int, errorCode: Int32) in
+            let sent = Darwin.sendto(
                 descriptor, bytes.baseAddress, bytes.count, 0,
                 address.pointee.ai_addr, address.pointee.ai_addrlen
             )
+            return (sent, sent == bytes.count ? 0 : errno)
         }
-        guard sent == data.count else {
-            completion(PeerTransportError.socketOperation("发送", errno))
+        guard sendResult.count == data.count else {
+            completion(PeerTransportError.socketOperation("发送", sendResult.errorCode))
             return
         }
         completion(nil)
@@ -217,6 +284,7 @@ final class PeerTransport {
     private let queue: DispatchQueue
     private let callbackQueue: DispatchQueue
     private let factory: PeerTransportSocketFactory
+    private let hostResolver: PeerHostAddressResolving
     private let queueKey = DispatchSpecificKey<Void>()
     private var socket: PeerTransportDatagramSocket?
     private var generation = 0
@@ -224,13 +292,20 @@ final class PeerTransport {
 
     init(
         factory: PeerTransportSocketFactory = BSDPeerTransportSocketFactory(),
+        hostResolver: PeerHostAddressResolving = BSDPeerHostAddressResolver(),
         queue: DispatchQueue = DispatchQueue(label: "DisplaySwitcher.peer-network"),
         callbackQueue: DispatchQueue = .main
     ) {
         self.factory = factory
+        self.hostResolver = hostResolver
         self.queue = queue
         self.callbackQueue = callbackQueue
         queue.setSpecific(key: queueKey, value: ())
+    }
+
+    func sourceMatches(_ source: PeerTransportEndpoint, configuredHost: String, port: Int) -> Bool {
+        guard source.port == port else { return false }
+        return hostResolver.numericIPv4Addresses(for: configuredHost).contains(source.host.lowercased())
     }
 
     deinit { performSync { stopLocked() } }
@@ -260,7 +335,7 @@ final class PeerTransport {
                 self?.performAsync {
                     guard let self, self.generation == activeGeneration,
                           self.socket === candidate else { return }
-                    self.reportError("UDP 接收失败：\(error.localizedDescription)")
+                    self.reportError(Self.safeErrorMessage(prefix: "UDP 接收失败", error: error))
                     self.stopLocked()
                 }
             }
@@ -271,8 +346,8 @@ final class PeerTransport {
                 result = .success
             } catch {
                 candidate.stop()
-                reportError("无法监听端口 \(port)：\(error.localizedDescription)")
-                result = .failure((error as? PeerTransportError)?.diagnosticCategory ?? .unknown)
+                reportError(Self.safeErrorMessage(prefix: "UDP 监听失败", error: error))
+                result = Self.failureResult(for: error, fallback: .unknown)
             }
         }
         return result
@@ -348,9 +423,38 @@ final class PeerTransport {
                 return
             }
             let operation = isReply ? "UDP 回复失败" : "UDP 发送失败"
-            self.reportError("\(operation)：\(error.localizedDescription)")
-            let category = (error as? PeerTransportError)?.diagnosticCategory ?? .send
-            self.callbackQueue.async { completion?(.failure(category)) }
+            self.reportError(Self.safeErrorMessage(
+                prefix: operation, error: error, fallback: .send
+            ))
+            let result = Self.failureResult(for: error, fallback: .send)
+            self.callbackQueue.async { completion?(result) }
+        }
+    }
+
+    private static func failureResult(
+        for error: Error,
+        fallback: PeerTransportFailureCategory
+    ) -> PeerTransportOperationResult {
+        guard let transportError = error as? PeerTransportError else {
+            return .failure(fallback, systemError: .init(domain: .unknown, code: 0))
+        }
+        return .failure(
+            transportError.diagnosticCategory,
+            systemError: transportError.diagnosticSystemError
+        )
+    }
+
+    private static func safeErrorMessage(
+        prefix: String,
+        error: Error,
+        fallback: PeerTransportFailureCategory = .unknown
+    ) -> String {
+        let result = failureResult(for: error, fallback: fallback)
+        switch result {
+        case .success: return "\(prefix)：unknown-error"
+        case .failure(let category, let systemError):
+            guard let systemError else { return "\(prefix)：\(category.rawValue)" }
+            return "\(prefix)：\(category.rawValue) \(systemError.domain.rawValue)=\(systemError.code)"
         }
     }
 

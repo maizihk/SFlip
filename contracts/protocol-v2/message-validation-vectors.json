@@ -220,6 +220,66 @@
         "authTag": "YVP3jw4siegn07tGM4_YJqS7hjmEctz_Cs0RIL97s_w"
       } },
       "expected": { "accepted": true, "reason": "accepted", "refreshPeer": true, "replyTypes": [], "hardwareCalls": { "wake": 0, "switchDisplay": 0, "inputActions": 0 } }
+    },
+    {
+      "id": "MSG2-021",
+      "description": "Accept a correctly authenticated status probe carrying an obsolete target cache; no hardware actions",
+      "input": {
+        "encoding": "jsonObject",
+        "value": {
+          "version": 2,
+          "type": "status_probe",
+          "eventID": "bbbbbbbb-bbbb-4bbb-8bbb-000000000021",
+          "sourceEndpointID": "11111111-1111-4111-8111-111111111111",
+          "targetEndpointID": "33333333-3333-4333-8333-333333333333",
+          "sourcePlatform": "macos",
+          "timestamp": 1788000000,
+          "nonce": "FRYXGBkaGxwdHh8gISIjJA",
+          "authTag": "XxmZ6WyXFobkTxjZiB7ncyd08ZohUa3MCxu6aO7Bvcc"
+        }
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "accepted",
+        "refreshPeer": true,
+        "replyTypes": [
+          "status_response"
+        ],
+        "hardwareCalls": {
+          "wake": 0,
+          "switchDisplay": 0,
+          "inputActions": 0
+        }
+      }
+    },
+    {
+      "id": "MSG2-022",
+      "description": "Reject an obsolete-target probe if the original target was tampered with without a valid pairing-code signature",
+      "input": {
+        "encoding": "jsonObject",
+        "value": {
+          "version": 2,
+          "type": "status_probe",
+          "eventID": "bbbbbbbb-bbbb-4bbb-8bbb-000000000021",
+          "sourceEndpointID": "11111111-1111-4111-8111-111111111111",
+          "targetEndpointID": "44444444-4444-4444-8444-444444444444",
+          "sourcePlatform": "macos",
+          "timestamp": 1788000000,
+          "nonce": "FRYXGBkaGxwdHh8gISIjJA",
+          "authTag": "XxmZ6WyXFobkTxjZiB7ncyd08ZohUa3MCxu6aO7Bvcc"
+        }
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "authentication_failed",
+        "refreshPeer": false,
+        "replyTypes": [],
+        "hardwareCalls": {
+          "wake": 0,
+          "switchDisplay": 0,
+          "inputActions": 0
+        }
+      }
     }
   ]
 }

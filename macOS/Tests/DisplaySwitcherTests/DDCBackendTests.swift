@@ -196,6 +196,29 @@ final class DDCBackendTests: XCTestCase {
         XCTAssertNotEqual(cache.values["display-a"]?[.luminance], 60)
     }
 
+    func testLinkedSettingsBatchReadContinuesAfterFailureAndOnlyReadsEnabledControls() {
+        let backend = MockDDCBackend()
+        backend.readFailures = ["display-a": [.luminance]]
+        backend.readings = ["display-b": [.volume: DDCReading(current: 35, maximum: 100)]]
+        let service = makeService(backend: backend, cache: MockDDCCache())
+
+        let readings = service.read([
+            target(id: "display-a", commands: [.luminance]),
+            target(id: "display-b", commands: [.volume]),
+            target(id: "display-c", commands: [])
+        ])
+
+        XCTAssertNil(readings["display-a"]?[.luminance])
+        XCTAssertEqual(readings["display-b"]?[.volume]?.reading.current, 35)
+        XCTAssertEqual(readings.skipped["display-c"], .noEnabledCommands)
+        XCTAssertTrue(backend.readCalls.contains { $0.0 == "display-a" && $0.1 == .luminance })
+        XCTAssertTrue(backend.readCalls.contains { $0.0 == "display-b" && $0.1 == .volume })
+        XCTAssertTrue(backend.readCalls.allSatisfy {
+            ($0.0 == "display-a" && $0.1 == .luminance) || ($0.0 == "display-b" && $0.1 == .volume)
+        })
+        XCTAssertTrue(backend.writeCalls.isEmpty)
+    }
+
     func testC020DisabledControlsPerformNoReadOrWrite() {
         let backend = MockDDCBackend()
         let service = makeService(backend: backend, cache: MockDDCCache())

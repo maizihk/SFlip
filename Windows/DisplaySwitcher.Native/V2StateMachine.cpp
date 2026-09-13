@@ -148,6 +148,17 @@ namespace DisplaySwitcher::Native
         return Clear(L"configuration_changed", V2CoordinatorState::Cancelled);
     }
 
+    std::vector<V2Action> V2StateMachine::UpdatePeerRoutesAfterAuthenticatedCacheChange(
+        std::wstring const& replacedEndpointId, bool coordinationEnabled,
+        std::vector<V2Target> enabledTargets)
+    {
+        coordinationEnabled_ = coordinationEnabled;
+        enabledTargets_ = std::move(enabledTargets);
+        if (replacedEndpointId.empty() || activeEventId_.empty() ||
+            !Equal(lockedTargetEndpointId_, replacedEndpointId)) return {};
+        return Clear(L"configuration_changed", V2CoordinatorState::Cancelled);
+    }
+
     std::vector<V2Action> V2StateMachine::Advance(int64_t nowMs, bool includeExactDue)
     {
         auto due = [&](std::optional<int64_t> value) { return value && (nowMs > *value || (includeExactDue && nowMs == *value)); };

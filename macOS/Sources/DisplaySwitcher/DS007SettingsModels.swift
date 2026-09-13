@@ -101,6 +101,9 @@ enum CollaborationConnectionState: Equatable {
     case neverChecked
     case checking
     case noResponse
+    case authenticationFailed
+    case listenerFailed(PeerTransportSystemError?)
+    case sendFailed(PeerTransportSystemError?)
     case available
     case connected
     case disconnected
@@ -109,16 +112,44 @@ enum CollaborationConnectionState: Equatable {
         switch self {
         case .disabled: return "未启用"
         case .incomplete: return "配置不完整"
-        case .neverChecked: return "尚未检测"
+        case .neverChecked: return "正在连接"
         case .checking: return "正在检测"
         case .noResponse: return "无响应"
-        case .available: return "v2 可用"
+        case .authenticationFailed: return "配对码不匹配"
+        case .listenerFailed(let error):
+            return "监听失败（系统码：\(Self.errorCode(error))）"
+        case .sendFailed(let error):
+            return "发送失败（系统码：\(Self.errorCode(error))）"
+        case .available: return "已连接"
         case .connected: return "已连接"
         case .disconnected: return "连接已断开"
         }
     }
 
     var connected: Bool { self == .available || self == .connected }
+
+    private static func errorCode(_ error: PeerTransportSystemError?) -> String {
+        guard let error else { return "unknown" }
+        return "\(error.domain.rawValue) \(error.code)"
+    }
+}
+
+enum CollaborationConnectionStatusPresentation {
+    static func text(
+        for state: CollaborationConnectionState,
+        profileName: String
+    ) -> String {
+        guard state.connected else { return state.text }
+        let name = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "已和对端建立连接" : "已和对端（\(name)）建立连接"
+    }
+}
+
+enum PeerInspectionPresentationPolicy {
+    static func shouldPresent(resultProfileID: String, selectedProfileID: String?) -> Bool {
+        guard let selectedProfileID else { return false }
+        return resultProfileID.caseInsensitiveCompare(selectedProfileID) == .orderedSame
+    }
 }
 
 final class CollaborationStatusStore {
@@ -127,6 +158,7 @@ final class CollaborationStatusStore {
         var checked = false
         var responded = false
         var lastAuthenticatedAtMs: Int64?
+        var inspectionFailure: CollaborationConnectionState?
     }
 
     private var states: [String: RuntimeState] = [:]
@@ -143,6 +175,7 @@ final class CollaborationStatusStore {
         ).issues.isEmpty else { return .incomplete }
         let runtime = states[profile.id] ?? RuntimeState()
         if runtime.checking { return .checking }
+        if let inspectionFailure = runtime.inspectionFailure { return inspectionFailure }
         if let last = runtime.lastAuthenticatedAtMs {
             return nowMs - last <= 6_000 ? .connected : .disconnected
         }
@@ -155,6 +188,7 @@ final class CollaborationStatusStore {
         var value = states[profileID] ?? RuntimeState()
         value.checking = true
         value.checked = true
+        value.inspectionFailure = nil
         states[profileID] = value
     }
 
@@ -163,6 +197,16 @@ final class CollaborationStatusStore {
         value.checking = false
         value.checked = true
         value.responded = responded
+        value.inspectionFailure = nil
+        states[profileID] = value
+    }
+
+    func finishCheck(profileID: String, failure: CollaborationConnectionState) {
+        var value = states[profileID] ?? RuntimeState()
+        value.checking = false
+        value.checked = true
+        value.responded = false
+        value.inspectionFailure = failure
         states[profileID] = value
     }
 
@@ -170,6 +214,7 @@ final class CollaborationStatusStore {
         var value = states[profileID] ?? RuntimeState()
         value.checking = false
         value.responded = true
+        value.inspectionFailure = nil
         value.lastAuthenticatedAtMs = nowMs
         states[profileID] = value
     }
@@ -927,10 +972,81 @@ struct DisplaySettingsControlProjection: Equatable {
         linkedEntries: [LinkedDDCControlProjection.Entry]
     ) -> DisplaySettingsControlProjection {
         DisplaySettingsControlProjection(
-            showsLinkedControls: linkAllDisplays && !linkedEntries.isEmpty,
+            showsLinkedControls: linkAllDisplays,
             showsIndividualSliders: !linkAllDisplays,
-            linkedCommands: linkAllDisplays ? linkedEntries.map(\.command) : []
+            linkedCommands: linkAllDisplays ? LinkedDDCControlProjection.orderedCommands : []
         )
+    }
+}
+
+enum LinkedDisplayPreferenceToggleState: Equatable {
+    case off, on, mixed
+
+    static func aggregate(_ values: [Bool]) -> Self {
+        guard values.contains(true) else { return .off }
+        return values.allSatisfy { $0 } ? .on : .mixed
+    }
+}
+
+struct LinkedDisplayPreferenceState: Equatable {
+    let feature: LinkedDisplayPreferenceToggleState
+    let tray: LinkedDisplayPreferenceToggleState
+    let trayEnabled: Bool
+}
+
+enum LinkedDisplaySettingsPolicy {
+    static func state(
+        command: DDCCommand, displays: [DisplayConfigurationV4Display]
+    ) -> LinkedDisplayPreferenceState {
+        let eligible = displays.filter {
+            DisplaySettingsSemantics.enabledCommands(for: $0).contains(command)
+        }
+        return LinkedDisplayPreferenceState(
+            feature: .aggregate(displays.map {
+                DisplaySettingsSemantics.enabledCommands(for: $0).contains(command)
+            }),
+            tray: .aggregate(eligible.map {
+                DisplaySettingsSemantics.trayCommands(for: $0).contains(command)
+            }),
+            trayEnabled: !eligible.isEmpty
+        )
+    }
+
+    static func settingFeatureEnabled(
+        _ enabled: Bool, command: DDCCommand, displays: [DisplayConfigurationV4Display]
+    ) -> [DisplayConfigurationV4Display] {
+        displays.map { display in
+            var value = display
+            switch command {
+            case .luminance:
+                value.brightnessEnabled = enabled
+                if !enabled { value.brightnessShowInTray = false }
+            case .contrast:
+                value.contrastEnabled = enabled
+                if !enabled { value.contrastShowInTray = false }
+            case .volume:
+                value.volumeEnabled = enabled
+                if !enabled { value.volumeShowInTray = false }
+            case .input: break
+            }
+            return value
+        }
+    }
+
+    static func settingTrayVisible(
+        _ visible: Bool, command: DDCCommand, displays: [DisplayConfigurationV4Display]
+    ) -> [DisplayConfigurationV4Display] {
+        displays.map { display in
+            var value = display
+            let enabled = DisplaySettingsSemantics.enabledCommands(for: display).contains(command)
+            switch command {
+            case .luminance: value.brightnessShowInTray = visible && enabled
+            case .contrast: value.contrastShowInTray = visible && enabled
+            case .volume: value.volumeShowInTray = visible && enabled
+            case .input: break
+            }
+            return value
+        }
     }
 }
 
@@ -993,6 +1109,10 @@ enum DisplayControlModuleContent {
 
 enum DisplayReadModuleContent {
     static let items: [SettingsModuleContentItem] = [.displayReadStatus, .separator, .displayControls]
+
+    static func items(showsIndividualControls: Bool) -> [SettingsModuleContentItem] {
+        showsIndividualControls ? items : [.displayReadStatus]
+    }
 }
 
 enum SettingsPageLayoutAction: String, Equatable {

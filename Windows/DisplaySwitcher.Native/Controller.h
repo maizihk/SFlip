@@ -29,7 +29,7 @@ namespace DisplaySwitcher::Native
         Controller(winrt::Microsoft::UI::Dispatching::DispatcherQueue const& dispatcher, std::function<void()> exitApplication);
         void Initialize();
         AppConfig Config() const;
-        void ApplyConfiguration(bool applyAutoStart = true);
+        void ApplyConfiguration(bool applyAutoStart = true, bool preserveProbeReplay = false);
         void EnterSafeStateAfterSaveFailure();
         void BeginUsbLearning();
         void EndUsbLearning();
@@ -50,7 +50,7 @@ namespace DisplaySwitcher::Native
             V2ValidationResult const& validation, uint64_t configurationGeneration);
         bool HandleUnboundStatusProbe(V2Message const& message, DatagramSource const& source,
             AppConfig const& config, std::vector<CollaborationProfile> const& candidates,
-            uint64_t configurationGeneration);
+            uint64_t configurationGeneration, uint64_t sideEffectGeneration);
         void CheckNetworkAccess(AppConfig const& workingConfig,
             std::function<void(bool, std::wstring const&)> completed);
         void BeginProfileDetection(AppConfig const& workingConfig, std::wstring const& profileId,
@@ -60,6 +60,8 @@ namespace DisplaySwitcher::Native
         void CompleteProfileDetection(ProfileDetectionResult const& result);
         void SendV2(V2Action const& action);
         void SendV2Probe(CollaborationProfile const& profile);
+        bool ApplyAuthenticatedPeerRoute(std::wstring const& profileId,
+            std::wstring const& endpointId, uint64_t expectedConfigurationGeneration);
         void ManualSwitch(std::wstring const& profileId);
         bool EnsurePeerListening(int port);
         bool IsPeerListening(int port) const;

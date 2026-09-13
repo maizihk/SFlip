@@ -36,6 +36,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             std::function<void()> closed);
         void SetConnectionStatus(std::wstring const& status, bool connected);
         void ReloadConfiguration(::DisplaySwitcher::Native::AppConfig const& config);
+        void SynchronizePeerRoutes(::DisplaySwitcher::Native::AppConfig const& config);
         void ShowWindow();
         void CloseForExit();
 
@@ -80,7 +81,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         void CancelProfileDetection();
         void SetProfileDetectionBusy(std::wstring const& id, bool busy);
         ::DisplaySwitcher::Native::AppConfig WorkingDdcConfig();
-        void ReadDdc(std::wstring const& displayId);
+        void ReadDdc(std::vector<std::wstring> const& displayIds);
         void WriteDdc(std::wstring const& displayId, ::DisplaySwitcher::Native::DdcVcpCode code, int value);
         void CompleteDdcOperation(::DisplaySwitcher::Native::AppConfig const& config,
             ::DisplaySwitcher::Native::DdcControlBatchResult const& result,
@@ -122,6 +123,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
         std::shared_ptr<::DisplaySwitcher::Native::DisplayOperationTracker> displayDiagnostics_;
         std::function<void()> closed_;
         ::DisplaySwitcher::Native::DdcCancellationSource ddcCancellation_;
+        bool ddcReadPending_{};
+        std::vector<std::pair<Microsoft::UI::Xaml::Controls::Button, bool>> ddcReadButtons_;
         ::DisplaySwitcher::Native::UsbLearningSession usbLearning_;
         Microsoft::UI::Dispatching::DispatcherQueueTimer usbLearningTimer_{ nullptr };
         uint64_t usbLearningGeneration_{};
