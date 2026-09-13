@@ -11,7 +11,7 @@ ZIP 版本解压后同样先移入“应用程序”，再按上述步骤打开�
 
 如果只显示“应用程序无法打开”，没有“仍要打开”，或允许后仍失败，请先用 Safari 从 GitHub 重新下载一份，避免继续使用经内置浏览器、聊天附件或其他工具转存的副本。有些下载工具会给文件加上额外的执行限制，普通手动放行不一定能解除；这和缺少公证不是同一件事。
 
-重新下载后仍失败，请反馈 macOS 版本、下载工具和完整提示。无需执行终端命令，也不要关闭系统的安全检查。上述手动放行流程仍需在遇到问题的 Mac 上复验，不保证覆盖所有下载渠道或受管理设备的限制。
+重新下载后仍失败，请反馈 macOS 版本、下载工具和完整提示。安装过程无需终端命令。
 
 参考：[苹果的手动打开说明](https://support.apple.com/zh-cn/102445) · [下载工具导致执行限制的案例](https://developer.apple.com/forums/thread/767612)
 
@@ -28,4 +28,4 @@ For the ZIP version, extract the app and move it to Applications first.
 
 If the message only says the application cannot be opened, Open Anyway is missing, or approval does not help, download a fresh copy directly using Safari. Embedded browsers, attachment downloads, or transfer tools may add a separate execution restriction; this is different from a missing notarization ticket.
 
-If the fresh download still fails, report the macOS version, download tool, and exact message. No Terminal commands or global security changes are part of this installation procedure. This workflow still needs verification on affected Macs and does not guarantee compatibility with every download channel or managed-device policy.
+If the fresh download still fails, report the macOS version, download tool, and exact message. No Terminal commands are required for this installation procedure.

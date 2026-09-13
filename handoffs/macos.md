@@ -838,5 +838,5 @@
 - 分支 codex/macos-manual-open，基线 ba1d3d1。用户允许手动放行，明确要求不依赖用户执行 xattr。
 - 当前只修改 README.md、README.en.md、macOS/INSTALL.md、macOS/scripts/package-dmg.sh、本平台清单和交接；不改应用代码、版本、签名策略或用户系统安全设置。
 - 当前 2.4.0 ZIP 无 AppleDouble 元数据，构建脚本已在开发端清理打包副本。早先“File created by an AppSandbox”与普通未公证提示不同，不能以签名校验代替真实 Gatekeeper 验证。
-- 用户反馈 Chrome 或其他浏览器直下载后无法打开。已请求 Safari 直下载对照，并区分“仍要打开”不存在/允许后失败/允许后成功；等待反馈后决定是否需要实际打包修复。
-- 文档为安装路径改进，不作为故障修复完成证据。CI 和真实首次安装复验待完成；本次不自动发布或替换 v2.4.0 资产。
+- 用户反馈旧下载副本无法打开；随后确认 Safari 从 GitHub 重新下载 v2.4.0，有“仍要打开”，点击后正常启动，全程未使用 xattr。原副本执行限制来源仍未取证，不笼统归因于 Chrome，也不保证所有下载渠道相同。
+- 无需应用代码或签名策略修改；无终端安装路径已由用户确认。打包说明提交 60c25d7 通过 CI 34758063598：297 项 XCTest、Debug/Release、严格签名及 DMG/ZIP 验证；本次不自动发布或替换 v2.4.0 资产。
