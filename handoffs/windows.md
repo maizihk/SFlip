@@ -6,7 +6,8 @@
 - 原因：程序资源仍为旧百分号素材，生成器从共享旧 PNG 抠除白底；通知区域虽然独立按主题渲染，内部也仍是百分号。现采用已确认的 Windows 独立显示器光影版和双向箭头线稿。
 - Native、Launcher 和 Inno Setup 已共用 Native/AppIcon.ico，无需增加新的资源加载路径；新增本平台 AppIcon-1024.png，保留 alpha，构建前生成九档 ICO 和 AppIcon-256.png，关于页也同步更新。
 - 托盘仅改变几何，保留黑白主题、高对比 fallback、90% 槽位、6% 轮廓、DPI 刷新、Explorer 恢复和状态提示。双向箭头笔画稍细，16px 时保留两行间隙；旧可见像素上限由 58% 改为 62%，实际 60.2%，alpha 覆盖仍 27.9%。
-- 本机用 clang++ 编译生产渲染函数并检查实际 16/20/24/32 图像；PNG alpha 和 ICO 九档尺寸已解析核对。macOS 没有 PowerShell/MSBuild，完整 x64 Release、原生回归和安装器验证待 PR Windows CI。
+- 本机用 clang++ 编译生产渲染函数并检查实际 16/20/24/32 图像；代码 `a5ee7f5` / [PR #110](https://github.com/maizihk/SFlip/pull/110) 通过 [Windows CI run 34835706384](https://github.com/maizihk/SFlip/actions/runs/34835706384)：535 项原生检查、61 项安装器检查、x64 Release 和 2.34 MiB 分发校验全部成功。macOS 没有 PowerShell/MSBuild，Windows 构建证据来自 CI。
+- 绿色版 artifact `10343978046` 和安装版 artifact `10343923530` 下载 SHA-256 与 GitHub digest 一致；解析 Launcher/Native 两份 PE 的九档内嵌图标均与包内 ICO 一致，256 PNG 与 ICO 大图逐字节一致。实际构建 PNG 已查看，透明轮廓、蓝色光影和金属底座与认可设计一致。
 - 实机桌面/开始菜单/任务栏/关于页、深浅托盘、高对比和不同 DPI 仍待验收。未启动 SFlip、重启 Explorer、修改权限或执行 USB、DDC、网络、唤醒动作；不改协议、schema、版本、tag 或 Release。
 
 

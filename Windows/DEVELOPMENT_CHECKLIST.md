@@ -530,5 +530,5 @@
 - [x] Windows 专用 1024 PNG 为源图，生成器直接保留 alpha、高光和阴影，输出 16/20/24/32/40/48/64/128/256 ICO 与关于页 256 PNG；正式构建先生成，避免回退旧共享素材。
 - [x] 托盘保留独立黑白线稿、系统主题/高对比 fallback、DPI 和 Explorer 恢复机制，仅替换为圆角显示器与双向箭头，底座与支架相连。
 - [x] 本机以生产 C++ 渲染函数检查 16/20/24/32 像素边界、透明背景和线宽；原有视觉覆盖率断言适配新箭头，主题/预乘 alpha/刷新回归保留。
-- [ ] Windows x64 Release、完整原生测试与安装器检查待本次 PR CI 完成；本机 macOS 无 PowerShell/MSBuild。
+- [x] 代码 `a5ee7f5` 通过 [Windows CI run 34835706384](https://github.com/maizihk/SFlip/actions/runs/34835706384)：535 项原生检查、61 项安装器检查、x64 Release 和 2.34 MiB 分发校验全部成功；本机 macOS 无 PowerShell/MSBuild。下载包 SHA-256 与 GitHub digest 一致，两份 EXE 内嵌九档图标与包内 ICO/256 PNG 已逐项核对。
 - [ ] 实机桌面、开始菜单、任务栏、关于页及托盘深浅主题/高对比/100–200% DPI 观感待确认；未启动应用或改变硬件/系统设置。
