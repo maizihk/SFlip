@@ -875,3 +875,12 @@
 - 修改：macOS/Sources/DisplaySwitcher/AppPreferences.swift、Localization.swift、MediaKeyDDC.swift、SettingsWindowController.swift、main.swift；macOS/Tests/DisplaySwitcherTests/MediaKeyDDCTests.swift；macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。主工作区未知workspace文件保留。
 
 - DS-051 最终自动验证：代码提交 26d16b334b3a6000791d5e631edfd69e3d6edbac 通过 macOS CI 34829277226，315/315 XCTest、Debug、Release build-app.sh、严格签名、DMG/ZIP 校验和上传全部成功。下载该 run 的 SFlip-macOS-ARM64 artifact，ZIP 解压后严格 codesign 复验通过。PR：https://github.com/maizihk/SFlip/pull/108（依赖 #107）。本行及对应清单状态为后续文档记录，代码与 CI 测试包一致，不把文档提交误作代码验证 SHA。
+
+## DS-052 菜单栏实心切换图标
+
+- 基线main@20ff11f，分支codex/macos-status-icon；包含已合并的登录启动和权限开关修复。
+- 原图标为细线显示器与百分号，小尺寸视觉重量偏轻。按用户要求移除底座与百分号，改为实心圆角屏幕、镂空双向箭头；保留18 pt画布和template自动着色。
+- 绘制在透明层内完成，destinationOut仅镂空图标自身；菜单项其他图标、业务逻辑及Windows均不变。
+- 修改文件：macOS/Sources/DisplaySwitcher/DS007SettingsModels.swift、macOS/Tests/DisplaySwitcherTests/DS007Tests.swift、macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。
+- 本机用生产绘制函数生成深浅背景预览，并验证实心区域alpha=1、箭头与底座区域alpha=0。新增对应XCTest；当前本机无完整Xcode，最终测试/构建/签名/打包交由CI验证。
+- 未启动应用或执行真实硬件操作；实际菜单栏、壁纸和缩放视觉效果待用户确认。

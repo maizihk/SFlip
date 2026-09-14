@@ -447,51 +447,40 @@ enum TrayImageFactory {
             transform.scale(by: scale)
             transform.concat()
 
-            NSColor.black.setStroke()
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+            defer { context.endTransparencyLayer() }
             NSColor.black.setFill()
-            let strokeWidth = TrayStatusIconDesign.strokeWidth
-            let centerMinimum = TrayStatusIconDesign.paintedMinimum + strokeWidth / 2
-            let centerMaximum = TrayStatusIconDesign.paintedMaximum - strokeWidth / 2
+            NSColor.black.setStroke()
 
-            let screen = NSBezierPath(
+            NSBezierPath(
                 roundedRect: NSRect(
-                    x: centerMinimum,
-                    y: 4.45,
-                    width: centerMaximum - centerMinimum,
-                    height: centerMaximum - 4.45
+                    x: TrayStatusIconDesign.paintedMinimum,
+                    y: 2.7,
+                    width: TrayStatusIconDesign.contentSize,
+                    height: 12.6
                 ),
-                xRadius: 1.8,
-                yRadius: 1.8
-            )
-            screen.lineWidth = strokeWidth
-            screen.stroke()
+                xRadius: 2.4,
+                yRadius: 2.4
+            ).fill()
 
-            let stand = NSBezierPath()
-            stand.lineWidth = strokeWidth
-            stand.lineCapStyle = .round
-            stand.move(to: NSPoint(x: canvas / 2, y: 4.45))
-            stand.line(to: NSPoint(x: canvas / 2, y: centerMinimum))
-            stand.move(to: NSPoint(x: 5.8, y: centerMinimum))
-            stand.line(to: NSPoint(x: 12.2, y: centerMinimum))
-            stand.stroke()
-
-            let percent = NSBezierPath()
-            percent.lineWidth = strokeWidth
-            percent.lineCapStyle = .round
-            percent.move(to: NSPoint(x: 5.55, y: 7.75))
-            percent.line(to: NSPoint(x: 12.45, y: 13.25))
-            percent.stroke()
-
-            for center in [NSPoint(x: 5.9, y: 12.7), NSPoint(x: 12.1, y: 8.3)] {
-                NSBezierPath(
-                    ovalIn: NSRect(
-                        x: center.x - 1.05,
-                        y: center.y - 1.05,
-                        width: 2.1,
-                        height: 2.1
-                    )
-                ).fill()
-            }
+            // Opposing cut-out arrows remain transparent under menu-bar template tinting.
+            context.setBlendMode(.destinationOut)
+            let arrows = NSBezierPath()
+            arrows.lineWidth = 1.35
+            arrows.lineCapStyle = .round
+            arrows.lineJoinStyle = .round
+            arrows.move(to: NSPoint(x: 4.8, y: 10.9))
+            arrows.line(to: NSPoint(x: 13.2, y: 10.9))
+            arrows.move(to: NSPoint(x: 11.2, y: 12.9))
+            arrows.line(to: NSPoint(x: 13.2, y: 10.9))
+            arrows.line(to: NSPoint(x: 11.2, y: 8.9))
+            arrows.move(to: NSPoint(x: 13.2, y: 7.1))
+            arrows.line(to: NSPoint(x: 4.8, y: 7.1))
+            arrows.move(to: NSPoint(x: 6.8, y: 9.1))
+            arrows.line(to: NSPoint(x: 4.8, y: 7.1))
+            arrows.line(to: NSPoint(x: 6.8, y: 5.1))
+            arrows.stroke()
             return true
         }
         image.isTemplate = true
