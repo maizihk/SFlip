@@ -77,6 +77,8 @@ namespace DisplaySwitcher::Native
 
     void Controller::Initialize()
     {
+        auto started = std::chrono::steady_clock::now();
+        sideEffectGate_.Block();
         SetDetailedDiagnosticRecordingEnabled(Config().detailedDiagnosticRecording);
         ResetDiagnosticLog();
         std::weak_ptr<Controller> weak = shared_from_this();
@@ -104,8 +106,47 @@ namespace DisplaySwitcher::Native
             [weak](MediaKeyAction action) { if (auto self = weak.lock()) self->OnMediaKey(action); },
             [weak] { if (auto self = weak.lock()) self->OnDisplayTopologyChanged(); },
             [weak] { if (auto self = weak.lock()) { auto exit = self->exitApplication_; if (exit) exit(); } });
-        ApplyConfiguration();
-        if (firstRun_) ShowSettings();
+        SetStatus(UiMessage(L"正在启动…"));
+        WriteDiagnostic("startup.tray_ready duration_ms=" + std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
+        startupSettingsRequested_ = firstRun_;
+        auto enumeration = std::make_shared<std::optional<DdcEnumerationResult>>();
+        startupTask_.Start(
+            [weak, enumeration]
+            {
+                auto self = weak.lock();
+                if (!self || self->disposed_) return;
+                auto started = std::chrono::steady_clock::now();
+                enumeration->reset();
+                if (!self->Config().displayConfigurationSafeMode)
+                {
+                    // Invalidation also stays off the UI thread: the native backend
+                    // shares a lock with the potentially slow driver enumeration.
+                    self->ddcBackends_.InvalidateTopology();
+                    *enumeration = EnumerateDdcMonitors(self->ddcBackends_.Lookup(NativeDdcBackendKey));
+                }
+                WriteDiagnostic("startup.display_enumeration duration_ms=" + std::to_string(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
+            },
+            [](std::function<void()> work) { std::thread(std::move(work)).detach(); },
+            [weak](std::function<void()> completion)
+            { if (auto self = weak.lock(); self && !self->disposed_) self->Enqueue(std::move(completion)); },
+            [weak, enumeration](bool success)
+            {
+                auto self = weak.lock();
+                if (!self || self->disposed_) return;
+                if (!success)
+                {
+                    std::scoped_lock lock(self->configMutex_);
+                    self->config_.EnterSafeState();
+                }
+                auto started = std::chrono::steady_clock::now();
+                self->ApplyConfiguration(true, false, enumeration->has_value() ? &enumeration->value() : nullptr);
+                WriteDiagnostic("startup.configuration_ready duration_ms=" + std::to_string(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
+                if (self->startupSettingsRequested_)
+                    self->ShowSettings(enumeration->has_value() ? &enumeration->value() : nullptr);
+            });
     }
 
     Controller::~Controller() { Dispose(); }
@@ -116,7 +157,8 @@ namespace DisplaySwitcher::Native
         return config_;
     }
 
-    void Controller::ApplyConfiguration(bool applyAutoStart, bool preserveProbeReplay)
+    void Controller::ApplyConfiguration(bool applyAutoStart, bool preserveProbeReplay,
+        DdcEnumerationResult const* initialEnumeration)
     {
         ++configurationGeneration_;
         v2KeyCache_.Clear();
@@ -136,7 +178,8 @@ namespace DisplaySwitcher::Native
         {
             try
             {
-                auto enumeration = EnumerateDdcMonitors(ddcBackends_.Lookup(NativeDdcBackendKey));
+                auto enumeration = initialEnumeration ? *initialEnumeration :
+                    EnumerateDdcMonitors(ddcBackends_.Lookup(NativeDdcBackendKey));
                 currentTopologyTrust = enumeration.topologyTrust;
                 currentTopologyAuthoritative = enumeration.IsTrustedNonEmptySnapshot();
                 if (enumeration.IsTrustedNonEmptySnapshot())
@@ -1280,6 +1323,11 @@ namespace DisplaySwitcher::Native
     void Controller::OnDisplayTopologyChanged()
     {
         if (disposed_) return;
+        if (startupTask_.Pending())
+        {
+            startupTask_.Invalidate();
+            return;
+        }
         ++sideEffectGeneration_;
         trayDdcWrites_.CancelPending();
         ddcBackends_.InvalidateTopology();
@@ -1471,8 +1519,14 @@ namespace DisplaySwitcher::Native
         if (completed) completed(finalResult);
     }
 
-    void Controller::ShowSettings()
+    void Controller::ShowSettings(DdcEnumerationResult const* initialEnumeration)
     {
+        if (disposed_) return;
+        if (startupTask_.Pending())
+        {
+            startupSettingsRequested_ = true;
+            return;
+        }
         if (settingsWindow_)
         {
             auto projected = settingsWindow_.as<::winrt::DisplaySwitcher::Native::SettingsWindow>();
@@ -1597,7 +1651,7 @@ namespace DisplaySwitcher::Native
                     }
                     self->settingsWindow_ = nullptr;
                 }
-            });
+            }, initialEnumeration);
         {
             std::scoped_lock lock(stateMutex_);
             get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->SetConnectionStatus(
@@ -1673,6 +1727,7 @@ namespace DisplaySwitcher::Native
     void Controller::Dispose()
     {
         if (disposed_.exchange(true)) return;
+        startupTask_.Cancel();
         ++sideEffectGeneration_;
         sideEffectGate_.Block();
         trayDdcWrites_.CancelPending();
