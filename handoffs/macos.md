@@ -851,3 +851,13 @@
 - 自动验证：新增 10 项模拟 XCTest，覆盖状态、notFound 首次注册、审批等待、重复开启、注册与取消失败、操作未生效、外部审批变更、不支持系统和双语文案。Windows 本机 git diff --check 通过；修复提交 7fbac6b 通过 macOS CI 34824592360：307 项 XCTest（含新增 10 项）、Debug/Release、build-app.sh、严格 codesign、DMG/ZIP 产物检查全部通过。
 - 实机待验：首次注册和审批、拒绝后恢复、取消待批准申请、注销后自动启动、应用位置变化及中英文/深浅色布局。本任务未修改真实登录项、系统权限或硬件状态。
 - 提交：7fbac6b；PR：https://github.com/maizihk/SFlip/pull/107，尚未合并；测试包为该提交的 CI artifact SFlip-macOS-ARM64（10340450133）。后续仅补充本验证记录。
+
+### DS-050 登录启动开关对齐跟进（2026-09-14）
+
+- 用户确认启动问题已修好，但截图显示开关较其他行左移；继续 PR #107 的 codex/macos-login-startup，基线 44fc74b，包含 origin/main@fd6f4fd。
+- 根因：外层 NSStackView 使用 NSView 的 setContentHuggingPriority，没有约束栈自身内容宽度；真实窗口布局时容器拉宽，center gravity 将开关居中。改用 NSStackView.setHuggingPriority(.required, for: .horizontal)，仅此一行代码变更，登录项状态与操作逻辑不变。
+- 离屏 NSWindow / AppKit 验证：590 pt 行宽下，旧开关 x=283、宽54；修复后 x=528、右缘582，与既有右侧8 pt边距一致。中文及英文长状态/审批按钮显隐反复切换均保持右缘，无需固定开关宽度或改动视图结构。
+- 相关 PublicPresentationModelsTests 44/44 通过（含全部登录启动模拟测试）。真实登录项、网络、USB、DDC、唤醒和系统权限未操作；实际设置窗口外观待用户确认。
+- 本次修改文件：macOS/Sources/DisplaySwitcher/SettingsWindowController.swift、macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。主工作区及其未跟踪 workspace 文件保留，修复在独立 worktree 完成。
+
+- 本次 Debug 测试构建、Release build-app.sh、严格 codesign、DMG/ZIP 打包验证通过；构建产物现名为 SFlip.app，按实际路径验签。布局修复 CI 以 PR #107 最新提交检查为准。

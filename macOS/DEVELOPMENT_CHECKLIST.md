@@ -616,3 +616,8 @@
 - [x] Windows 本机静态审查和 git diff --check 通过；修改限于 macOS 代码、测试及本平台清单/交接，版本和协议不变。
 - [x] 修复提交 7fbac6b 通过 macOS CI 34824592360：307 项 XCTest（含新增 10 项登录启动测试）、Debug/Release、build-app.sh、严格 codesign 和 DMG/ZIP 产物检查全部通过；PR #107。
 - [ ] 真实 macOS 首次开启、系统批准/取消、注销后自动启动、应用迁移及中英文/深浅色 AppKit 布局仍待用户验证；本任务未执行真实 register/unregister。
+
+- [x] DS-050 布局跟进：用户确认启动问题已修好，另反馈登录启动开关左移。改用 NSStackView 的水平 hugging API，使操作容器贴合内容；离屏 AppKit 窗口复现修复前左移 245 pt，修复后中英文和审批按钮显隐切换时开关右缘均保持行右侧 8 pt。相关 XCTest 44/44 通过。
+- [ ] 本次布局修复的实际设置窗口外观仍待用户确认；不将用户的启动成功反馈扩展为全部审批、迁移与系统组合验收。
+
+- 本次 Debug 测试构建、Release build-app.sh、严格 codesign、DMG/ZIP 打包验证通过；构建产物现名为 SFlip.app，按实际路径验签。布局修复 CI 以 PR #107 最新提交检查为准。

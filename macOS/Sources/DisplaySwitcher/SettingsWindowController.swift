@@ -1360,7 +1360,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         trailing.alignment = .centerY
         trailing.spacing = 8
         trailing.translatesAutoresizingMaskIntoConstraints = false
-        trailing.setContentHuggingPriority(.required, for: .horizontal)
+        trailing.setHuggingPriority(.required, for: .horizontal)
         trailing.setContentCompressionResistancePriority(.required, for: .horizontal)
         launchAtLoginCheckbox.setAccessibilityLabel(title)
         let row = NSView()
