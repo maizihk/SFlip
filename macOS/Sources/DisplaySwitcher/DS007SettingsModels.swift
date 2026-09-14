@@ -445,6 +445,10 @@ enum TrayImageFactory {
                 yBy: destination.minY + (destination.height - canvas * scale) / 2
             )
             transform.scale(by: scale)
+            // Match the visual weight of adjacent menu-bar items without changing
+            // the balanced proportions of the screen and stand.
+            transform.translateX(by: -0.9, yBy: -0.9)
+            transform.scale(by: 1.1)
             transform.concat()
 
             guard let context = NSGraphicsContext.current?.cgContext else { return false }

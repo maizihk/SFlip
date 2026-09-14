@@ -591,7 +591,7 @@ final class DS007Tests: XCTestCase {
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
         image.draw(in: NSRect(x: 0, y: 0, width: 72, height: 72))
-        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 10, y: 32)).alphaComponent, 0.95)
+        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 7, y: 32)).alphaComponent, 0.95)
         XCTAssertLessThan(try XCTUnwrap(bitmap.colorAt(x: 36, y: 24)).alphaComponent, 0.05)
         XCTAssertLessThan(try XCTUnwrap(bitmap.colorAt(x: 36, y: 4)).alphaComponent, 0.05)
         XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 36, y: 61)).alphaComponent, 0.95)
