@@ -840,3 +840,14 @@
 - 当前 2.4.0 ZIP 无 AppleDouble 元数据，构建脚本已在开发端清理打包副本。早先“File created by an AppSandbox”与普通未公证提示不同，不能以签名校验代替真实 Gatekeeper 验证。
 - 用户反馈旧下载副本无法打开；随后确认 Safari 从 GitHub 重新下载 v2.4.0，有“仍要打开”，点击后正常启动，全程未使用 xattr。原副本执行限制来源仍未取证，不笼统归因于 Chrome，也不保证所有下载渠道相同。
 - 无需应用代码或签名策略修改；无终端安装路径已由用户确认。打包说明提交 60c25d7 通过 CI 34758063598：297 项 XCTest、Debug/Release、严格签名及 DMG/ZIP 验证；本次不自动发布或替换 v2.4.0 资产。
+
+## DS-050 Mac 登录启动状态与审批恢复
+
+- 日期：2026-09-14；基线 main@fd6f4fd，分支 codex/macos-login-startup。
+- 原因：旧设置将 requiresApproval 也显示开启，但系统尚未允许自动启动；notFound 开启无操作，操作成功后不回读，用户在系统设置批准后返回 App 也不刷新。
+- 实现：可注入 LaunchAtLoginServicing 和纯 LaunchAtLoginController；系统 adapter 只在用户开启/关闭/取消申请时 register/unregister。notFound 可以首次注册；已启用、待批准不自动重注册；操作后核对实际状态并诚实报告失败。
+- 界面：同一登录启动图标行显示动态详情；待批准开关关闭，提供“打开系统登录项设置”和“取消申请”。系统入口使用 SMAppService.openSystemSettingsLoginItems()，只由按钮点击触发。App 激活只回读登录项投影，不重载用户编辑的其他配置；语言切换更新详情和按钮。
+- 修改：macOS/Sources/DisplaySwitcher/PublicPresentationModels.swift、SettingsWindowController.swift、Localization.swift；macOS/Tests/DisplaySwitcherTests/PublicPresentationModelsTests.swift；macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。模型/测试沿用已有 app/test target 文件，无需新增工程条目。
+- 自动验证：新增 10 项模拟 XCTest，覆盖状态、notFound 首次注册、审批等待、重复开启、注册与取消失败、操作未生效、外部审批变更、不支持系统和双语文案。Windows 本机 git diff --check 通过；没有 Swift/Xcode，XCTest、完整平台构建和严格验签尚未运行，待主任务 macOS CI。
+- 实机待验：首次注册和审批、拒绝后恢复、取消待批准申请、注销后自动启动、应用位置变化及中英文/深浅色布局。本任务未修改真实登录项、系统权限或硬件状态。
+- 提交、PR、CI：由根任务审查后提交并推送，不提前声明完成或通过。

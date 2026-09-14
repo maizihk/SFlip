@@ -288,3 +288,63 @@ enum DDCValuePresentationPolicy {
         entryPoint == .settingsReadButton ? .hardware : .cache
     }
 }
+
+// Login item state is read from the system; no separate preference can imply success.
+enum LaunchAtLoginStatus: Equatable {
+    case enabled, notRegistered, requiresApproval, notFound, unavailable
+
+    var isEnabled: Bool { self == .enabled }
+    var canRequestChange: Bool { self != .unavailable }
+    var needsSystemSettings: Bool { self == .requiresApproval }
+    var detailText: String {
+        switch self {
+        case .enabled: return L10n.text("已启用登录启动。")
+        case .notRegistered: return L10n.text("登录启动未启用。")
+        case .requiresApproval: return L10n.text("等待系统批准。请在系统设置 → 通用 → 登录项中允许 SFlip。")
+        case .notFound: return L10n.text("系统尚未找到登录项。请将 SFlip 放入“应用程序”后重新开启。")
+        case .unavailable: return L10n.text("登录启动服务不可用。")
+        }
+    }
+}
+
+protocol LaunchAtLoginServicing {
+    var status: LaunchAtLoginStatus { get }
+    func register() throws
+    func unregister() throws
+}
+
+enum LaunchAtLoginChangeError: LocalizedError {
+    case unavailable, registrationNotEffective, removalNotEffective
+    var errorDescription: String? {
+        switch self {
+        case .unavailable: return L10n.text("登录启动服务不可用。")
+        case .registrationNotEffective: return L10n.text("系统未启用登录启动，请检查应用程序位置和系统登录项设置。")
+        case .removalNotEffective: return L10n.text("系统未关闭登录启动，请检查系统登录项设置。")
+        }
+    }
+}
+
+struct LaunchAtLoginController {
+    let service: LaunchAtLoginServicing
+    var status: LaunchAtLoginStatus { service.status }
+
+    @discardableResult
+    func setEnabled(_ enabled: Bool) throws -> LaunchAtLoginStatus {
+        let before = service.status
+        guard before != .unavailable else { throw LaunchAtLoginChangeError.unavailable }
+        if enabled {
+            // A new app may be notFound before its first registration.
+            if before == .notRegistered || before == .notFound { try service.register() }
+        } else if before == .enabled || before == .requiresApproval {
+            try service.unregister()
+        }
+        let after = service.status
+        if enabled && after != .enabled && after != .requiresApproval {
+            throw LaunchAtLoginChangeError.registrationNotEffective
+        }
+        if !enabled && after != .notRegistered && after != .notFound {
+            throw LaunchAtLoginChangeError.removalNotEffective
+        }
+        return after
+    }
+}
