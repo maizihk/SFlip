@@ -614,5 +614,5 @@
 - [x] 返回 App、打开设置和切换界面语言刷新登录项投影；激活不重新载入整份配置，保留编辑内容。
 - [x] 新增 10 项可注入模拟 XCTest，覆盖五状态、首次注册、待批准、已启用不重复操作、注册/取消失败、操作未生效、系统审批变化和双语文案；不调用真实登录项服务或硬件。
 - [x] Windows 本机静态审查和 git diff --check 通过；修改限于 macOS 代码、测试及本平台清单/交接，版本和协议不变。
-- [ ] 当前本机无 Swift/Xcode；完整 XCTest、Debug/Release、build-app.sh、严格 codesign 和 macOS CI 待主任务验证，不记录为已通过。
+- [x] 修复提交 7fbac6b 通过 macOS CI 34824592360：307 项 XCTest（含新增 10 项登录启动测试）、Debug/Release、build-app.sh、严格 codesign 和 DMG/ZIP 产物检查全部通过；PR #107。
 - [ ] 真实 macOS 首次开启、系统批准/取消、注销后自动启动、应用迁移及中英文/深浅色 AppKit 布局仍待用户验证；本任务未执行真实 register/unregister。

@@ -848,6 +848,6 @@
 - 实现：可注入 LaunchAtLoginServicing 和纯 LaunchAtLoginController；系统 adapter 只在用户开启/关闭/取消申请时 register/unregister。notFound 可以首次注册；已启用、待批准不自动重注册；操作后核对实际状态并诚实报告失败。
 - 界面：同一登录启动图标行显示动态详情；待批准开关关闭，提供“打开系统登录项设置”和“取消申请”。系统入口使用 SMAppService.openSystemSettingsLoginItems()，只由按钮点击触发。App 激活只回读登录项投影，不重载用户编辑的其他配置；语言切换更新详情和按钮。
 - 修改：macOS/Sources/DisplaySwitcher/PublicPresentationModels.swift、SettingsWindowController.swift、Localization.swift；macOS/Tests/DisplaySwitcherTests/PublicPresentationModelsTests.swift；macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。模型/测试沿用已有 app/test target 文件，无需新增工程条目。
-- 自动验证：新增 10 项模拟 XCTest，覆盖状态、notFound 首次注册、审批等待、重复开启、注册与取消失败、操作未生效、外部审批变更、不支持系统和双语文案。Windows 本机 git diff --check 通过；没有 Swift/Xcode，XCTest、完整平台构建和严格验签尚未运行，待主任务 macOS CI。
+- 自动验证：新增 10 项模拟 XCTest，覆盖状态、notFound 首次注册、审批等待、重复开启、注册与取消失败、操作未生效、外部审批变更、不支持系统和双语文案。Windows 本机 git diff --check 通过；修复提交 7fbac6b 通过 macOS CI 34824592360：307 项 XCTest（含新增 10 项）、Debug/Release、build-app.sh、严格 codesign、DMG/ZIP 产物检查全部通过。
 - 实机待验：首次注册和审批、拒绝后恢复、取消待批准申请、注销后自动启动、应用位置变化及中英文/深浅色布局。本任务未修改真实登录项、系统权限或硬件状态。
-- 提交、PR、CI：由根任务审查后提交并推送，不提前声明完成或通过。
+- 提交：7fbac6b；PR：https://github.com/maizihk/SFlip/pull/107，尚未合并；测试包为该提交的 CI artifact SFlip-macOS-ARM64（10340450133）。后续仅补充本验证记录。
