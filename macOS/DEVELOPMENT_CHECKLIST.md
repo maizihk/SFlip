@@ -640,3 +640,10 @@
 - [x] 真实绘制回归测试覆盖实心屏幕、透明箭头、边缘留空和实心底座；本机生产函数独立AppKit像素检查通过。
 - 完整XCTest、正式构建、签名和打包由macOS CI执行，最终结果记录在handoffs/macos.md；本机当前只有Command Line Tools，无完整Xcode。
 - [ ] 实际菜单栏在不同壁纸、深浅外观和缩放下的视觉效果待用户确认。
+
+### DS-053 光影应用图标（2026-09-14）
+
+- [x] 采用用户认可的蓝色渐变圆角底板、白色显示器与双向箭头光影版，替换 AppIcon.png 与 AppIcon.icns；透明外缘保留，PNG 与认可原稿逐字节一致。
+- [x] ICNS 从同一 1024 px PNG 生成 16、32、128、256、512 pt 的 1x/2x 共十个表示；不改 DS-052 已放大 10% 的菜单栏 template 图标。
+- 本机只有 Command Line Tools，XCTest 和 build-app.sh 明确报缺少完整 Xcode；正式测试、构建、严格签名和打包交由本次 PR 的 macOS CI 验证。
+- [ ] Finder、Dock、关于页及 DMG 中的真实系统图标显示仍待用户确认；未安装或启动真实应用。
