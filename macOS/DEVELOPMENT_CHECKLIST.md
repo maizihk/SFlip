@@ -647,3 +647,4 @@
 - [x] ICNS 从同一 1024 px PNG 生成 16、32、128、256、512 pt 的 1x/2x 共十个表示；不改 DS-052 已放大 10% 的菜单栏 template 图标。
 - 本机只有 Command Line Tools，XCTest 和 build-app.sh 明确报缺少完整 Xcode；正式测试、构建、严格签名和打包交由本次 PR 的 macOS CI 验证。
 - [ ] Finder、Dock、关于页及 DMG 中的真实系统图标显示仍待用户确认；未安装或启动真实应用。
+- [x] 资源提交 6ac355e 通过 macOS CI 34835764890：316/316 XCTest、Debug/Release、build-app.sh、严格签名和 DMG/ZIP 产物验证全部成功。下载该 CI ZIP 解压后严格验签通过，包内 PNG/ICNS 与提交资源逐字节一致。

@@ -901,3 +901,4 @@
 - 本机缺完整 Xcode，相关 XCTest 与 build-app.sh 均在工具链检查阶段失败；不把旧构建结果当作本次验证，最终使用本次 CI 的新包完成严格验签与包内资源一致性检查。
 - 实机待验：Finder、Dock、关于页和 DMG 的图标观感与系统图标缓存刷新。本任务未启动或安装应用，未改权限、登录项、USB、DDC、网络、版本或发布资产。
 - 离线图标校验：ICNS 容器长度有效，系统 iconutil 可解出十个正确尺寸的透明表示；八个现代表示逐像素匹配原 iconset。系统为 16/32 pt 的 1x 生成传统 ic04/ic05，解码存在色彩转换，保留系统标准编码并人工核对小图；1024 px 源图及最大表示完全一致。
+- 最终自动验证：资源提交 6ac355eed6e0a9556ca9c8209d5f68f36419f693 通过 macOS CI 34835764890（job 103949099125），316/316 XCTest、Debug/Release、build-app.sh、严格签名、DMG/ZIP 检查与上传成功。下载该 run 的 arm64 ZIP 后严格 codesign 和 ZIP 完整性复验通过，包内 PNG/ICNS 与提交资源逐字节相同；ICNS SHA-256 为 9c9dca7e778fefe2fafcbbd20262fcb22496d547bcf84f3c5bb418a23436d921，ZIP SHA-256 为 28d106c4704901cbf558f2bcb3b0f27acd2da76c11a08c969be4cf96abc18b6f。此后仅补验证文档，实际应用外观仍待用户确认。
