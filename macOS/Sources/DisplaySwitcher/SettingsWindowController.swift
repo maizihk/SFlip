@@ -208,6 +208,21 @@ private final class SettingsTabButton: NSControl {
     }
 }
 
+@available(macOS 13.0, *)
+private struct SystemLaunchAtLoginService: LaunchAtLoginServicing {
+    var status: LaunchAtLoginStatus {
+        switch SMAppService.mainApp.status {
+        case .enabled: return .enabled
+        case .notRegistered: return .notRegistered
+        case .requiresApproval: return .requiresApproval
+        case .notFound: return .notFound
+        @unknown default: return .unavailable
+        }
+    }
+    func register() throws { try SMAppService.mainApp.register() }
+    func unregister() throws { try SMAppService.mainApp.unregister() }
+}
+
 final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTextFieldDelegate {
     var onLanguageChanged: (() -> Void)?
     var onSave: (() -> Void)?
@@ -236,6 +251,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     private let linkedCheckbox = NSSwitch()
     private let launchAtLoginCheckbox = NSSwitch()
+    private let launchAtLoginStatusLabel = NSTextField(wrappingLabelWithString: "")
+    private let loginItemsActionsStack = NSStackView()
+    private lazy var loginItemsSettingsButton = NSButton(
+        title: L10n.text("打开系统登录项设置"), target: self,
+        action: #selector(openLoginItemsSettings)
+    )
+    private lazy var cancelLoginApprovalButton = NSButton(
+        title: L10n.text("取消申请"), target: self,
+        action: #selector(cancelLoginApproval)
+    )
     private let detailedDiagnosticRecordingCheckbox = NSSwitch()
     private let mediaKeyShortcutTitleLabel = NSTextField(labelWithString: L10n.text("媒体快捷键关联需要输入监控权限"))
     private let mediaKeyShortcutDetailLabel = NSTextField(wrappingLabelWithString: "")
@@ -361,6 +386,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         window.center()
         super.init(window: window)
         window.delegate = self
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(applicationDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification, object: nil
+        )
         buildInterface()
         updateLocalNetworkPermissionPresentation(.notChecked)
         updateMediaKeyShortcutPresentation(
@@ -377,6 +406,28 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     required init?(coder: NSCoder) {
         nil
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func applicationDidBecomeActive() {
+        reloadLaunchAtLoginState()
+    }
+
+    @objc private func openLoginItemsSettings() {
+        guard #available(macOS 13.0, *) else { return }
+        SMAppService.openSystemSettingsLoginItems()
+    }
+
+    @objc private func cancelLoginApproval() {
+        guard #available(macOS 13.0, *) else { return }
+        do {
+            try setLaunchAtLogin(enabled: false)
+            clearValidationError()
+        } catch {
+            showValidationError(L10n.format("登录启动设置失败：\n{0}\n\n请确认 App 已放入“应用程序”文件夹。", error.localizedDescription))
+        }
+        reloadLaunchAtLoginState()
     }
 
     func show(tabIndex: Int = 0) {
@@ -562,6 +613,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
         refreshSelectedCollaborationStatus()
         updateLocalNetworkPermissionPresentation(permissionEvidence)
+        reloadLaunchAtLoginState()
         refreshSaveFeedbackPresentation()
         onLanguageChanged?()
         selectTab(at: selectedTab)
@@ -667,12 +719,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
                     symbolName: "character.bubble"
                 ),
                 separator(),
-                switchRow(
-                    button: launchAtLoginCheckbox,
-                    title: L10n.text("登录时启动"),
-                    description: L10n.text("登录 macOS 后自动在菜单栏启动显示器控制。"),
-                    symbolName: "power"
-                ),
+                launchAtLoginRow(),
                 separator(),
                 switchRow(
                     button: detailedDiagnosticRecordingCheckbox,
@@ -1285,6 +1332,60 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         }
     }
 
+    private func launchAtLoginRow() -> NSView {
+        let title = L10n.text("登录时启动")
+        let icon = NSImageView()
+        icon.image = NSImage(systemSymbolName: "power", accessibilityDescription: title)
+        icon.contentTintColor = .secondaryLabelColor
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        launchAtLoginStatusLabel.font = .systemFont(ofSize: 11)
+        launchAtLoginStatusLabel.textColor = .secondaryLabelColor
+        launchAtLoginStatusLabel.maximumNumberOfLines = 0
+        let labels = NSStackView(views: [titleLabel, launchAtLoginStatusLabel])
+        labels.orientation = .vertical
+        labels.alignment = .leading
+        labels.spacing = 2
+        labels.translatesAutoresizingMaskIntoConstraints = false
+        labels.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        labels.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let actions = loginItemsActionsStack
+        actions.setViews([loginItemsSettingsButton, cancelLoginApprovalButton], in: .center)
+        actions.orientation = .vertical
+        actions.alignment = .trailing
+        actions.spacing = 4
+        let trailing = NSStackView(views: [actions, launchAtLoginCheckbox])
+        trailing.orientation = .horizontal
+        trailing.alignment = .centerY
+        trailing.spacing = 8
+        trailing.translatesAutoresizingMaskIntoConstraints = false
+        trailing.setHuggingPriority(.required, for: .horizontal)
+        trailing.setContentCompressionResistancePriority(.required, for: .horizontal)
+        launchAtLoginCheckbox.setAccessibilityLabel(title)
+        let row = NSView()
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.addSubview(icon)
+        row.addSubview(labels)
+        row.addSubview(trailing)
+        NSLayoutConstraint.activate([
+            row.widthAnchor.constraint(equalToConstant: 590),
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
+            icon.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 8),
+            icon.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 22),
+            icon.heightAnchor.constraint(equalToConstant: 22),
+            labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12),
+            labels.topAnchor.constraint(equalTo: row.topAnchor, constant: 8),
+            labels.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -8),
+            labels.trailingAnchor.constraint(equalTo: trailing.leadingAnchor, constant: -16),
+            trailing.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -8),
+            trailing.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            row.heightAnchor.constraint(greaterThanOrEqualTo: trailing.heightAnchor, constant: 16)
+        ])
+        return row
+    }
+
     private func switchRow(
         button: NSSwitch,
         title: String,
@@ -1739,6 +1840,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         if sender === launchAtLoginCheckbox {
             do {
                 try updateLaunchAtLogin()
+                reloadLaunchAtLoginState()
+                clearValidationError()
             } catch {
                 reloadLaunchAtLoginState()
                 showValidationError(L10n.format("登录启动设置失败：\n{0}\n\n请确认 App 已放入“应用程序”文件夹。", String(describing: error.localizedDescription)))
@@ -2085,9 +2188,26 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     }
 
     private func reloadLaunchAtLoginState() {
-        guard #available(macOS 13.0, *) else { return }
-        let status = SMAppService.mainApp.status
-        launchAtLoginCheckbox.state = (status == .enabled || status == .requiresApproval) ? .on : .off
+        let status: LaunchAtLoginStatus
+        if #available(macOS 13.0, *) {
+            status = LaunchAtLoginController(service: SystemLaunchAtLoginService()).status
+        } else {
+            status = .unavailable
+        }
+        launchAtLoginCheckbox.state = status.isEnabled ? .on : .off
+        launchAtLoginCheckbox.isEnabled = status.canRequestChange
+        launchAtLoginCheckbox.toolTip = status.detailText
+        launchAtLoginStatusLabel.stringValue = (status == .enabled || status == .notRegistered)
+            ? L10n.text("登录 macOS 后自动在菜单栏启动显示器控制。") : status.detailText
+        cancelLoginApprovalButton.title = L10n.text("取消申请")
+        cancelLoginApprovalButton.isHidden = !status.needsSystemSettings
+        loginItemsSettingsButton.title = L10n.text("打开系统登录项设置")
+        loginItemsSettingsButton.isHidden = !status.needsSystemSettings
+        loginItemsActionsStack.isHidden = !status.needsSystemSettings
+        if #unavailable(macOS 13.0) {
+            launchAtLoginStatusLabel.stringValue = L10n.text("需要 macOS 13 或更高版本")
+            launchAtLoginCheckbox.toolTip = launchAtLoginStatusLabel.stringValue
+        }
     }
 
     private func reloadValues(rebuildDisplayForms shouldRebuildDisplayForms: Bool = true) {
@@ -2143,14 +2263,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         mediaKeyVolumeTakeoverCheckbox.state = AppPreferences.mediaKeyVolumeTakeoverEnabled
             ? .on : .off
 
-        if #available(macOS 13.0, *) {
-            reloadLaunchAtLoginState()
-            launchAtLoginCheckbox.isEnabled = true
-        } else {
-            launchAtLoginCheckbox.state = .off
-            launchAtLoginCheckbox.isEnabled = false
-            launchAtLoginCheckbox.toolTip = L10n.text("需要 macOS 13 或更高版本")
-        }
+        reloadLaunchAtLoginState()
     }
 
     private func restoreCachedDDCValues(in document: DisplayConfigurationStoreV5Document) {
@@ -2515,14 +2628,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
     @available(macOS 13.0, *)
     private func setLaunchAtLogin(enabled: Bool) throws {
-        let service = SMAppService.mainApp
-        if enabled {
-            if service.status == .notRegistered {
-                try service.register()
-            }
-        } else if service.status != .notRegistered {
-            try service.unregister()
-        }
+        try LaunchAtLoginController(service: SystemLaunchAtLoginService()).setEnabled(enabled)
     }
 
     private func updateLaunchAtLogin() throws {

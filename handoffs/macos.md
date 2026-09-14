@@ -840,3 +840,24 @@
 - 当前 2.4.0 ZIP 无 AppleDouble 元数据，构建脚本已在开发端清理打包副本。早先“File created by an AppSandbox”与普通未公证提示不同，不能以签名校验代替真实 Gatekeeper 验证。
 - 用户反馈旧下载副本无法打开；随后确认 Safari 从 GitHub 重新下载 v2.4.0，有“仍要打开”，点击后正常启动，全程未使用 xattr。原副本执行限制来源仍未取证，不笼统归因于 Chrome，也不保证所有下载渠道相同。
 - 无需应用代码或签名策略修改；无终端安装路径已由用户确认。打包说明提交 60c25d7 通过 CI 34758063598：297 项 XCTest、Debug/Release、严格签名及 DMG/ZIP 验证；本次不自动发布或替换 v2.4.0 资产。
+
+## DS-050 Mac 登录启动状态与审批恢复
+
+- 日期：2026-09-14；基线 main@fd6f4fd，分支 codex/macos-login-startup。
+- 原因：旧设置将 requiresApproval 也显示开启，但系统尚未允许自动启动；notFound 开启无操作，操作成功后不回读，用户在系统设置批准后返回 App 也不刷新。
+- 实现：可注入 LaunchAtLoginServicing 和纯 LaunchAtLoginController；系统 adapter 只在用户开启/关闭/取消申请时 register/unregister。notFound 可以首次注册；已启用、待批准不自动重注册；操作后核对实际状态并诚实报告失败。
+- 界面：同一登录启动图标行显示动态详情；待批准开关关闭，提供“打开系统登录项设置”和“取消申请”。系统入口使用 SMAppService.openSystemSettingsLoginItems()，只由按钮点击触发。App 激活只回读登录项投影，不重载用户编辑的其他配置；语言切换更新详情和按钮。
+- 修改：macOS/Sources/DisplaySwitcher/PublicPresentationModels.swift、SettingsWindowController.swift、Localization.swift；macOS/Tests/DisplaySwitcherTests/PublicPresentationModelsTests.swift；macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。模型/测试沿用已有 app/test target 文件，无需新增工程条目。
+- 自动验证：新增 10 项模拟 XCTest，覆盖状态、notFound 首次注册、审批等待、重复开启、注册与取消失败、操作未生效、外部审批变更、不支持系统和双语文案。Windows 本机 git diff --check 通过；修复提交 7fbac6b 通过 macOS CI 34824592360：307 项 XCTest（含新增 10 项）、Debug/Release、build-app.sh、严格 codesign、DMG/ZIP 产物检查全部通过。
+- 实机待验：首次注册和审批、拒绝后恢复、取消待批准申请、注销后自动启动、应用位置变化及中英文/深浅色布局。本任务未修改真实登录项、系统权限或硬件状态。
+- 提交：7fbac6b；PR：https://github.com/maizihk/SFlip/pull/107，尚未合并；测试包为该提交的 CI artifact SFlip-macOS-ARM64（10340450133）。后续仅补充本验证记录。
+
+### DS-050 登录启动开关对齐跟进（2026-09-14）
+
+- 用户确认启动问题已修好，但截图显示开关较其他行左移；继续 PR #107 的 codex/macos-login-startup，基线 44fc74b，包含 origin/main@fd6f4fd。
+- 根因：外层 NSStackView 使用 NSView 的 setContentHuggingPriority，没有约束栈自身内容宽度；真实窗口布局时容器拉宽，center gravity 将开关居中。改用 NSStackView.setHuggingPriority(.required, for: .horizontal)，仅此一行代码变更，登录项状态与操作逻辑不变。
+- 离屏 NSWindow / AppKit 验证：590 pt 行宽下，旧开关 x=283、宽54；修复后 x=528、右缘582，与既有右侧8 pt边距一致。中文及英文长状态/审批按钮显隐反复切换均保持右缘，无需固定开关宽度或改动视图结构。
+- 相关 PublicPresentationModelsTests 44/44 通过（含全部登录启动模拟测试）。真实登录项、网络、USB、DDC、唤醒和系统权限未操作；实际设置窗口外观待用户确认。
+- 本次修改文件：macOS/Sources/DisplaySwitcher/SettingsWindowController.swift、macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。主工作区及其未跟踪 workspace 文件保留，修复在独立 worktree 完成。
+
+- 本次 Debug 测试构建、Release build-app.sh、严格 codesign、DMG/ZIP 打包验证通过；构建产物现名为 SFlip.app，按实际路径验签。布局修复 CI 以 PR #107 最新提交检查为准。

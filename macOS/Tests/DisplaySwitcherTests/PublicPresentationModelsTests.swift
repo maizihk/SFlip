@@ -1117,3 +1117,116 @@ final class PublicPresentationModelsTests: XCTestCase {
         )
     }
 }
+
+private final class MockLaunchAtLoginService: LaunchAtLoginServicing {
+    var status: LaunchAtLoginStatus
+    var registeredStatus: LaunchAtLoginStatus = .enabled
+    var unregisteredStatus: LaunchAtLoginStatus = .notRegistered
+    var failure: Error?
+    var registerCount = 0
+    var unregisterCount = 0
+    init(_ status: LaunchAtLoginStatus) { self.status = status }
+    func register() throws {
+        registerCount += 1
+        if let failure { throw failure }
+        status = registeredStatus
+    }
+    func unregister() throws {
+        unregisterCount += 1
+        if let failure { throw failure }
+        status = unregisteredStatus
+    }
+}
+
+final class LaunchAtLoginControllerTests: XCTestCase {
+    func testOnlyEnabledStateReportsEnabled() {
+        let states: [LaunchAtLoginStatus] = [.enabled, .notRegistered, .requiresApproval, .notFound, .unavailable]
+        for state in states {
+            XCTAssertEqual(state.isEnabled, state == .enabled)
+            XCTAssertEqual(state.needsSystemSettings, state == .requiresApproval)
+            XCTAssertEqual(state.canRequestChange, state != .unavailable)
+        }
+    }
+    func testFirstRegistrationAlsoHandlesNotFound() throws {
+        let states: [LaunchAtLoginStatus] = [.notRegistered, .notFound]
+        for state in states {
+            let service = MockLaunchAtLoginService(state)
+            XCTAssertEqual(try LaunchAtLoginController(service: service).setEnabled(true), .enabled)
+            XCTAssertEqual(service.registerCount, 1)
+            XCTAssertEqual(service.unregisterCount, 0)
+        }
+    }
+    func testApprovalRequiredRemainsPendingWithoutReregistering() throws {
+        let service = MockLaunchAtLoginService(.notRegistered)
+        service.registeredStatus = .requiresApproval
+        let controller = LaunchAtLoginController(service: service)
+        XCTAssertEqual(try controller.setEnabled(true), .requiresApproval)
+        XCTAssertEqual(try controller.setEnabled(true), .requiresApproval)
+        XCTAssertFalse(controller.status.isEnabled)
+        XCTAssertEqual(service.registerCount, 1)
+    }
+    func testEnabledItemIsNotRemovedOrReregistered() throws {
+        let service = MockLaunchAtLoginService(.enabled)
+        XCTAssertEqual(try LaunchAtLoginController(service: service).setEnabled(true), .enabled)
+        XCTAssertEqual(service.registerCount, 0)
+        XCTAssertEqual(service.unregisterCount, 0)
+    }
+    func testRegistrationFailurePreservesActualState() {
+        let service = MockLaunchAtLoginService(.notFound)
+        service.failure = NSError(domain: "MockLoginItem", code: 1)
+        let controller = LaunchAtLoginController(service: service)
+        XCTAssertThrowsError(try controller.setEnabled(true))
+        XCTAssertEqual(controller.status, .notFound)
+    }
+    func testRegistrationReturningWithoutEffectiveStateIsAnError() {
+        let service = MockLaunchAtLoginService(.notRegistered)
+        service.registeredStatus = .notFound
+        XCTAssertThrowsError(try LaunchAtLoginController(service: service).setEnabled(true))
+        XCTAssertEqual(service.status, .notFound)
+    }
+    func testExplicitDisableAndRemovalFailure() throws {
+        let states: [LaunchAtLoginStatus] = [.enabled, .requiresApproval]
+        for state in states {
+            let service = MockLaunchAtLoginService(state)
+            let controller = LaunchAtLoginController(service: service)
+            service.failure = NSError(domain: "MockLoginItem", code: 2)
+            XCTAssertThrowsError(try controller.setEnabled(false))
+            XCTAssertEqual(controller.status, state)
+            service.failure = nil
+            XCTAssertEqual(try controller.setEnabled(false), .notRegistered)
+            XCTAssertEqual(service.unregisterCount, 2)
+        }
+        let service = MockLaunchAtLoginService(.enabled)
+        service.unregisteredStatus = .enabled
+        XCTAssertThrowsError(try LaunchAtLoginController(service: service).setEnabled(false))
+    }
+    func testRefreshReadsExternalApprovalAndRevocationWithoutMutation() {
+        let service = MockLaunchAtLoginService(.requiresApproval)
+        let controller = LaunchAtLoginController(service: service)
+        service.status = .enabled
+        XCTAssertTrue(controller.status.isEnabled)
+        service.status = .requiresApproval
+        XCTAssertFalse(controller.status.isEnabled)
+        XCTAssertTrue(controller.status.needsSystemSettings)
+        XCTAssertEqual(service.registerCount + service.unregisterCount, 0)
+    }
+    func testUnavailableServiceNeverMutates() {
+        let service = MockLaunchAtLoginService(.unavailable)
+        let controller = LaunchAtLoginController(service: service)
+        XCTAssertThrowsError(try controller.setEnabled(true))
+        XCTAssertThrowsError(try controller.setEnabled(false))
+        XCTAssertEqual(service.registerCount + service.unregisterCount, 0)
+    }
+    func testLoginItemEnglishStringsAreTranslated() {
+        let sources = ["已启用登录启动。", "登录启动未启用。",
+            "等待系统批准。请在系统设置 → 通用 → 登录项中允许 SFlip。",
+            "系统尚未找到登录项。请将 SFlip 放入“应用程序”后重新开启。",
+            "打开系统登录项设置", "取消申请", "登录启动服务不可用。",
+            "系统未启用登录启动，请检查应用程序位置和系统登录项设置。",
+            "系统未关闭登录启动，请检查系统登录项设置。"]
+        for source in sources {
+            XCTAssertNotEqual(L10n.text(source, language: .english), source)
+            XCTAssertEqual(L10n.text(source, language: .simplifiedChinese), source)
+        }
+    }
+}

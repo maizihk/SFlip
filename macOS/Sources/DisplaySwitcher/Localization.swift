@@ -51,6 +51,15 @@ enum L10n {
     }
 
     static let english: [String: String] = [
+        "取消申请": "Cancel Request",
+        "已启用登录启动。": "Launch at login is enabled.",
+        "登录启动未启用。": "Launch at login is disabled.",
+        "等待系统批准。请在系统设置 → 通用 → 登录项中允许 SFlip。": "Approval required. Allow SFlip in System Settings → General → Login Items.",
+        "系统尚未找到登录项。请将 SFlip 放入“应用程序”后重新开启。": "The system has not found the login item. Move SFlip to Applications and enable it again.",
+        "打开系统登录项设置": "Open Login Items Settings",
+        "登录启动服务不可用。": "The launch at login service is unavailable.",
+        "系统未启用登录启动，请检查应用程序位置和系统登录项设置。": "The system did not enable launch at login. Check the app location and Login Items settings.",
+        "系统未关闭登录启动，请检查系统登录项设置。": "The system did not disable launch at login. Check Login Items settings.",
         "亮度": "Brightness",
         "对比度": "Contrast",
         "输入源": "Input Source",
