@@ -873,3 +873,5 @@
 - 环境限制：相关测试完成后，本机Xcode被替换，新版本许可尚未接受；正式build-app.sh在本机无法继续。未代接受许可或修改全局选择；通过现有Command Line Tools完成离屏布局，最终正式构建/签名/打包由分支CI验证。
 - 实机待验：输入监控、辅助功能真实授权/拒绝/取消、返回App刷新、系统撤权、只有辅助功能授权时的主动tap及实际设置窗口。未执行真实权限申请、USB、DDC、唤醒、登录项或系统设置变更。
 - 修改：macOS/Sources/DisplaySwitcher/AppPreferences.swift、Localization.swift、MediaKeyDDC.swift、SettingsWindowController.swift、main.swift；macOS/Tests/DisplaySwitcherTests/MediaKeyDDCTests.swift；macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。主工作区未知workspace文件保留。
+
+- DS-051 最终自动验证：代码提交 26d16b334b3a6000791d5e631edfd69e3d6edbac 通过 macOS CI 34829277226，315/315 XCTest、Debug、Release build-app.sh、严格签名、DMG/ZIP 校验和上传全部成功。下载该 run 的 SFlip-macOS-ARM64 artifact，ZIP 解压后严格 codesign 复验通过。PR：https://github.com/maizihk/SFlip/pull/108（依赖 #107）。本行及对应清单状态为后续文档记录，代码与 CI 测试包一致，不把文档提交误作代码验证 SHA。
