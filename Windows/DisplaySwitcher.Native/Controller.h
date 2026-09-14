@@ -25,7 +25,7 @@ namespace DisplaySwitcher::Native
         ~Controller();
         void Dispose();
         void ShowError(std::wstring const& title, std::wstring const& message);
-        void ShowSettings();
+        void ShowSettings(DdcEnumerationResult const* initialEnumeration = nullptr);
 
     private:
         Controller(winrt::Microsoft::UI::Dispatching::DispatcherQueue const& dispatcher, std::function<void()> exitApplication);

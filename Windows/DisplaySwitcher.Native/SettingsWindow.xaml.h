@@ -33,7 +33,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
             std::function<void()> endUsbLearning,
             std::function<::DisplaySwitcher::Native::DiagnosticSnapshot()> diagnosticSnapshot,
             std::shared_ptr<::DisplaySwitcher::Native::DisplayOperationTracker> displayDiagnostics,
-            std::function<void()> closed);
+            std::function<void()> closed,
+            ::DisplaySwitcher::Native::DdcEnumerationResult const* initialEnumeration = nullptr);
         void SetConnectionStatus(::DisplaySwitcher::Native::UiMessage const& status, bool connected);
         void ReloadConfiguration(::DisplaySwitcher::Native::AppConfig const& config);
         void SynchronizePeerRoutes(::DisplaySwitcher::Native::AppConfig const& config);
@@ -63,7 +64,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
         void ShowUsbLearningCandidates();
         void EndUsbLearning(::DisplaySwitcher::Native::UsbLearningCompletion completion =
             ::DisplaySwitcher::Native::UsbLearningCompletion::None, std::wstring const& message = {});
-        void LoadDdcMonitors();
+        void LoadDdcMonitors(::DisplaySwitcher::Native::DdcEnumerationResult const* initialEnumeration = nullptr);
         void CaptureDisplayEditors();
         void RebuildDisplayEditors();
         void RemoveOfflineDisplay(std::wstring const& id);

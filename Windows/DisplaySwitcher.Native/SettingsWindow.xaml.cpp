@@ -337,7 +337,8 @@ namespace winrt::DisplaySwitcher::Native::implementation
         std::function<void()> endUsbLearning,
         std::function<::DisplaySwitcher::Native::DiagnosticSnapshot()> diagnosticSnapshot,
         std::shared_ptr<::DisplaySwitcher::Native::DisplayOperationTracker> displayDiagnostics,
-        std::function<void()> closed)
+        std::function<void()> closed,
+        ::DisplaySwitcher::Native::DdcEnumerationResult const* initialEnumeration)
     {
         if (initialized_) return;
         initialized_ = true;
@@ -364,7 +365,7 @@ namespace winrt::DisplaySwitcher::Native::implementation
             ddcCancellation_.Cancel(); EndUsbLearning(); if (closed_) closed_();
         });
         LoadUsbDevices();
-        LoadDdcMonitors();
+        LoadDdcMonitors(initialEnumeration);
     }
 
     void SettingsWindow::ChangeLanguage(::DisplaySwitcher::Native::UiLanguagePreference preference)
@@ -1048,12 +1049,12 @@ namespace winrt::DisplaySwitcher::Native::implementation
         }
     }
 
-    void SettingsWindow::LoadDdcMonitors()
+    void SettingsWindow::LoadDdcMonitors(::DisplaySwitcher::Native::DdcEnumerationResult const* initialEnumeration)
     {
         CaptureDisplayEditors();
         try
         {
-            auto enumeration = enumerateDdc_ ? enumerateDdc_()
+            auto enumeration = initialEnumeration ? *initialEnumeration : enumerateDdc_ ? enumerateDdc_()
                 : ::DisplaySwitcher::Native::DdcEnumerationResult{ false,
                     ::DisplaySwitcher::Native::DdcErrorKind::BackendUnavailable,
                     ::DisplaySwitcher::Native::UiText(L"Windows 原生 DDC 后端不可用"), {}, false };

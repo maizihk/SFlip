@@ -144,7 +144,8 @@ namespace DisplaySwitcher::Native
                 self->ApplyConfiguration(true, false, enumeration->has_value() ? &enumeration->value() : nullptr);
                 WriteDiagnostic("startup.configuration_ready duration_ms=" + std::to_string(
                     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
-                if (self->startupSettingsRequested_) self->ShowSettings();
+                if (self->startupSettingsRequested_)
+                    self->ShowSettings(enumeration->has_value() ? &enumeration->value() : nullptr);
             });
     }
 
@@ -1518,7 +1519,7 @@ namespace DisplaySwitcher::Native
         if (completed) completed(finalResult);
     }
 
-    void Controller::ShowSettings()
+    void Controller::ShowSettings(DdcEnumerationResult const* initialEnumeration)
     {
         if (disposed_) return;
         if (startupTask_.Pending())
@@ -1650,7 +1651,7 @@ namespace DisplaySwitcher::Native
                     }
                     self->settingsWindow_ = nullptr;
                 }
-            });
+            }, initialEnumeration);
         {
             std::scoped_lock lock(stateMutex_);
             get_self<::winrt::DisplaySwitcher::Native::implementation::SettingsWindow>(projected)->SetConnectionStatus(
