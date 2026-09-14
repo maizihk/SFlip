@@ -884,3 +884,5 @@
 - 修改文件：macOS/Sources/DisplaySwitcher/DS007SettingsModels.swift、macOS/Tests/DisplaySwitcherTests/DS007Tests.swift、macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。
 - 本机用生产绘制函数生成深浅背景预览，并验证实心区域alpha=1、箭头与底座区域alpha=0。新增对应XCTest；当前本机无完整Xcode，最终测试/构建/签名/打包交由CI验证。
 - 未启动应用或执行真实硬件操作；实际菜单栏、壁纸和缩放视觉效果待用户确认。
+
+- DS-052最终验证：代码52b7622通过macOS CI 34830914021，316/316 XCTest、Debug、Release build-app.sh、严格签名和DMG/ZIP全部成功。下载CI ZIP后解压严格codesign复验通过。PR：https://github.com/maizihk/SFlip/pull/109。此条仅记录验证，未修改已测试代码。
