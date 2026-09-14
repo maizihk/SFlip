@@ -578,7 +578,7 @@ final class DS007Tests: XCTestCase {
         XCTAssertEqual(TrayStatusIconDesign.paintedMaximum, 17.1, accuracy: 0.001)
     }
 
-    func testStatusIconHasSolidScreenTransparentArrowsAndNoStand() throws {
+    func testStatusIconHasCompactScreenTransparentArrowsAndSolidStand() throws {
         let image = TrayImageFactory.statusImage(accessibilityDescription: "SFlip")
         XCTAssertTrue(image.isTemplate)
         XCTAssertEqual(image.size, NSSize(width: 18, height: 18))
@@ -591,9 +591,10 @@ final class DS007Tests: XCTestCase {
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
         image.draw(in: NSRect(x: 0, y: 0, width: 72, height: 72))
-        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 8, y: 36)).alphaComponent, 0.95)
-        XCTAssertLessThan(try XCTUnwrap(bitmap.colorAt(x: 36, y: 28)).alphaComponent, 0.05)
+        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 10, y: 32)).alphaComponent, 0.95)
+        XCTAssertLessThan(try XCTUnwrap(bitmap.colorAt(x: 36, y: 24)).alphaComponent, 0.05)
         XCTAssertLessThan(try XCTUnwrap(bitmap.colorAt(x: 36, y: 4)).alphaComponent, 0.05)
+        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 36, y: 61)).alphaComponent, 0.95)
     }
 
     func testDS028TrayDDCRowUsesCompactSingleLineLayout() {

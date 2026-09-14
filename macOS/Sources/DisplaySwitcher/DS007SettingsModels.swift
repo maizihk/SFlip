@@ -453,33 +453,35 @@ enum TrayImageFactory {
             NSColor.black.setFill()
             NSColor.black.setStroke()
 
+            NSBezierPath(roundedRect: NSRect(x: 7.8, y: 2.6, width: 2.4, height: 3.3), xRadius: 0.5, yRadius: 0.5).fill()
+            NSBezierPath(roundedRect: NSRect(x: 5.1, y: 1.3, width: 7.8, height: 2.2), xRadius: 0.8, yRadius: 0.8).fill()
             NSBezierPath(
                 roundedRect: NSRect(
-                    x: TrayStatusIconDesign.paintedMinimum,
-                    y: 2.7,
-                    width: TrayStatusIconDesign.contentSize,
-                    height: 12.6
+                    x: 2,
+                    y: 4.7,
+                    width: 14,
+                    height: 10.8
                 ),
-                xRadius: 2.4,
-                yRadius: 2.4
+                xRadius: 2.1,
+                yRadius: 2.1
             ).fill()
 
             // Opposing cut-out arrows remain transparent under menu-bar template tinting.
             context.setBlendMode(.destinationOut)
             let arrows = NSBezierPath()
-            arrows.lineWidth = 1.35
+            arrows.lineWidth = 1.25
             arrows.lineCapStyle = .round
             arrows.lineJoinStyle = .round
-            arrows.move(to: NSPoint(x: 4.8, y: 10.9))
-            arrows.line(to: NSPoint(x: 13.2, y: 10.9))
-            arrows.move(to: NSPoint(x: 11.2, y: 12.9))
-            arrows.line(to: NSPoint(x: 13.2, y: 10.9))
-            arrows.line(to: NSPoint(x: 11.2, y: 8.9))
-            arrows.move(to: NSPoint(x: 13.2, y: 7.1))
-            arrows.line(to: NSPoint(x: 4.8, y: 7.1))
-            arrows.move(to: NSPoint(x: 6.8, y: 9.1))
-            arrows.line(to: NSPoint(x: 4.8, y: 7.1))
-            arrows.line(to: NSPoint(x: 6.8, y: 5.1))
+            arrows.move(to: NSPoint(x: 5.724, y: 11.658))
+            arrows.line(to: NSPoint(x: 12.276, y: 11.658))
+            arrows.move(to: NSPoint(x: 10.716, y: 13.298))
+            arrows.line(to: NSPoint(x: 12.276, y: 11.658))
+            arrows.line(to: NSPoint(x: 10.716, y: 10.018))
+            arrows.move(to: NSPoint(x: 12.276, y: 8.542))
+            arrows.line(to: NSPoint(x: 5.724, y: 8.542))
+            arrows.move(to: NSPoint(x: 7.284, y: 10.182))
+            arrows.line(to: NSPoint(x: 5.724, y: 8.542))
+            arrows.line(to: NSPoint(x: 7.284, y: 6.902))
             arrows.stroke()
             return true
         }
