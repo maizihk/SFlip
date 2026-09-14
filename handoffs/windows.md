@@ -1,5 +1,16 @@
 # Windows 交接记录
 
+## 当前任务：W-049 Windows 程序与托盘图标（2026-09-14）
+
+- 分支 `codex/windows-native-icons`，基线 `origin/main@20ff11f`，已包含 PR #107/#108 和近期 Windows 提交；主工作区原有未跟踪文件保持不动。
+- 原因：程序资源仍为旧百分号素材，生成器从共享旧 PNG 抠除白底；通知区域虽然独立按主题渲染，内部也仍是百分号。现采用已确认的 Windows 独立显示器光影版和双向箭头线稿。
+- Native、Launcher 和 Inno Setup 已共用 Native/AppIcon.ico，无需增加新的资源加载路径；新增本平台 AppIcon-1024.png，保留 alpha，构建前生成九档 ICO 和 AppIcon-256.png，关于页也同步更新。
+- 托盘仅改变几何，保留黑白主题、高对比 fallback、90% 槽位、6% 轮廓、DPI 刷新、Explorer 恢复和状态提示。双向箭头笔画稍细，16px 时保留两行间隙；旧可见像素上限由 58% 改为 62%，实际 60.2%，alpha 覆盖仍 27.9%。
+- 本机用 clang++ 编译生产渲染函数并检查实际 16/20/24/32 图像；代码 `a5ee7f5` / [PR #110](https://github.com/maizihk/SFlip/pull/110) 通过 [Windows CI run 34835706384](https://github.com/maizihk/SFlip/actions/runs/34835706384)：535 项原生检查、61 项安装器检查、x64 Release 和 2.34 MiB 分发校验全部成功。macOS 没有 PowerShell/MSBuild，Windows 构建证据来自 CI。
+- 绿色版 artifact `10343978046` 和安装版 artifact `10343923530` 下载 SHA-256 与 GitHub digest 一致；解析 Launcher/Native 两份 PE 的九档内嵌图标均与包内 ICO 一致，256 PNG 与 ICO 大图逐字节一致。实际构建 PNG 已查看，透明轮廓、蓝色光影和金属底座与认可设计一致。
+- 实机桌面/开始菜单/任务栏/关于页、深浅托盘、高对比和不同 DPI 仍待验收。未启动 SFlip、重启 Explorer、修改权限或执行 USB、DDC、网络、唤醒动作；不改协议、schema、版本、tag 或 Release。
+
+
 ## 当前任务：W-046 联动调节列对齐与统一读取（2026-09-12）
 
 - 分支 `codex/windows-linked-controls-alignment`，基线 `36b3b5a`；只修改 Windows 设置 UI 和本平台记录，不改协议、schema、读取码范围或硬件语义。
