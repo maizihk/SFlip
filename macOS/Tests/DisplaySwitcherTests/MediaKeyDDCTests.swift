@@ -19,6 +19,128 @@ final class MediaKeyDDCTests: XCTestCase {
         super.tearDown()
     }
 
+    func testPermissionRequestRemainsOffUntilFreshGrantAndNeverPersistsPending() {
+        var granted = false
+        var requests = 0
+        var saved: [Bool] = []
+        let controller = MediaKeyPermissionController(enabled: false,
+            permissionGranted: { granted }, requestPermission: { requests += 1 },
+            saveEnabled: { saved.append($0) })
+        controller.setEnabled(true) {
+            XCTAssertFalse(controller.enabled)
+            XCTAssertTrue(controller.waitingForPermission)
+            XCTAssertEqual(requests, 0)
+        }
+        XCTAssertEqual(requests, 1)
+        XCTAssertFalse(controller.enabled)
+        XCTAssertTrue(controller.waitingForPermission)
+        XCTAssertFalse(saved.contains(true))
+        controller.refresh() // returning after refusing/deferring permission stays off
+        XCTAssertFalse(controller.enabled)
+        granted = true
+        controller.refresh()
+        XCTAssertTrue(controller.enabled)
+        XCTAssertFalse(controller.waitingForPermission)
+        XCTAssertEqual(saved.last, true)
+    }
+
+    func testPermissionCancelPreventsLateGrantFromEnablingAndDoesNotRevokePermission() {
+        var granted = false
+        var requests = 0
+        let controller = MediaKeyPermissionController(enabled: false,
+            permissionGranted: { granted }, requestPermission: { requests += 1 }, saveEnabled: { _ in })
+        controller.setEnabled(true)
+        controller.setEnabled(false)
+        granted = true
+        controller.refresh()
+        XCTAssertFalse(controller.enabled)
+        XCTAssertFalse(controller.waitingForPermission)
+        controller.setEnabled(true)
+        XCTAssertTrue(controller.enabled)
+        XCTAssertEqual(requests, 1) // existing grant does not request again
+        controller.setEnabled(false)
+        XCTAssertTrue(granted)
+        XCTAssertFalse(controller.enabled)
+    }
+
+    func testPermissionRevocationClearsSavedEnablementAndRequiresNewIntent() {
+        var granted = true
+        var saved: [Bool] = []
+        let controller = MediaKeyPermissionController(enabled: true,
+            permissionGranted: { granted }, requestPermission: { XCTFail("must not prompt") },
+            saveEnabled: { saved.append($0) })
+        granted = false
+        controller.refresh()
+        XCTAssertFalse(controller.enabled)
+        XCTAssertEqual(saved.last, false)
+        granted = true
+        controller.refresh()
+        XCTAssertFalse(controller.enabled)
+    }
+
+    func testUnapprovedPersistedPreferenceAndRelaunchCannotRestorePendingRequest() {
+        var saved: [Bool] = []
+        let controller = MediaKeyPermissionController(enabled: true,
+            permissionGranted: { false }, requestPermission: { XCTFail("must not prompt") },
+            saveEnabled: { saved.append($0) })
+        XCTAssertFalse(controller.enabled)
+        XCTAssertFalse(controller.waitingForPermission)
+        XCTAssertEqual(saved, [false])
+    }
+
+    func testPermissionRequestReturnDoesNotOverrideFreshPermissionEvidence() {
+        var granted = false
+        let controller = MediaKeyPermissionController(enabled: false,
+            permissionGranted: { granted }, requestPermission: { granted = true }, saveEnabled: { _ in })
+        controller.setEnabled(true)
+        XCTAssertTrue(controller.enabled) // fresh checker, not request result, confirmed it
+        XCTAssertFalse(controller.waitingForPermission)
+    }
+
+    func testMediaFeatureRoutingAndTapModesPreserveIndependentSwitches() {
+        for shortcuts in [false, true] {
+            for volume in [false, true] {
+                XCTAssertEqual(MediaKeyFeaturePolicy.allows(.luminance, shortcuts: shortcuts, volumeTakeover: volume), shortcuts)
+                XCTAssertEqual(MediaKeyFeaturePolicy.allows(.volume, shortcuts: shortcuts, volumeTakeover: volume), shortcuts || volume)
+                let mode = MediaKeyFeaturePolicy.monitorMode(shortcuts: shortcuts, volumeTakeover: volume)
+                XCTAssertEqual(mode, volume ? .activeTakeover : (shortcuts ? .passive : nil))
+            }
+        }
+        let consumption = MediaKeyEventConsumptionController()
+        XCTAssertEqual(consumption.disposition(for: captured(.volumeUp)), .passThrough)
+        XCTAssertEqual(consumption.disposition(for: captured(.brightnessUp)), .passThrough)
+    }
+
+    func testNewShortcutPreferenceMigrationRequiresExistingInstallationAndGrant() {
+        for existing in [false, true] {
+            for granted in [false, true] {
+                XCTAssertEqual(MediaKeyFeaturePolicy.initialShortcutEnabled(stored: nil,
+                    existingInstallation: existing, permissionGranted: granted), existing && granted)
+                XCTAssertFalse(MediaKeyFeaturePolicy.initialShortcutEnabled(stored: false,
+                    existingInstallation: existing, permissionGranted: granted))
+            }
+        }
+    }
+
+    func testPermissionRowsShowSettingsOnlyForPendingRequestsInBothLanguages() {
+        for language in [AppLanguage.simplifiedChinese, .english] {
+            L10n.preference = language
+            for waiting in [false, true] {
+                let shortcut = MediaKeyShortcutPresentation.make(state: .permissionRequired,
+                    lastRoute: nil, enabled: false, waitingForPermission: waiting)
+                let volume = MediaKeyVolumeTakeoverPresentation.make(enabled: false,
+                    accessibilityTrusted: false, monitorState: .unavailable, route: .unavailable,
+                    armed: false, waitingForPermission: waiting)
+                XCTAssertFalse(shortcut.enabled)
+                XCTAssertFalse(volume.enabled)
+                XCTAssertEqual(shortcut.actionTitle != nil, waiting)
+                XCTAssertEqual(volume.actionTitle != nil, waiting)
+                XCTAssertTrue(MediaKeySettingsRowPresentation.shortcut(shortcut).hasCompleteContent)
+                XCTAssertTrue(MediaKeySettingsRowPresentation.volumeTakeover(volume).hasCompleteContent)
+            }
+        }
+    }
+
     func testNormalizerAcceptsFinalMediaActionsAndPreservesRepeat() {
         XCTAssertEqual(normalize(key: 3), event(.brightnessDown))
         XCTAssertEqual(normalize(key: 2), event(.brightnessUp))
@@ -203,13 +325,11 @@ final class MediaKeyDDCTests: XCTestCase {
     }
 
     func testPermissionPresentationIsSafeAndExplicit() {
-        let presentation = MediaKeyShortcutPresentation.make(
-            state: .permissionRequired,
-            lastRoute: nil
-        )
-        XCTAssertEqual(presentation.actionTitle, "申请权限")
-        XCTAssertTrue(presentation.title.contains("输入监控权限"))
-        XCTAssertTrue(presentation.detail.contains("其他功能不受影响"))
+        let presentation = MediaKeyShortcutPresentation.make(state: .permissionRequired, lastRoute: nil,
+            enabled: false, waitingForPermission: true)
+        XCTAssertEqual(presentation.actionTitle, "打开系统设置")
+        XCTAssertFalse(presentation.enabled)
+        XCTAssertTrue(presentation.detail.contains("等待输入监控授权"))
     }
 
     func testConfigurationReloadGenerationSuppressesLateMediaWriteCompletion() {
@@ -903,9 +1023,8 @@ final class MediaKeyDDCTests: XCTestCase {
             enabled: true, accessibilityTrusted: false, monitorState: .passive,
             route: audioRoute(.hdmi), armed: false
         )
-        XCTAssertEqual(permission.actionTitle, "申请辅助功能权限")
-        XCTAssertTrue(permission.detail.contains("不吞按键"))
-        XCTAssertTrue(permission.detail.contains("仍额外执行 DDC"))
+        XCTAssertNil(permission.actionTitle)
+        XCTAssertFalse(permission.enabled)
 
         let waiting = MediaKeyVolumeTakeoverPresentation.make(
             enabled: true, accessibilityTrusted: true, monitorState: .passive,
@@ -952,13 +1071,14 @@ final class MediaKeyDDCTests: XCTestCase {
             )
         )
         let missing = MediaKeySettingsSectionPresentation.make(
-            shortcut: .make(state: .permissionRequired, lastRoute: nil),
+            shortcut: .make(state: .permissionRequired, lastRoute: nil, enabled: false, waitingForPermission: true),
             volumeTakeover: .make(
                 enabled: true,
                 accessibilityTrusted: false,
                 monitorState: .passive,
                 route: audioRoute(.hdmi),
-                armed: false
+                armed: false,
+                waitingForPermission: true
             )
         )
 
@@ -972,7 +1092,7 @@ final class MediaKeyDDCTests: XCTestCase {
 
     func testInputMonitoringAndAccessibilityActionsRemainIndependent() throws {
         let inputMissing = MediaKeySettingsSectionPresentation.make(
-            shortcut: .make(state: .permissionRequired, lastRoute: nil),
+            shortcut: .make(state: .permissionRequired, lastRoute: nil, enabled: false, waitingForPermission: true),
             volumeTakeover: .make(
                 enabled: true,
                 accessibilityTrusted: true,
@@ -988,7 +1108,8 @@ final class MediaKeyDDCTests: XCTestCase {
                 accessibilityTrusted: false,
                 monitorState: .passive,
                 route: audioRoute(.hdmi),
-                armed: false
+                armed: false,
+                waitingForPermission: true
             )
         )
 

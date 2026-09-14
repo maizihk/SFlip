@@ -861,3 +861,17 @@
 - 本次修改文件：macOS/Sources/DisplaySwitcher/SettingsWindowController.swift、macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。主工作区及其未跟踪 workspace 文件保留，修复在独立 worktree 完成。
 
 - 本次 Debug 测试构建、Release build-app.sh、严格 codesign、DMG/ZIP 打包验证通过；构建产物现名为 SFlip.app，按实际路径验签。布局修复 CI 以 PR #107 最新提交检查为准。
+
+## DS-051 媒体键功能与权限统一开关
+
+- 日期：2026-09-14；基线 codex/macos-login-startup@333b7e5（PR #107 未合并），新分支 codex/macos-permission-switches。此主题独立堆叠在 #107，不修改其启动逻辑，不合并前置 PR。
+- 根因：原媒体快捷键只有授权按钮，没有停用入口；音量接管把启用偏好与实际权限分离，未经授权也显示开启。已有事件 tap 提前返回，激活回调不检查运行中监听权限，撤权后状态也可能过时。
+- 实现：注入式 MediaKeyPermissionController 保存实际启用状态，pending 仅进程内；显示关闭/等待后才请求权限，请求返回值不作为授权。只读 fresh preflight/AX 检查后启用；取消或撤权清除意愿与偏好，后来授权不自动恢复。关闭不撤销 TCC 权限，App 激活只刷新这两项，不重载其他编辑字段。
+- 独立运行：快捷键开启保留原亮度及音量镜像；音量单独开启只处理音量。辅助功能允许主动 tap 观察首次按键，无需先依赖输入监控；消费仍受原快照与安全门控制，未 armed 不吞键，不新增任何硬件探测。开关/权限改变使媒体 runtime generation 和读取队列失效，读取回调再次检查权限与开关。
+- UI：两行保持右侧原生开关，普通态一句说明；等待态显示系统设置和取消。运行细节保留 tooltip。垂直操作栈使用 trailing 对齐和开关自身 hugging；不能照搬横向栈的 required 横向 hugging，否则不同宽度按钮被压缩。
+- 本机自动验证：新增8项生命周期/路由/迁移/双语测试，相关104项通过；离屏AppKit中英共12场景右缘582/行宽590、开关宽54，待授权英文按钮宽159、中文102，均不压缩或交叠。临时harness不进入Git。
+- 环境限制：相关测试完成后，本机Xcode被替换，新版本许可尚未接受；正式build-app.sh在本机无法继续。未代接受许可或修改全局选择；通过现有Command Line Tools完成离屏布局，最终正式构建/签名/打包由分支CI验证。
+- 实机待验：输入监控、辅助功能真实授权/拒绝/取消、返回App刷新、系统撤权、只有辅助功能授权时的主动tap及实际设置窗口。未执行真实权限申请、USB、DDC、唤醒、登录项或系统设置变更。
+- 修改：macOS/Sources/DisplaySwitcher/AppPreferences.swift、Localization.swift、MediaKeyDDC.swift、SettingsWindowController.swift、main.swift；macOS/Tests/DisplaySwitcherTests/MediaKeyDDCTests.swift；macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。主工作区未知workspace文件保留。
+
+- DS-051 最终自动验证：代码提交 26d16b334b3a6000791d5e631edfd69e3d6edbac 通过 macOS CI 34829277226，315/315 XCTest、Debug、Release build-app.sh、严格签名、DMG/ZIP 校验和上传全部成功。下载该 run 的 SFlip-macOS-ARM64 artifact，ZIP 解压后严格 codesign 复验通过。PR：https://github.com/maizihk/SFlip/pull/108（依赖 #107）。本行及对应清单状态为后续文档记录，代码与 CI 测试包一致，不把文档提交误作代码验证 SHA。

@@ -237,9 +237,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
     var onRefreshDisplays: (() -> Void)?
     var onDisplayDeleted: ((String, String) -> Void)?
     var onDetailedDiagnosticRecordingChanged: ((Bool) -> Void)?
-    var onRequestMediaKeyPermission: (() -> Void)?
+    var onMediaKeyShortcutChanged: ((Bool) -> Void)?
     var onMediaKeyVolumeTakeoverChanged: ((Bool) -> Void)?
-    var onRequestAccessibilityPermission: (() -> Void)?
     var onWindowClosed: (() -> Void)?
     var collaborationStatus: ((CollaborationProfile) -> CollaborationConnectionState)?
     var cachedDDCValue: ((String, DDCCommand) -> Int?)?
@@ -262,12 +261,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         action: #selector(cancelLoginApproval)
     )
     private let detailedDiagnosticRecordingCheckbox = NSSwitch()
+    private let mediaKeyShortcutCheckbox = NSSwitch()
     private let mediaKeyShortcutTitleLabel = NSTextField(labelWithString: L10n.text("媒体快捷键关联需要输入监控权限"))
     private let mediaKeyShortcutDetailLabel = NSTextField(wrappingLabelWithString: "")
     private lazy var requestMediaKeyPermissionButton = NSButton(
         title: L10n.text("申请权限"),
         target: self,
         action: #selector(requestMediaKeyPermission)
+    )
+    private lazy var cancelMediaKeyPermissionButton = NSButton(
+        title: L10n.text("取消"), target: self, action: #selector(cancelMediaKeyPermission)
+    )
+    private lazy var cancelAccessibilityPermissionButton = NSButton(
+        title: L10n.text("取消"), target: self, action: #selector(cancelAccessibilityPermission)
     )
     private let mediaKeyShortcutTrailingStack = NSStackView()
     private weak var mediaKeyShortcutRowContainer: NSView?
@@ -513,13 +519,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         let row = MediaKeySettingsRowPresentation.shortcut(presentation)
         mediaKeyShortcutTitleLabel.stringValue = row.title
         mediaKeyShortcutDetailLabel.stringValue = row.detail
+        mediaKeyShortcutDetailLabel.toolTip = presentation.detail
         mediaKeyShortcutRowContainer?.setAccessibilityValue("\(row.title)。\(row.detail)")
+        mediaKeyShortcutCheckbox.state = presentation.enabled ? .on : .off
+        var controls: [NSView] = [mediaKeyShortcutCheckbox]
         if let actionTitle = row.actionTitle {
             requestMediaKeyPermissionButton.title = actionTitle
-            mediaKeyShortcutTrailingStack.setViews([requestMediaKeyPermissionButton], in: .center)
-        } else {
-            mediaKeyShortcutTrailingStack.setViews([], in: .center)
+            cancelMediaKeyPermissionButton.title = L10n.text("取消")
+            controls += [requestMediaKeyPermissionButton, cancelMediaKeyPermissionButton]
         }
+        mediaKeyShortcutTrailingStack.setViews(controls, in: .center)
         relayoutMediaKeySettingsRows()
     }
 
@@ -528,11 +537,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         mediaKeyVolumeTakeoverCheckbox.state = presentation.enabled ? .on : .off
         mediaKeyVolumeTakeoverTitleLabel.stringValue = row.title
         mediaKeyVolumeTakeoverDetailLabel.stringValue = row.detail
+        mediaKeyVolumeTakeoverDetailLabel.toolTip = presentation.detail
         mediaKeyVolumeTakeoverRowContainer?.setAccessibilityValue("\(row.title)。\(row.detail)")
         var controls: [NSView] = [mediaKeyVolumeTakeoverCheckbox]
         if let actionTitle = row.actionTitle {
             requestAccessibilityPermissionButton.title = actionTitle
-            controls.append(requestAccessibilityPermissionButton)
+            cancelAccessibilityPermissionButton.title = L10n.text("取消")
+            controls += [requestAccessibilityPermissionButton, cancelAccessibilityPermissionButton]
         }
         mediaKeyVolumeTakeoverTrailingStack.setViews(controls, in: .center)
         relayoutMediaKeySettingsRows()
@@ -658,6 +669,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         launchAtLoginCheckbox.action = #selector(immediateSwitchChanged(_:))
         detailedDiagnosticRecordingCheckbox.target = self
         detailedDiagnosticRecordingCheckbox.action = #selector(detailedDiagnosticRecordingChanged(_:))
+        mediaKeyShortcutCheckbox.target = self
+        mediaKeyShortcutCheckbox.action = #selector(mediaKeyShortcutChanged(_:))
         mediaKeyVolumeTakeoverCheckbox.target = self
         mediaKeyVolumeTakeoverCheckbox.action = #selector(mediaKeyVolumeTakeoverChanged(_:))
         usbArrivalSwitchCheckbox.target = self
@@ -1466,8 +1479,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
 
         requestMediaKeyPermissionButton.setContentHuggingPriority(.required, for: .horizontal)
         requestMediaKeyPermissionButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-        mediaKeyShortcutTrailingStack.orientation = .horizontal
-        mediaKeyShortcutTrailingStack.alignment = .centerY
+        mediaKeyShortcutTrailingStack.orientation = .vertical
+        mediaKeyShortcutTrailingStack.alignment = .trailing
+        mediaKeyShortcutTrailingStack.spacing = 6
+        mediaKeyShortcutCheckbox.setContentHuggingPriority(.required, for: .horizontal)
+        mediaKeyShortcutCheckbox.setAccessibilityLabel(L10n.text("媒体快捷键"))
         mediaKeyShortcutTrailingStack.translatesAutoresizingMaskIntoConstraints = false
         let row = NSView()
         row.translatesAutoresizingMaskIntoConstraints = false
@@ -1485,13 +1501,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             labels.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -8),
             labels.trailingAnchor.constraint(equalTo: mediaKeyShortcutTrailingStack.leadingAnchor, constant: -16),
             mediaKeyShortcutTrailingStack.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -8),
-            mediaKeyShortcutTrailingStack.centerYAnchor.constraint(equalTo: row.centerYAnchor)
+            mediaKeyShortcutTrailingStack.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
+            row.heightAnchor.constraint(greaterThanOrEqualTo: mediaKeyShortcutTrailingStack.heightAnchor, constant: 16)
         ])
         row.setAccessibilityElement(true)
         row.setAccessibilityRole(.group)
         row.setAccessibilityLabel(L10n.text("媒体快捷键与输入监控权限"))
         mediaKeyShortcutRowContainer = row
-        mediaKeyShortcutTrailingStack.setViews([], in: .center)
+        mediaKeyShortcutTrailingStack.setViews([mediaKeyShortcutCheckbox], in: .center)
         return row
     }
 
@@ -1513,6 +1531,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         labels.setContentHuggingPriority(.defaultLow, for: .horizontal)
         labels.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        mediaKeyVolumeTakeoverCheckbox.setContentHuggingPriority(.required, for: .horizontal)
+        mediaKeyVolumeTakeoverCheckbox.setAccessibilityLabel(L10n.text("音量键控制显示器"))
         mediaKeyVolumeTakeoverTrailingStack.orientation = .vertical
         mediaKeyVolumeTakeoverTrailingStack.alignment = .trailing
         mediaKeyVolumeTakeoverTrailingStack.spacing = 6
@@ -1533,7 +1553,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
             labels.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -8),
             labels.trailingAnchor.constraint(equalTo: mediaKeyVolumeTakeoverTrailingStack.leadingAnchor, constant: -16),
             mediaKeyVolumeTakeoverTrailingStack.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -8),
-            mediaKeyVolumeTakeoverTrailingStack.centerYAnchor.constraint(equalTo: row.centerYAnchor)
+            mediaKeyVolumeTakeoverTrailingStack.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
+            row.heightAnchor.constraint(greaterThanOrEqualTo: mediaKeyVolumeTakeoverTrailingStack.heightAnchor, constant: 16)
         ])
         row.setAccessibilityElement(true)
         row.setAccessibilityRole(.group)
@@ -1960,18 +1982,33 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         onRefreshDisplays?()
     }
 
+    @objc private func mediaKeyShortcutChanged(_ sender: NSSwitch) {
+        onMediaKeyShortcutChanged?(sender.state == .on)
+    }
+
     @objc private func requestMediaKeyPermission() {
-        onRequestMediaKeyPermission?()
+        guard !requestMediaKeyPermissionButton.isHidden,
+              mediaKeyShortcutTrailingStack.arrangedSubviews.contains(requestMediaKeyPermissionButton),
+              let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc private func cancelMediaKeyPermission() {
+        onMediaKeyShortcutChanged?(false)
     }
 
     @objc private func mediaKeyVolumeTakeoverChanged(_ sender: NSSwitch) {
-        let enabled = sender.state == .on
-        AppPreferences.setMediaKeyVolumeTakeoverEnabled(enabled)
-        onMediaKeyVolumeTakeoverChanged?(enabled)
+        onMediaKeyVolumeTakeoverChanged?(sender.state == .on)
     }
 
     @objc private func requestAccessibilityPermission() {
-        onRequestAccessibilityPermission?()
+        guard mediaKeyVolumeTakeoverTrailingStack.arrangedSubviews.contains(requestAccessibilityPermissionButton),
+              let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc private func cancelAccessibilityPermission() {
+        onMediaKeyVolumeTakeoverChanged?(false)
     }
 
     @objc private func confirmDeleteDisplay(_ sender: NSButton) {
@@ -2259,8 +2296,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTe
         loadSelectedProfileFields()
         refreshSelectedCollaborationStatus()
         detailedDiagnosticRecordingCheckbox.state = AppPreferences.detailedDiagnosticRecordingEnabled
-            ? .on : .off
-        mediaKeyVolumeTakeoverCheckbox.state = AppPreferences.mediaKeyVolumeTakeoverEnabled
             ? .on : .off
 
         reloadLaunchAtLoginState()
