@@ -75,6 +75,7 @@
     <ClInclude Include="AppConfig.h" />
     <ClInclude Include="AutoStart.h" />
     <ClInclude Include="Controller.h" />
+    <ClInclude Include="StartupTask.h" />
     <ClInclude Include="DdcBackends.h" />
     <ClInclude Include="DdcControl.h" />
     <ClInclude Include="InputSourceControl.h" />

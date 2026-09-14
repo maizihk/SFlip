@@ -21,6 +21,7 @@
 #include "../DisplaySwitcher.Native/TrayContracts.h"
 #include "../DisplaySwitcher.Native/TrayMonochromeIcon.h"
 #include "../DisplaySwitcher.Native/TrayRecoveryPolicy.h"
+#include "StartupTaskTests.h"
 #include <array>
 #include <iostream>
 
@@ -3944,6 +3945,7 @@ namespace {
 
 int wmain()
 {
+    DisplaySwitcher::Native::Tests::RunStartupTaskTests(Check);
     winrt::init_apartment();
     DisplaySwitcher::Native::SetLanguageForTests(DisplaySwitcher::Native::UiLanguage::Chinese);
     auto root = std::filesystem::temp_directory_path() / (L"DisplaySwitcher-DS004-" + GenerateIdentifier());

@@ -1,5 +1,15 @@
 # Windows 交接记录
 
+## W-050 Windows 启动响应优化（2026-09-14）
+
+- 分支 `codex/windows-startup-responsiveness`，基线 `origin/main@20ff11f`；已 fetch 复查远端，独立于图标 PR #110，保留原目录未知改动。只修改 Windows 启动流程、模拟测试及本平台记录。
+- 原因：Controller 初始化在 UI 线程同步等待 QueryDisplayConfig/SetupAPI/DXVA2 物理显示器枚举，消息循环无法及时处理托盘；尚无用户 Windows 实机耗时，不能把转圈全部归因于此。
+- 改动：首次枚举和后端失效在单个后台任务执行；托盘立即就绪，结果回到 UI 后沿用配置协调/保存与运行时启动。初始化时硬件安全门关闭，设置请求合并延后；退出取消发布，不 join 慢驱动。
+- 生命周期：拓扑变化只增加失效代次，同一时间只运行一个枚举；旧扫描结束后至多合并排入一次新扫描。退出、替换和迟到回调安全丢弃，后台异常经 UI 进入原有配置安全态；RDP、空/部分快照保持原逻辑。
+- 测量：详细诊断沿用默认关闭，新增 startup.tray_ready、startup.display_enumeration、startup.configuration_ready 的 duration_ms；分别测 Controller 初始化内托盘准备、每次后台扫描和最终配置应用，不能冒充从进程创建起的总启动耗时。
+- 本机验证：共享生产调度 helper 的 13 项模拟检查，Clang C++20、-Wall/-Wextra/-Werror、ASan/UBSan 全过；本机无 PowerShell/MSBuild，完整 Windows x64 Release、原生回归和安装器校验待 CI。
+- 实机待验：普通/首次/--show-settings 启动、冷启动阶段耗时和光标时长、启动期间退出及热插拔。未启动真实应用或执行网络、USB、DDC、输入源、唤醒、权限/登录项变更；不修改协议、配置 schema、版本、Release 或启动反馈光标策略。
+
 ## 当前任务：W-046 联动调节列对齐与统一读取（2026-09-12）
 
 - 分支 `codex/windows-linked-controls-alignment`，基线 `36b3b5a`；只修改 Windows 设置 UI 和本平台记录，不改协议、schema、读取码范围或硬件语义。

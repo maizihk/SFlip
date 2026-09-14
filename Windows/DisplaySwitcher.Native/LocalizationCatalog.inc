@@ -388,3 +388,4 @@
 { L"未命名显示器", L"Display" },
 { L"已切换到 {name}；有 {count} 台显示器缺少映射", L"Switched to {name}; {count} display(s) have no mapping" },
 { L"切换到 {name} 失败：{error}；有 {count} 台显示器缺少映射", L"Switch to {name} failed: {error}; {count} display(s) have no mapping" },
+{ L"正在启动…", L"Starting…" },
