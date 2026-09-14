@@ -51,6 +51,16 @@ enum L10n {
     }
 
     static let english: [String: String] = [
+        "音量键控制显示器": "Control Display Volume with Volume Keys",
+        "打开系统设置": "Open System Settings",
+        "等待输入监控授权。请在系统设置中允许 SFlip；返回后自动启用，也可取消。": "Waiting for Input Monitoring. Allow SFlip in System Settings, then return to enable. You can also cancel.",
+        "等待辅助功能授权。请在系统设置中允许 SFlip；返回后自动启用，也可取消。": "Waiting for Accessibility. Allow SFlip in System Settings, then return to enable. You can also cancel.",
+        "开启后可用媒体快捷键调节显示器亮度和音量，需要输入监控权限。关闭不会撤销系统权限。": "Use media keys to adjust display brightness and volume. Input Monitoring is required. Turning this off keeps the system permission.",
+        "快捷键监听暂不可用。可关闭后重新开启；其他功能不受影响。": "Media key monitoring is unavailable. Turn it off and on to retry; other features are unaffected.",
+        "使用媒体快捷键调节显示器亮度和音量。": "Use media keys to adjust display brightness and volume.",
+        "开启后使用媒体快捷键调节亮度和音量，需要输入监控权限。": "Use media keys for brightness and volume. Requires Input Monitoring.",
+        "使用音量键调节 HDMI/DP 音频输出显示器的音量。": "Use volume keys to adjust the HDMI/DP audio output display.",
+        "开启后使用音量键控制 HDMI/DP 音频输出显示器，需要辅助功能权限。": "Use volume keys for the HDMI/DP audio output display. Requires Accessibility.",
         "取消申请": "Cancel Request",
         "已启用登录启动。": "Launch at login is enabled.",
         "登录启动未启用。": "Launch at login is disabled.",

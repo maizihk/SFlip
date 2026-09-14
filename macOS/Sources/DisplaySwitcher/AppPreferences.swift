@@ -1,6 +1,20 @@
 import Foundation
 
 enum AppPreferences {
+    private static let mediaKeyShortcutKey = "mediaKeyShortcutEnabled"
+
+    static func initialMediaKeyShortcutEnabled(inputMonitoringGranted: Bool) -> Bool {
+        let stored = UserDefaults.standard.object(forKey: mediaKeyShortcutKey) as? Bool
+        let existing = UserDefaults.standard.data(forKey: DisplayConfigurationStore.storageKey) != nil
+        return MediaKeyFeaturePolicy.initialShortcutEnabled(
+            stored: stored, existingInstallation: existing, permissionGranted: inputMonitoringGranted
+        )
+    }
+
+    static func setMediaKeyShortcutEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: mediaKeyShortcutKey)
+    }
+
     private static let mediaKeyVolumeTakeoverKey = "mediaKeyVolumeTakeoverEnabled"
 
     static var displayConfigurations: [DisplayConfiguration] {

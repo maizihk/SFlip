@@ -102,6 +102,63 @@ enum MediaKeyEventNormalizer {
     }
 }
 
+/// A pending request belongs only to this process and never persists as enabled.
+/// The request API is an effect; only a fresh permission check can enable a feature.
+final class MediaKeyPermissionController {
+    private(set) var enabled: Bool
+    private(set) var waitingForPermission = false
+    private let permissionGranted: () -> Bool
+    private let requestPermission: () -> Void
+    private let saveEnabled: (Bool) -> Void
+
+    init(enabled: Bool, permissionGranted: @escaping () -> Bool,
+         requestPermission: @escaping () -> Void, saveEnabled: @escaping (Bool) -> Void) {
+        self.enabled = enabled && permissionGranted()
+        self.permissionGranted = permissionGranted
+        self.requestPermission = requestPermission
+        self.saveEnabled = saveEnabled
+        saveEnabled(self.enabled)
+    }
+
+    func setEnabled(_ requested: Bool, beforePermissionRequest: () -> Void = {}) {
+        waitingForPermission = false
+        enabled = requested && permissionGranted()
+        saveEnabled(enabled)
+        if requested && !enabled {
+            waitingForPermission = true
+            beforePermissionRequest()
+            requestPermission()
+            refresh()
+        }
+    }
+
+    func refresh() {
+        let granted = permissionGranted()
+        let next = granted && (enabled || waitingForPermission)
+        if granted { waitingForPermission = false }
+        if next != enabled {
+            enabled = next
+            saveEnabled(next)
+        }
+    }
+}
+
+enum MediaKeyFeaturePolicy {
+    static func initialShortcutEnabled(stored: Bool?, existingInstallation: Bool, permissionGranted: Bool) -> Bool {
+        (stored ?? existingInstallation) && permissionGranted
+    }
+
+    static func allows(_ command: DDCCommand, shortcuts: Bool, volumeTakeover: Bool) -> Bool {
+        shortcuts || (volumeTakeover && command == .volume)
+    }
+
+    static func monitorMode(shortcuts: Bool, volumeTakeover: Bool) -> MediaKeyEventTapMode? {
+        // An active tap can observe the first volume key without Input Monitoring.
+        // Consumption remains governed by the existing per-event safety snapshot.
+        volumeTakeover ? .activeTakeover : (shortcuts ? .passive : nil)
+    }
+}
+
 enum MediaKeyMonitorState: Equatable {
     case permissionRequired
     case passive
@@ -229,19 +286,19 @@ final class MediaKeyEventMonitor {
         stop()
     }
 
-    func start(mode: MediaKeyEventTapMode = .passive, requestPermission: Bool = false) -> MediaKeyMonitorState {
+    func start(mode: MediaKeyEventTapMode = .passive) -> MediaKeyMonitorState {
+        let allowed = mode == .passive ? CGPreflightListenEventAccess() : AXIsProcessTrusted()
+        guard allowed else {
+            onTapWillRestartSynchronously()
+            stop()
+            return .permissionRequired
+        }
         if eventTap != nil, self.mode == mode {
             return mode == .activeTakeover ? .activeTakeover : .passive
         }
         if eventTap != nil { onTapWillRestartSynchronously() }
         stop()
         self.mode = mode
-        if mode == .passive {
-            let allowed = requestPermission ? CGRequestListenEventAccess() : CGPreflightListenEventAccess()
-            guard allowed else { return .permissionRequired }
-        } else {
-            guard AXIsProcessTrusted() else { return .permissionRequired }
-        }
         guard let systemDefinedType = CGEventType(rawValue: 14) else { return .unavailable }
         let mask = CGEventMask(1) << systemDefinedType.rawValue
         let context = Unmanaged.passUnretained(self).toOpaque()
@@ -1826,38 +1883,31 @@ struct MediaKeyShortcutPresentation: Equatable {
         case retryListener
     }
 
+    let enabled: Bool
+    let waitingForPermission: Bool
     let title: String
     let detail: String
     let actionTitle: String?
     let action: Action?
 
-    static func make(state: MediaKeyMonitorState, lastRoute: String?) -> Self {
-        switch state {
-        case .passive, .activeTakeover:
-            let suffix = lastRoute.map { L10n.format(" 最近一次：{0}。", String(describing: $0)) } ?? ""
-            return Self(
-                title: L10n.text("媒体快捷键关联已启用"),
-                detail: state == .activeTakeover
-                    ? L10n.format("F1/F2 始终放行；符合安全条件时接管 F10/F11/F12。{0}", String(describing: suffix))
-                    : L10n.format("F1/F2 关联亮度，F10/F11/F12 关联音量；系统原生行为不受影响。{0}", String(describing: suffix)),
-                actionTitle: nil,
-                action: nil
-            )
-        case .permissionRequired:
-            return Self(
-                title: L10n.text("媒体快捷键关联需要输入监控权限"),
-                detail: L10n.text("未授权时仅停用快捷键关联，其他功能不受影响。请在“系统设置 > 隐私与安全性 > 输入监控”中允许 SFlip。"),
-                actionTitle: L10n.text("申请权限"),
-                action: .requestInputMonitoring
-            )
-        case .unavailable:
-            return Self(
-                title: L10n.text("媒体快捷键监听未启动"),
-                detail: L10n.text("未执行任何快捷键 DDC 写入；可重试监听，其他功能不受影响。"),
-                actionTitle: L10n.text("重试"),
-                action: .retryListener
-            )
+    static func make(state: MediaKeyMonitorState, lastRoute: String?,
+                     enabled: Bool = true, waitingForPermission: Bool = false) -> Self {
+        let active = enabled && state != .permissionRequired
+        let detail: String
+        if waitingForPermission {
+            detail = L10n.text("等待输入监控授权。请在系统设置中允许 SFlip；返回后自动启用，也可取消。")
+        } else if !active {
+            detail = L10n.text("开启后可用媒体快捷键调节显示器亮度和音量，需要输入监控权限。关闭不会撤销系统权限。")
+        } else if state == .unavailable {
+            detail = L10n.text("快捷键监听暂不可用。可关闭后重新开启；其他功能不受影响。")
+        } else {
+            let suffix = lastRoute.map { L10n.format(" 最近一次：{0}。", $0) } ?? ""
+            detail = L10n.format("F1/F2 关联亮度，F10/F11/F12 关联音量；系统原生行为不受影响。{0}", suffix)
         }
+        return Self(enabled: active, waitingForPermission: waitingForPermission,
+                    title: L10n.text("媒体快捷键"), detail: detail,
+                    actionTitle: waitingForPermission ? L10n.text("打开系统设置") : nil,
+                    action: waitingForPermission ? .requestInputMonitoring : nil)
     }
 }
 
@@ -1867,6 +1917,7 @@ struct MediaKeyVolumeTakeoverPresentation: Equatable {
     }
 
     let enabled: Bool
+    let waitingForPermission: Bool
     let title: String
     let detail: String
     let actionTitle: String?
@@ -1877,24 +1928,19 @@ struct MediaKeyVolumeTakeoverPresentation: Equatable {
         accessibilityTrusted: Bool,
         monitorState: MediaKeyMonitorState,
         route: AudioOutputRouteSnapshot,
-        armed: Bool
+        armed: Bool,
+        waitingForPermission: Bool = false
     ) -> Self {
-        guard enabled else {
+        if waitingForPermission || !enabled || !accessibilityTrusted {
             return Self(
                 enabled: false,
-                title: L10n.text("HDMI/DP DDC 音量接管（可选）"),
-                detail: L10n.text("默认关闭。需要辅助功能权限；仅在默认音频输出为 HDMI/DisplayPort，且 macOS 自身无法调音量时接管 F10/F11/F12。"),
-                actionTitle: nil,
-                action: nil
-            )
-        }
-        guard accessibilityTrusted else {
-            return Self(
-                enabled: true,
-                title: L10n.text("音量接管需要辅助功能权限"),
-                detail: L10n.text("未授权时保持被动监听，不吞按键；仅当输出符合 HDMI/DP 条件时仍额外执行 DDC。可在系统设置中允许 SFlip。"),
-                actionTitle: L10n.text("申请辅助功能权限"),
-                action: .requestAccessibility
+                waitingForPermission: waitingForPermission,
+                title: L10n.text("音量键控制显示器"),
+                detail: waitingForPermission
+                    ? L10n.text("等待辅助功能授权。请在系统设置中允许 SFlip；返回后自动启用，也可取消。")
+                    : L10n.text("默认关闭。需要辅助功能权限；仅在默认音频输出为 HDMI/DisplayPort，且 macOS 自身无法调音量时接管 F10/F11/F12。"),
+                actionTitle: waitingForPermission ? L10n.text("打开系统设置") : nil,
+                action: waitingForPermission ? .requestAccessibility : nil
             )
         }
         let mode = monitorState == .activeTakeover ? L10n.text("主动监听") : L10n.text("被动监听")
@@ -1918,7 +1964,8 @@ struct MediaKeyVolumeTakeoverPresentation: Equatable {
         }
         return Self(
             enabled: true,
-            title: armed ? L10n.text("HDMI/DP DDC 音量接管已就绪") : L10n.text("HDMI/DP DDC 音量接管待确认"),
+            waitingForPermission: false,
+            title: L10n.text("音量键控制显示器"),
             detail: "\(mode)；\(routeText)；\(behaviorText)。",
             actionTitle: nil,
             action: nil
@@ -1953,7 +2000,10 @@ struct MediaKeySettingsRowPresentation: Equatable {
         Self(
             role: .shortcutStatus,
             title: presentation.title,
-            detail: presentation.detail,
+            detail: presentation.waitingForPermission ? presentation.detail
+                : (presentation.enabled
+                   ? L10n.text("使用媒体快捷键调节显示器亮度和音量。")
+                   : L10n.text("开启后使用媒体快捷键调节亮度和音量，需要输入监控权限。")),
             action: presentation.action.map {
                 switch $0 {
                 case .requestInputMonitoring: .requestInputMonitoring
@@ -1968,7 +2018,10 @@ struct MediaKeySettingsRowPresentation: Equatable {
         Self(
             role: .volumeTakeover,
             title: presentation.title,
-            detail: presentation.detail,
+            detail: presentation.waitingForPermission ? presentation.detail
+                : (presentation.enabled
+                   ? L10n.text("使用音量键调节 HDMI/DP 音频输出显示器的音量。")
+                   : L10n.text("开启后使用音量键控制 HDMI/DP 音频输出显示器，需要辅助功能权限。")),
             action: presentation.action.map { _ in .requestAccessibility },
             actionTitle: presentation.actionTitle
         )

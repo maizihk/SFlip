@@ -183,6 +183,10 @@ private final class PendingPeerCapabilityInspection {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, HandoffScheduler, HandoffEventIDSource, V2HandoffActionSink, LocalUSBSwitchActionSink {
+    // Capture migration evidence before startup can create an empty configuration document.
+    private let initialMediaKeyShortcutEnabled = AppPreferences.initialMediaKeyShortcutEnabled(
+        inputMonitoringGranted: CGPreflightListenEventAccess()
+    )
     private lazy var statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private var instanceLockFD: Int32 = -1
     private var ownsPrimaryInstance = false
@@ -221,6 +225,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         )
     )
     private var mediaKeyRouter = MediaKeyDDCRouter()
+    private lazy var mediaKeyShortcutPermission = MediaKeyPermissionController(
+        enabled: initialMediaKeyShortcutEnabled,
+        permissionGranted: { CGPreflightListenEventAccess() },
+        requestPermission: { _ = CGRequestListenEventAccess() },
+        saveEnabled: { AppPreferences.setMediaKeyShortcutEnabled($0) }
+    )
+    private lazy var mediaKeyVolumePermission = MediaKeyPermissionController(
+        enabled: AppPreferences.mediaKeyVolumeTakeoverEnabled,
+        permissionGranted: { AccessibilityTrust.isTrusted },
+        requestPermission: { AccessibilityTrust.request() },
+        saveEnabled: { AppPreferences.setMediaKeyVolumeTakeoverEnabled($0) }
+    )
     private var mediaKeyMonitorState: MediaKeyMonitorState = .unavailable
     private var mediaKeyLastRoute: MediaKeyDDCRouteOutcome?
     private var mediaKeyLastStatusSource: String?
@@ -375,15 +391,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         controller.onDetailedDiagnosticRecordingChanged = { [weak self] _ in
             self?.clearDetailedDiagnostics()
         }
-        controller.onRequestMediaKeyPermission = { [weak self] in
-            self?.refreshMediaKeyMonitor(requestPermission: true)
+        controller.onMediaKeyShortcutChanged = { [weak self] enabled in
+            guard let self else { return }
+            self.setMediaKeyFeature(self.mediaKeyShortcutPermission, enabled: enabled)
         }
-        controller.onMediaKeyVolumeTakeoverChanged = { [weak self] _ in
-            self?.mediaKeyVolumeTakeoverConfigurationChanged()
-        }
-        controller.onRequestAccessibilityPermission = { [weak self] in
-            AccessibilityTrust.request()
-            self?.mediaKeyVolumeTakeoverConfigurationChanged()
+        controller.onMediaKeyVolumeTakeoverChanged = { [weak self] enabled in
+            guard let self else { return }
+            self.setMediaKeyFeature(self.mediaKeyVolumePermission, enabled: enabled)
         }
         controller.onWriteDDC = { [weak self] stableID, command, value in
             guard let self,
@@ -515,7 +529,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             self.audioOutputRouteSnapshot = snapshot
             self.disarmMediaKeyVolumeTakeover(diagnostic: .passive)
             self.updateMediaKeyVolumeTakeoverContext()
-            self.refreshMediaKeyMonitor(requestPermission: false)
+            self.refreshMediaKeyMonitor()
         }
 
         if let button = statusItem.button {
@@ -558,16 +572,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
         configurePeerTransport()
         audioOutputRouteMonitor.start()
         updateMediaKeyVolumeTakeoverContext()
-        refreshMediaKeyMonitor(requestPermission: false)
+        refreshMediaKeyMonitor()
         detectDisplays(showFailure: false)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        if mediaKeyMonitorState != .passive && mediaKeyMonitorState != .activeTakeover {
-            refreshMediaKeyMonitor(requestPermission: false)
-        }
-        updateMediaKeyVolumeTakeoverContext()
-        updateMediaKeyVolumeTakeoverPresentation()
+        // Read fresh TCC grants even if a previously-created tap still exists.
+        refreshMediaKeyMonitor()
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -765,12 +776,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
     }
 
     private func handleMediaKeyEvent(_ event: NormalizedMediaKeyEvent) {
+        refreshMediaKeyMonitor()
+        guard MediaKeyFeaturePolicy.allows(event.action.command,
+            shortcuts: mediaKeyShortcutPermission.enabled,
+            volumeTakeover: mediaKeyVolumePermission.enabled) else { return }
         updateMediaKeyVolumeTakeoverContext()
         mediaKeyRuntimeStageTrace.beginEvent()
         updateMediaKeyRouteStatus(nil, override: "已收到系统媒体按键")
         if event.action.command == .volume,
            !MediaKeyVolumeDDCRoutePolicy.allowsDDCProcessing(
-               optIn: AppPreferences.mediaKeyVolumeTakeoverEnabled,
+               optIn: mediaKeyVolumePermission.enabled,
                route: audioOutputRouteSnapshot
            ) {
             mediaKeyRuntimeStageTrace.append(.routeBlocked)
@@ -855,8 +870,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
     }
 
     private func completeMediaKeyFreshRead(_ result: MediaKeyFreshReadResult) {
+        refreshMediaKeyPermissionState()
         let request = result.request
-        guard request.runtimeGeneration == mediaKeyRuntimeGeneration,
+        guard MediaKeyFeaturePolicy.allows(request.event.action.command,
+                  shortcuts: mediaKeyShortcutPermission.enabled,
+                  volumeTakeover: mediaKeyVolumePermission.enabled),
+              request.runtimeGeneration == mediaKeyRuntimeGeneration,
               (request.event.action.command != .volume
                   || request.audioRouteGeneration == audioOutputRouteSnapshot.generation),
               configurationSafetyGate.allows(.ddc),
@@ -870,7 +889,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             if request.event.action.command == .volume {
                 disarmMediaKeyVolumeTakeover(diagnostic: .activeDisarmed)
                 if request.event.wasConsumed { ddcVolumeHUDController.show(.failed) }
-                refreshMediaKeyMonitor(requestPermission: false)
+                refreshMediaKeyMonitor()
             }
             return
         }
@@ -880,7 +899,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             if request.event.action.command == .volume {
                 disarmMediaKeyVolumeTakeover(diagnostic: .ddcFailed)
                 if request.event.wasConsumed { ddcVolumeHUDController.show(.failed) }
-                refreshMediaKeyMonitor(requestPermission: false)
+                refreshMediaKeyMonitor()
                 if request.event.wasConsumed {
                     updateMediaKeyRouteStatus(.missingTrustedValues)
                     return
@@ -948,7 +967,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                 } else {
                     disarmMediaKeyVolumeTakeover(diagnostic: .ddcFailed)
                     if request.event.wasConsumed { ddcVolumeHUDController.show(.failed) }
-                    refreshMediaKeyMonitor(requestPermission: false)
+                    refreshMediaKeyMonitor()
                 }
             }
         }
@@ -972,27 +991,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             settingsWindowController.updateMediaKeyShortcutPresentation(
                 .make(
                     state: mediaKeyMonitorState,
-                    lastRoute: mediaKeyLastStatusText
+                    lastRoute: mediaKeyLastStatusText,
+                    enabled: mediaKeyShortcutPermission.enabled,
+                    waitingForPermission: mediaKeyShortcutPermission.waitingForPermission
                 )
             )
             updateMediaKeyVolumeTakeoverPresentation()
         }
     }
 
-    private func refreshMediaKeyMonitor(requestPermission: Bool) {
-        let consumption = mediaKeyVolumeTakeoverController.consumptionSnapshot()
-        let wantsActive = consumption.canConsumeVolume || consumption.canConsumeMute
-        let desiredMode: MediaKeyEventTapMode = wantsActive ? .activeTakeover : .passive
-        mediaKeyMonitorState = mediaKeyMonitor.start(
-            mode: desiredMode,
-            requestPermission: desiredMode == .passive && requestPermission
-        )
-        if desiredMode == .activeTakeover, mediaKeyMonitorState != .activeTakeover {
-            disarmMediaKeyVolumeTakeover(diagnostic: .passive)
-            mediaKeyMonitorState = mediaKeyMonitor.start(
-                mode: .passive,
-                requestPermission: requestPermission
-            )
+    private func setMediaKeyFeature(_ feature: MediaKeyPermissionController, enabled: Bool) {
+        feature.setEnabled(enabled) {
+            // Publish OFF + waiting before the OS permission request can display a prompt.
+            settingsWindowController.updateMediaKeyShortcutPresentation(mediaKeyShortcutPresentation())
+            updateMediaKeyVolumeTakeoverPresentation()
+        }
+        // Cancel stale reads before a disabled feature can submit new DDC writes.
+        invalidateMediaKeyRuntime(resetPhysicalEvidence: false)
+        refreshMediaKeyMonitor()
+    }
+
+    private func refreshMediaKeyPermissionState() {
+        let oldShortcuts = mediaKeyShortcutPermission.enabled
+        let oldVolume = mediaKeyVolumePermission.enabled
+        mediaKeyShortcutPermission.refresh()
+        mediaKeyVolumePermission.refresh()
+        if oldShortcuts != mediaKeyShortcutPermission.enabled || oldVolume != mediaKeyVolumePermission.enabled {
+            invalidateMediaKeyRuntime(resetPhysicalEvidence: false)
+            mediaKeyMonitor.stop()
+            mediaKeyMonitorState = .unavailable
+        }
+    }
+
+    private func refreshMediaKeyMonitor() {
+        refreshMediaKeyPermissionState()
+        updateMediaKeyVolumeTakeoverContext()
+        if let mode = MediaKeyFeaturePolicy.monitorMode(
+            shortcuts: mediaKeyShortcutPermission.enabled,
+            volumeTakeover: mediaKeyVolumePermission.enabled
+        ) {
+            mediaKeyMonitorState = mediaKeyMonitor.start(mode: mode)
+            if mode == .activeTakeover, mediaKeyMonitorState != .activeTakeover {
+                disarmMediaKeyVolumeTakeover(diagnostic: .passive)
+                if mediaKeyShortcutPermission.enabled {
+                    mediaKeyMonitorState = mediaKeyMonitor.start(mode: .passive)
+                }
+            }
+        } else {
+            mediaKeyMonitor.stop()
+            mediaKeyMonitorState = .unavailable
         }
         if settingsWindowHasBeenShown {
             settingsWindowController.updateMediaKeyShortcutPresentation(mediaKeyShortcutPresentation())
@@ -1003,17 +1050,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
     private func mediaKeyShortcutPresentation() -> MediaKeyShortcutPresentation {
         .make(
             state: mediaKeyMonitorState,
-            lastRoute: mediaKeyLastStatusText
+            lastRoute: mediaKeyLastStatusText,
+            enabled: mediaKeyShortcutPermission.enabled,
+            waitingForPermission: mediaKeyShortcutPermission.waitingForPermission
         )
     }
 
     private func mediaKeyVolumeTakeoverPresentation() -> MediaKeyVolumeTakeoverPresentation {
         .make(
-            enabled: AppPreferences.mediaKeyVolumeTakeoverEnabled,
+            enabled: mediaKeyVolumePermission.enabled,
             accessibilityTrusted: AccessibilityTrust.isTrusted,
             monitorState: mediaKeyMonitorState,
             route: audioOutputRouteSnapshot,
-            armed: mediaKeyVolumeTakeoverController.isArmed
+            armed: mediaKeyVolumeTakeoverController.isArmed,
+            waitingForPermission: mediaKeyVolumePermission.waitingForPermission
         )
     }
 
@@ -1029,7 +1079,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             DDCWriteKey(stableID: $0.stableID, command: .volume)
         })
         mediaKeyVolumeTakeoverController.updateContext(.init(
-            optIn: AppPreferences.mediaKeyVolumeTakeoverEnabled,
+            optIn: mediaKeyVolumePermission.enabled,
             accessibilityTrusted: AccessibilityTrust.isTrusted,
             route: audioOutputRouteSnapshot,
             topologyTrusted: linkedDDCTopologyResolved && mediaKeyPhysicalTopologyTrusted,
@@ -1056,20 +1106,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
 
     private func handleMediaKeyTapDisabled() {
         disarmMediaKeyVolumeTakeover(diagnostic: .passive)
-        refreshMediaKeyMonitor(requestPermission: false)
+        refreshMediaKeyMonitor()
     }
 
     private func failConsumedMediaKeyIfNeeded(_ event: NormalizedMediaKeyEvent) {
         guard event.action.command == .volume, event.wasConsumed else { return }
         disarmMediaKeyVolumeTakeover(diagnostic: .ddcFailed)
         ddcVolumeHUDController.show(.failed)
-        refreshMediaKeyMonitor(requestPermission: false)
+        refreshMediaKeyMonitor()
     }
 
     private func mediaKeyVolumeTakeoverConfigurationChanged() {
         disarmMediaKeyVolumeTakeover(diagnostic: .passive)
         updateMediaKeyVolumeTakeoverContext()
-        refreshMediaKeyMonitor(requestPermission: false)
+        refreshMediaKeyMonitor()
     }
 
     private func disarmMediaKeyVolumeTakeover(
@@ -1093,7 +1143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
             mediaKeyTakeoverLastDiagnostic = .ddcFailed
             mediaKeyConsumptionController.disarm()
             if showHUD || request.origin != .user { ddcVolumeHUDController.show(.failed) }
-            refreshMediaKeyMonitor(requestPermission: false)
+            refreshMediaKeyMonitor()
         case .succeeded(let presentation):
             mediaKeyRuntimeStageTrace.append(.writeSucceeded)
             mediaKeyTakeoverLastDiagnostic = .ddcSucceeded
@@ -1101,7 +1151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, Handof
                 mediaKeyVolumeTakeoverController.consumptionSnapshot()
             )
             ddcVolumeHUDController.show(presentation)
-            refreshMediaKeyMonitor(requestPermission: false)
+            refreshMediaKeyMonitor()
         }
     }
 
