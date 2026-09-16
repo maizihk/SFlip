@@ -10,6 +10,7 @@
 #include "V2Protocol.h"
 #include "V2StateMachine.h"
 #include "UsbSwitchCoordinator.h"
+#include "StartupTask.h"
 
 namespace DisplaySwitcher::Native
 {
@@ -24,13 +25,14 @@ namespace DisplaySwitcher::Native
         ~Controller();
         void Dispose();
         void ShowError(std::wstring const& title, std::wstring const& message);
-        void ShowSettings();
+        void ShowSettings(DdcEnumerationResult const* initialEnumeration = nullptr);
 
     private:
         Controller(winrt::Microsoft::UI::Dispatching::DispatcherQueue const& dispatcher, std::function<void()> exitApplication);
         void Initialize();
         AppConfig Config() const;
-        void ApplyConfiguration(bool applyAutoStart = true, bool preserveProbeReplay = false);
+        void ApplyConfiguration(bool applyAutoStart = true, bool preserveProbeReplay = false,
+            DdcEnumerationResult const* initialEnumeration = nullptr);
         void EnterSafeStateAfterSaveFailure();
         void BeginUsbLearning();
         void EndUsbLearning();
@@ -83,6 +85,8 @@ namespace DisplaySwitcher::Native
         std::function<void()> exitApplication_;
         mutable std::mutex configMutex_;
         bool firstRun_{};
+        StartupTask startupTask_;
+        bool startupSettingsRequested_{};
         AppConfig config_;
         std::unique_ptr<TrayIcon> trayIcon_;
         std::unique_ptr<UdpPeer> peer_;

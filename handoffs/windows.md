@@ -2,6 +2,7 @@
 
 ## 当前任务：W-049 Windows 程序与托盘图标（2026-09-14）
 
+- 2026-09-17 主线同步：按用户要求在原任务分支正常 merge `main@3227ff3`。冲突仅为本交接文件和 Windows 清单中 W-049 / W-050 在相同位置追加内容；完整保留双方记录，既有应用代码、图标资源及启动测试沿用自动合并结果。本机静态差异和双方记录保留检查通过；缺少 PowerShell/MSBuild，集成后的原生测试、x64 Release、安装器与分发验证以 [PR #110](https://github.com/maizihk/SFlip/pull/110) 的对应提交 CI 为准。未执行真实硬件或系统设置操作，不改变实机待验状态。
 - 分支 `codex/windows-native-icons`，基线 `origin/main@20ff11f`，已包含 PR #107/#108 和近期 Windows 提交；主工作区原有未跟踪文件保持不动。
 - 原因：程序资源仍为旧百分号素材，生成器从共享旧 PNG 抠除白底；通知区域虽然独立按主题渲染，内部也仍是百分号。现采用已确认的 Windows 独立显示器光影版和双向箭头线稿。
 - Native、Launcher 和 Inno Setup 已共用 Native/AppIcon.ico，无需增加新的资源加载路径；新增本平台 AppIcon-1024.png，保留 alpha，构建前生成九档 ICO 和 AppIcon-256.png，关于页也同步更新。
@@ -10,6 +11,30 @@
 - 绿色版 artifact `10343978046` 和安装版 artifact `10343923530` 下载 SHA-256 与 GitHub digest 一致；解析 Launcher/Native 两份 PE 的九档内嵌图标均与包内 ICO 一致，256 PNG 与 ICO 大图逐字节一致。实际构建 PNG 已查看，透明轮廓、蓝色光影和金属底座与认可设计一致。
 - 实机桌面/开始菜单/任务栏/关于页、深浅托盘、高对比和不同 DPI 仍待验收。未启动 SFlip、重启 Explorer、修改权限或执行 USB、DDC、网络、唤醒动作；不改协议、schema、版本、tag 或 Release。
 
+## W-050 Windows 启动响应优化（2026-09-14）
+
+- 分支 `codex/windows-startup-responsiveness`，基线 `origin/main@20ff11f`；已 fetch 复查远端，独立于图标 PR #110，保留原目录未知改动。只修改 Windows 启动流程、模拟测试及本平台记录。
+- 原因：Controller 初始化在 UI 线程同步等待 QueryDisplayConfig/SetupAPI/DXVA2 物理显示器枚举，消息循环无法及时处理托盘；尚无用户 Windows 实机耗时，不能把转圈全部归因于此。
+- 改动：首次枚举和后端失效在单个后台任务执行；托盘立即就绪，结果回到 UI 后沿用配置协调/保存与运行时启动。初始化时硬件安全门关闭，设置请求合并延后；退出取消发布，不 join 慢驱动。
+- 生命周期：拓扑变化只增加失效代次，同一时间只运行一个枚举；旧扫描结束后至多合并排入一次新扫描。退出、替换和迟到回调安全丢弃，后台异常经 UI 进入原有配置安全态；RDP、空/部分快照保持原逻辑。
+- 测量：详细诊断沿用默认关闭，新增 startup.tray_ready、startup.display_enumeration、startup.configuration_ready 的 duration_ms；分别测 Controller 初始化内托盘准备、每次后台扫描和最终配置应用，不能冒充从进程创建起的总启动耗时。
+- 验证：生产 helper 的 13 项模拟检查及本机 Clang C++20、ASan/UBSan 通过。代码 `da0f464` / [PR #111](https://github.com/maizihk/SFlip/pull/111) 的 [Windows CI 34838784720](https://github.com/maizihk/SFlip/actions/runs/34838784720) 全部成功：548 项原生检查、61 项安装器检查、x64 Release、分发验证及绿色版/安装版上传。本机没有 PowerShell/MSBuild；Windows 证据来自 CI。
+- 实机待验：普通/首次/--show-settings 启动、冷启动阶段耗时和光标时长、启动期间退出及热插拔。未启动真实应用或执行网络、USB、DDC、输入源、唤醒、权限/登录项变更；不修改协议、配置 schema、版本、Release 或启动反馈光标策略。
+
+### W-050 修改文件
+
+- `Windows/DisplaySwitcher.Native/Controller.cpp`
+- `Windows/DisplaySwitcher.Native/Controller.h`
+- `Windows/DisplaySwitcher.Native/StartupTask.h`
+- `Windows/DisplaySwitcher.Native/SettingsWindow.xaml.cpp`
+- `Windows/DisplaySwitcher.Native/SettingsWindow.xaml.h`
+- `Windows/DisplaySwitcher.Native/Diagnostics.cpp`
+- `Windows/DisplaySwitcher.Native/LocalizationCatalog.inc`
+- `Windows/DisplaySwitcher.Native/DisplaySwitcher.Native.vcxproj`
+- `Windows/DisplaySwitcher.Tests/StartupTaskTests.h`
+- `Windows/DisplaySwitcher.Tests/Tests.cpp`
+- `Windows/DEVELOPMENT_CHECKLIST.md`
+- `handoffs/windows.md`
 
 ## 当前任务：W-046 联动调节列对齐与统一读取（2026-09-12）
 
@@ -459,3 +484,5 @@
 - 分支 codex/windows-release-2-4-0，基线 3ff778a；用户授权双端正式发布 2.4.0（构建 24）。
 - 版本配置、双语 README 和发布说明已更新；发布代码 81dd2be。535 项原生检查、61 项安装器检查、x64 Release 和绿色包验证通过；CI 34753517787，程序/安装器版本均为 2.4.0.24。下载包哈希校验通过。
 - 发布 PR #105；Release：https://github.com/maizihk/SFlip/releases/tag/v2.4.0。文件含 Mac DMG/ZIP、Windows 安装版/绿色版及 SHA256SUMS.txt。未执行真实硬件流程。
+
+- W-050 首开补充：首次运行或启动期间请求设置时，设置页同步消费本次已验证的枚举快照，避免初始化后立即再次扫描；之后手动打开/重新检测仍读取当前拓扑，不保留跨次首开的旧快照。

@@ -35,6 +35,7 @@ namespace
         stream >> name;
         static std::set<std::string> const allowedEvents{
             "app.started", "controller.usb_presence", "protocol.v2",
+            "startup.tray_ready", "startup.display_enumeration", "startup.configuration_ready",
             "profile_detection.response_received", "profile_detection.response_authenticated",
             "profile_detection.response_authentication_failed", "profile_detection.started",
             "profile_detection.response_timeout", "profile_detection.send_completed",
