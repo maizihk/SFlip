@@ -1,5 +1,15 @@
 # macOS 交接记录
 
+## DS-054 项目文档与协议 CI 触发一致性（2026-09-17）
+
+- 基线 `main@0ee1fe3`，分支 `codex/macos-project-check-fixes`；开始时工作区干净，已快进同步确认远端无新增提交。DS-052 / DS-053 已由未合并的图标 PR #109 使用，本次保留其编号与修改。
+- 原因：发布及产品改名后，清单首页版本和项目约束验签路径未同步；两个平台工作流的路径过滤未包含唯一生效规范 `PROTOCOL.md`。
+- 修复：清单当前版本与现有 Info.plist 对齐为 2.4.0（build 24），验签目标对齐实际 `SFlip.app`；两份工作流仅增加 `PROTOCOL.md` 的 PR 触发路径。按用户要求将默认子 agent 模型 `gpt-5.6-sol`、推理强度 `low` 写入项目约束，用户另有说明时优先。
+- 修改文件：`AGENTS.md`、`macOS/DEVELOPMENT_CHECKLIST.md`、`handoffs/macos.md`、`.github/workflows/macos.yml`、`.github/workflows/windows.yml`。不修改协议内容、应用实现、版本配置或 Windows 平台完成状态。
+- 本地验证：工作流 YAML 1.2 解析和路径匹配检查通过，协议文件命中双端、平台目录各自命中；其余工作流配置保持不变。清单版本、应用产物名称与生产配置一致，`git diff --check` 通过。
+- 提交与验证入口：实现提交 `3b8261e`；[PR #112](https://github.com/maizihk/SFlip/pull/112) 的双端检查记录各提交的完整验证状态。该实现提交的 macOS CI [35139558633](https://github.com/maizihk/SFlip/actions/runs/35139558633) 已通过 315 项 XCTest、Debug/Release、严格签名和 DMG/ZIP 验证；后续文档提交不改变已测应用代码及工作流，仍以对应提交的 PR 检查结果为准。
+- 环境与实机边界：本机缺少 Xcode / MSBuild，双端原生测试与构建由 PR 的现有 CI 执行。未执行真实硬件、网络探测、权限或系统设置操作；既有实机待验项保持。
+
 ## 当前任务：DS-047 中英双语与本机语言选择
 
 - 日期：2026-09-13；分支：`codex/windows-english-localization`；基线：`main@7aa467d`，跨端任务由协调端统一提交、推送和 PR。
