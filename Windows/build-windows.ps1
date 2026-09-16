@@ -52,6 +52,8 @@ function Invoke-CleanEnvironmentProcess([string]$fileName, [string[]]$arguments)
 }
 
 $msbuild = Find-MSBuild
+# Generate all application sizes from the platform artwork before embedding them.
+& (Join-Path $PSScriptRoot "generate-windows-icon.ps1")
 Invoke-CleanEnvironmentProcess $msbuild @(
     $project, "/restore", "/m", "/t:Rebuild", "/p:Configuration=Release", "/p:Platform=x64", "/v:minimal"
 )

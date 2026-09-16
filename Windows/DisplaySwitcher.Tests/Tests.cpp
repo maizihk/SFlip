@@ -450,7 +450,9 @@ namespace
                 L"W-031: 16/20/24/32 像素图标主体占槽位约 90% 且不裁边");
             Check(alphaSum > 0 && matchingAlpha && blackPremultiplied && whitePremultiplied,
                 L"W-031: 每个 DPI 渲染均为非空透明背景及匹配 alpha 的预乘黑白线稿");
-            Check(visiblePixelCoverage >= 0.42 && visiblePixelCoverage <= 0.58 &&
+            // Opposing arrows touch more antialiased pixels at 16px; alpha coverage
+            // stays near 29%, so this remains an outline rather than a filled glyph.
+            Check(visiblePixelCoverage >= 0.42 && visiblePixelCoverage <= 0.62 &&
                 alphaCoverage >= 0.27 && alphaCoverage <= 0.34 &&
                 (dpi != 96 || (geometry.bodySize * TrayIconStrokeRatio >= 0.8 &&
                     geometry.bodySize * TrayIconStrokeRatio <= 0.9)),

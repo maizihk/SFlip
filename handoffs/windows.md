@@ -1,5 +1,16 @@
 # Windows 交接记录
 
+## 当前任务：W-049 Windows 程序与托盘图标（2026-09-14）
+
+- 2026-09-17 主线同步：按用户要求在原任务分支正常 merge `main@3227ff3`。冲突仅为本交接文件和 Windows 清单中 W-049 / W-050 在相同位置追加内容；完整保留双方记录，既有应用代码、图标资源及启动测试沿用自动合并结果。本机静态差异和双方记录保留检查通过；缺少 PowerShell/MSBuild，集成后的原生测试、x64 Release、安装器与分发验证以 [PR #110](https://github.com/maizihk/SFlip/pull/110) 的对应提交 CI 为准。未执行真实硬件或系统设置操作，不改变实机待验状态。
+- 分支 `codex/windows-native-icons`，基线 `origin/main@20ff11f`，已包含 PR #107/#108 和近期 Windows 提交；主工作区原有未跟踪文件保持不动。
+- 原因：程序资源仍为旧百分号素材，生成器从共享旧 PNG 抠除白底；通知区域虽然独立按主题渲染，内部也仍是百分号。现采用已确认的 Windows 独立显示器光影版和双向箭头线稿。
+- Native、Launcher 和 Inno Setup 已共用 Native/AppIcon.ico，无需增加新的资源加载路径；新增本平台 AppIcon-1024.png，保留 alpha，构建前生成九档 ICO 和 AppIcon-256.png，关于页也同步更新。
+- 托盘仅改变几何，保留黑白主题、高对比 fallback、90% 槽位、6% 轮廓、DPI 刷新、Explorer 恢复和状态提示。双向箭头笔画稍细，16px 时保留两行间隙；旧可见像素上限由 58% 改为 62%，实际 60.2%，alpha 覆盖仍 27.9%。
+- 本机用 clang++ 编译生产渲染函数并检查实际 16/20/24/32 图像；代码 `a5ee7f5` / [PR #110](https://github.com/maizihk/SFlip/pull/110) 通过 [Windows CI run 34835706384](https://github.com/maizihk/SFlip/actions/runs/34835706384)：535 项原生检查、61 项安装器检查、x64 Release 和 2.34 MiB 分发校验全部成功。macOS 没有 PowerShell/MSBuild，Windows 构建证据来自 CI。
+- 绿色版 artifact `10343978046` 和安装版 artifact `10343923530` 下载 SHA-256 与 GitHub digest 一致；解析 Launcher/Native 两份 PE 的九档内嵌图标均与包内 ICO 一致，256 PNG 与 ICO 大图逐字节一致。实际构建 PNG 已查看，透明轮廓、蓝色光影和金属底座与认可设计一致。
+- 实机桌面/开始菜单/任务栏/关于页、深浅托盘、高对比和不同 DPI 仍待验收。未启动 SFlip、重启 Explorer、修改权限或执行 USB、DDC、网络、唤醒动作；不改协议、schema、版本、tag 或 Release。
+
 ## W-050 Windows 启动响应优化（2026-09-14）
 
 - 分支 `codex/windows-startup-responsiveness`，基线 `origin/main@20ff11f`；已 fetch 复查远端，独立于图标 PR #110，保留原目录未知改动。只修改 Windows 启动流程、模拟测试及本平台记录。

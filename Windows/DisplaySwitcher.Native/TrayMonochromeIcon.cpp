@@ -28,21 +28,27 @@ namespace
         {
             return DistanceToSegment(point, start, end) <= half;
         };
-        // Monitor outline, center stand, and foot.
-        if (segment({ 0.04, 0.05 }, { 0.96, 0.05 }) ||
-            segment({ 0.96, 0.05 }, { 0.96, 0.66 }) ||
-            segment({ 0.96, 0.66 }, { 0.04, 0.66 }) ||
-            segment({ 0.04, 0.66 }, { 0.04, 0.05 }) ||
-            segment({ 0.50, 0.69 }, { 0.50, 0.84 }) ||
-            segment({ 0.29, 0.95 }, { 0.71, 0.95 })) return true;
+        // Rounded monitor outline and connected stand, with transparent interior.
+        constexpr auto left = 0.04, right = 0.96, top = 0.05, bottom = 0.72, radius = 0.10;
+        auto closestX = (std::clamp)(point.x, left + radius, right - radius);
+        auto closestY = (std::clamp)(point.y, top + radius, bottom - radius);
+        auto outlineDistance = std::hypot(point.x - closestX, point.y - closestY) - radius;
+        if (std::abs(outlineDistance) <= half ||
+            segment({ 0.50, bottom }, { 0.50, 0.94 }) ||
+            segment({ 0.28, 0.94 }, { 0.72, 0.94 })) return true;
 
-        // Percent sign inside the monitor.
-        auto ring = [&](Point center, double radius)
+        // Opposing arrows replace the old percent symbol. Slightly lighter inner
+        // strokes preserve the gap between arrows in the 16-pixel notification slot.
+        auto arrowSegment = [&](Point start, Point end)
         {
-            return std::abs(std::hypot(point.x - center.x, point.y - center.y) - radius) <= half;
+            return DistanceToSegment(point, start, end) <= half * (5.0 / 6.0);
         };
-        return ring({ 0.34, 0.29 }, 0.075) || ring({ 0.66, 0.48 }, 0.075) ||
-            segment({ 0.40, 0.50 }, { 0.60, 0.27 });
+        return arrowSegment({ 0.26, 0.28 }, { 0.74, 0.28 }) ||
+            arrowSegment({ 0.65, 0.19 }, { 0.74, 0.28 }) ||
+            arrowSegment({ 0.74, 0.28 }, { 0.65, 0.37 }) ||
+            arrowSegment({ 0.74, 0.49 }, { 0.26, 0.49 }) ||
+            arrowSegment({ 0.35, 0.40 }, { 0.26, 0.49 }) ||
+            arrowSegment({ 0.26, 0.49 }, { 0.35, 0.58 });
     }
 
     int ColorLuminance(COLORREF color) noexcept
