@@ -49,6 +49,7 @@ Codex 在本仓库中执行任何开发、修复、测试、构建或发布任�
 ## 实施原则
 
 - 每次只完成一个可独立验证的主题；避免无关格式化、重命名和大范围重构。
+- 除非用户另有说明，需要使用子 agent 时默认选择 `gpt-5.6-sol`，并使用 `low` 推理强度。
 - 保留现有 AppKit、WinUI 3、USB、UDP、DDC、登录启动和设置存储行为，除非当前任务明确要求修改。
 - 配置迁移必须向后兼容。迁移失败时保留原数据，并进入不执行硬件动作的安全状态。
 - 新安装不得猜测 USB、显示器、输入源、IP、路径或配对码。
@@ -79,7 +80,7 @@ Codex 在本仓库中执行任何开发、修复、测试、构建或发布任�
 
 1. 运行与风险相称的自动测试和平台构建：
 
-   - macOS：至少运行相关 XCTest；正式变更还要运行 `./macOS/scripts/build-app.sh` 和 `codesign --verify --deep --strict macOS/outputs/DisplaySwitcher.app`。
+   - macOS：至少运行相关 XCTest；正式变更还要运行 `./macOS/scripts/build-app.sh` 和 `codesign --verify --deep --strict macOS/outputs/SFlip.app`。
    - Windows：至少运行相关自动测试和 `Windows/build-windows.ps1` 的 x64 Release 构建。
 
 2. 不启动真实硬件流程来凑测试结果。把自动验证与仍需实机验证的项目分开记录。

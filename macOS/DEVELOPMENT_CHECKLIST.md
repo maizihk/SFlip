@@ -9,11 +9,18 @@
 - Bundle Identifier：`local.maizi.DisplaySwitcher`；最低支持 macOS 12。
 - 正式构建脚本：`macOS/scripts/build-app.sh`。
 - 构建产物：`macOS/outputs/SFlip.app` 和当前架构 SFlip DMG/ZIP。
-- 当前版本：2.2.0（build 20）。
+- 当前版本：2.4.0（build 24）。
 - 本机配置为 `schemaVersion = 5`；v4 保留非 USB 设置并迁移到新格式，独立 USB 功能默认关闭且不猜测旧绑定或输入源。
 - 双端网络运行时只接受协议 v2；v1、缺失版本、类型错误和未知版本均在入口安全拒绝。
 - macOS 正式运行时只使用 Apple Silicon CoreDisplay/IOAVService 原生 DDC；Intel Mac 明确不支持，不执行外部 DDC 工具或软件调光回退。
 - App Sandbox 和 Hardened Runtime 当前保持关闭，正式公证前必须评估私有 API、USB、DDC 与登录启动兼容性。
+
+### DS-054 项目初检文档与 CI 一致性维护（2026-09-17）
+
+- [x] 将当前版本基线同步为已发布并由 DS-048 验证的 2.4.0（build 24）。
+- [x] 仓库通用结束检查中的 macOS 严格验签目标同步为构建脚本实际产物 `macOS/outputs/SFlip.app`。
+- [x] 记录子 agent 的长期默认协作偏好：除非用户另有说明，使用 `gpt-5.6-sol` 与 `low` 推理强度。
+- [ ] 本轮 workflow 路径一致性调整及 GitHub Actions 结果由主任务在 PR 后核验并回填；本项不改变既有 GUI、权限、网络或硬件实机待验状态。
 
 ## 已完成
 
