@@ -20,7 +20,8 @@
 - [x] 将当前版本基线同步为已发布并由 DS-048 验证的 2.4.0（build 24）。
 - [x] 仓库通用结束检查中的 macOS 严格验签目标同步为构建脚本实际产物 `macOS/outputs/SFlip.app`。
 - [x] 记录子 agent 的长期默认协作偏好：除非用户另有说明，使用 `gpt-5.6-sol` 与 `low` 推理强度。
-- [ ] 本轮 workflow 路径一致性调整及 GitHub Actions 结果由主任务在 PR 后核验并回填；本项不改变既有 GUI、权限、网络或硬件实机待验状态。
+- [x] 两端工作流的 PR 路径过滤均纳入 `PROTOCOL.md`；YAML 1.2 解析、协议与平台路径匹配、其余配置不变检查通过。
+- 验证入口：[PR #112](https://github.com/maizihk/SFlip/pull/112) 的双端 GitHub Actions 检查。实现提交 `3b8261e` 的 macOS CI [35139558633](https://github.com/maizihk/SFlip/actions/runs/35139558633) 已通过 315 项 XCTest、Debug/Release、严格签名及 DMG/ZIP 验证；后续文档提交的状态以 PR 对应提交的检查结果为准。本项不改变既有 GUI、权限、网络或硬件实机待验状态。
 
 ## 已完成
 
