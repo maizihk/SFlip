@@ -1,5 +1,12 @@
 # Windows 交接记录
 
+## W-051 双端统一发布 2.4.1（2026-09-17）
+
+- 用户授权正式发布；基线 `main@d491be4`，协调分支 `codex/windows-release-2-4-1`。本次 Windows 版本更新为 2.4.1.25，macOS 同步为 2.4.1（build 25）。
+- Windows 只修改 Native/AppIcon.rc 版本资源、本平台清单及交接；共享 README 和发布说明同步。运行库依赖仍为 Windows App Runtime 2.4，安装器继续从应用资源读取版本；不改协议、配置格式或运行时逻辑。
+- 验证及交付：原生回归、x64 Release、61 项安装器生命周期及分发校验由发布 PR 的 Windows CI 执行；从成功的同一提交下载附件，核对归档摘要、程序及安装器版本，制作绿色版 ZIP 并发布 [v2.4.1](https://github.com/maizihk/SFlip/releases/tag/v2.4.1)。最终 CI 和附件校验以该 PR 及 Release 记录为准。
+- 本机为 Linux，无 PowerShell/MSBuild；未执行真实应用、DDC、USB、网络探测、唤醒或系统设置变更。W-049 图标主题/DPI 和 W-050 冷启动等实机待验项保持。
+
 ## 当前任务：W-049 Windows 程序与托盘图标（2026-09-14）
 
 - 2026-09-17 主线同步：按用户要求在原任务分支正常 merge `main@3227ff3`。冲突仅为本交接文件和 Windows 清单中 W-049 / W-050 在相同位置追加内容；完整保留双方记录，既有应用代码、图标资源及启动测试沿用自动合并结果。本机静态差异和双方记录保留检查通过；缺少 PowerShell/MSBuild，集成后的原生测试、x64 Release、安装器与分发验证以 [PR #110](https://github.com/maizihk/SFlip/pull/110) 的对应提交 CI 为准。未执行真实硬件或系统设置操作，不改变实机待验状态。

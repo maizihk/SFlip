@@ -1,5 +1,12 @@
 # macOS 交接记录
 
+## DS-055 双端统一发布 2.4.1（2026-09-17）
+
+- 用户授权正式发布；基线 `main@d491be4`，协调分支 `codex/windows-release-2-4-1`。本次双端版本统一为 2.4.1（build 25），不修改协议、配置格式或运行时逻辑。
+- macOS 修改 `Resources/Info.plist`、本平台清单及交接；共享 README 和发布说明由本次双端任务同步。新版包含已合并的 DS-050 / DS-051 登录启动和权限流程、DS-052 / DS-053 图标更新。
+- 验证及交付：完整 XCTest、Debug/Release、严格签名和 DMG/ZIP 校验由发布 PR 的 macOS CI 执行；从成功的同一提交下载附件，核对归档摘要、包内版本后发布 [v2.4.1](https://github.com/maizihk/SFlip/releases/tag/v2.4.1)。最终 CI 和附件校验以该 PR 及 Release 记录为准。
+- 本机为 Linux，无 Xcode；未执行真实权限、登录项、DDC、USB、网络探测或唤醒。既有实机待验项不改勾选，保持当前未公证分发及手动放行说明。
+
 ## DS-054 项目文档与协议 CI 触发一致性（2026-09-17）
 
 - 基线 `main@0ee1fe3`，分支 `codex/macos-project-check-fixes`；开始时工作区干净，已快进同步确认远端无新增提交。DS-052 / DS-053 已由未合并的图标 PR #109 使用，本次保留其编号与修改。
