@@ -9,7 +9,7 @@
 - Bundle Identifier：`local.maizi.DisplaySwitcher`；最低支持 macOS 12。
 - 正式构建脚本：`macOS/scripts/build-app.sh`。
 - 构建产物：`macOS/outputs/SFlip.app` 和当前架构 SFlip DMG/ZIP。
-- 当前版本：2.4.0（build 24）。
+- 当前版本：2.4.1（build 25）。
 - 本机配置为 `schemaVersion = 5`；v4 保留非 USB 设置并迁移到新格式，独立 USB 功能默认关闭且不猜测旧绑定或输入源。
 - 双端网络运行时只接受协议 v2；v1、缺失版本、类型错误和未知版本均在入口安全拒绝。
 - macOS 正式运行时只使用 Apple Silicon CoreDisplay/IOAVService 原生 DDC；Intel Mac 明确不支持，不执行外部 DDC 工具或软件调光回退。
@@ -24,6 +24,12 @@
 - 验证入口：[PR #112](https://github.com/maizihk/SFlip/pull/112) 的双端 GitHub Actions 检查。实现提交 `3b8261e` 的 macOS CI [35139558633](https://github.com/maizihk/SFlip/actions/runs/35139558633) 已通过 315 项 XCTest、Debug/Release、严格签名及 DMG/ZIP 验证；后续文档提交的状态以 PR 对应提交的检查结果为准。本项不改变既有 GUI、权限、网络或硬件实机待验状态。
 
 ## 已完成
+
+### DS-055 双端统一发布 2.4.1（2026-09-17）
+
+- [x] 用户授权新版本发布；macOS 版本更新为 2.4.1（build 25），同步双语下载链接及发布说明，包含已合并的登录启动、权限开关与图标更新。
+- 发布验证：本次发布 PR 的 macOS CI 执行完整 XCTest、Debug/Release、严格 codesign 和 DMG/ZIP 产物检查；正式附件在验证通过后发布至 [v2.4.1](https://github.com/maizihk/SFlip/releases/tag/v2.4.1)，校验值随 Release 提供。
+- 本次不执行真实权限或硬件操作，既有 GUI、权限、登录启动及硬件实机待验项保持。
 
 ### DS-039 配对码直接连接（实现完成，macOS CI / 双机实测待验）
 
