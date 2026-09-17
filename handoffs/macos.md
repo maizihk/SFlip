@@ -885,3 +885,30 @@
 - 修改：macOS/Sources/DisplaySwitcher/AppPreferences.swift、Localization.swift、MediaKeyDDC.swift、SettingsWindowController.swift、main.swift；macOS/Tests/DisplaySwitcherTests/MediaKeyDDCTests.swift；macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。主工作区未知workspace文件保留。
 
 - DS-051 最终自动验证：代码提交 26d16b334b3a6000791d5e631edfd69e3d6edbac 通过 macOS CI 34829277226，315/315 XCTest、Debug、Release build-app.sh、严格签名、DMG/ZIP 校验和上传全部成功。下载该 run 的 SFlip-macOS-ARM64 artifact，ZIP 解压后严格 codesign 复验通过。PR：https://github.com/maizihk/SFlip/pull/108（依赖 #107）。本行及对应清单状态为后续文档记录，代码与 CI 测试包一致，不把文档提交误作代码验证 SHA。
+
+## DS-052 菜单栏实心切换图标
+
+- 基线main@20ff11f，分支codex/macos-status-icon；包含已合并的登录启动和权限开关修复。
+- 最终用户选定加底座的紧凑版：屏幕宽14 pt、高10.8 pt；支架2.4 pt宽、底座7.8×2.2 pt，重心下调。内部为镂空双向箭头，保持18 pt template画布与无障碍描述。
+- 绘制在透明层内完成，destinationOut仅镂空图标自身；菜单项其他图标、业务逻辑及Windows均不变。
+- 修改文件：macOS/Sources/DisplaySwitcher/DS007SettingsModels.swift、macOS/Tests/DisplaySwitcherTests/DS007Tests.swift、macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。
+- 本机生产函数像素验证通过：屏幕与底座alpha=1、箭头与外侧留白alpha=0。对应XCTest随本次调整更新；当前本机无完整Xcode，最终测试/构建/签名/打包交由CI验证。
+- 上一版无底座代码52b7622通过CI 34830914021（316项测试），该包不代表本次有底座调整版；新包必须取本次提交CI产物。
+- 未启动应用或执行真实硬件操作；实际菜单栏、壁纸和缩放视觉效果待用户确认。PR：https://github.com/maizihk/SFlip/pull/109。
+
+- 加底座紧凑版最终验证：代码83ffdd8通过macOS CI 34832509023，316/316 XCTest、Debug、Release、严格签名及DMG/ZIP全部通过。下载该run测试包后解压严格codesign复验通过。本条仅补验证记录，测试包与该代码提交一致。
+
+- 用户实测紧凑版比相邻图标小：保持18 pt画布与屏幕/底座比例，以画布中心整体放大1.1倍；屏幕可见宽15.4 pt，图形仍在画布内。更新像素测试检查放大后的屏幕边缘，最终新包按本次代码CI交付。
+
+- 放大版最终验证：代码7ecc329通过macOS CI 34833526531，316/316 XCTest、Debug、Release、严格签名和DMG/ZIP通过；下载CI ZIP解压后严格验签通过。本条仅记录该代码提交的验证结果。
+
+## DS-053 光影应用图标
+
+- 日期：2026-09-14；延续 codex/macos-status-icon / PR #109，开始时 head c63b487，已包含最新 origin/main@20ff11f。用户授权双端图标替换；本子任务只负责 macOS，Windows 独立处理，无协议影响。
+- 原应用图标使用白色方底和百分号，和已选定的菜单栏切换图形不一致。按用户认可原稿原样替换为蓝色渐变底板、冷白显示器、双向箭头和柔和投影；1024 px AppIcon.png 为设计源，ICNS 由同源缩放生成，不重复加入独立绘图实现。
+- ICNS 生成使用 sips 按 16/32/128/256/512 pt 的 1x 与 2x 输出标准 iconset，再以 iconutil -c icns 转换。原稿 PNG 完全一致；Xcode 工程与 Info.plist 现有 AppIcon 引用已覆盖两种资源，无需改工程。菜单栏代码保持 DS-052 放大版。
+- 修改文件：macOS/Resources/AppIcon.png、macOS/Resources/AppIcon.icns、macOS/DEVELOPMENT_CHECKLIST.md、handoffs/macos.md。
+- 本机缺完整 Xcode，相关 XCTest 与 build-app.sh 均在工具链检查阶段失败；不把旧构建结果当作本次验证，最终使用本次 CI 的新包完成严格验签与包内资源一致性检查。
+- 实机待验：Finder、Dock、关于页和 DMG 的图标观感与系统图标缓存刷新。本任务未启动或安装应用，未改权限、登录项、USB、DDC、网络、版本或发布资产。
+- 离线图标校验：ICNS 容器长度有效，系统 iconutil 可解出十个正确尺寸的透明表示；八个现代表示逐像素匹配原 iconset。系统为 16/32 pt 的 1x 生成传统 ic04/ic05，解码存在色彩转换，保留系统标准编码并人工核对小图；1024 px 源图及最大表示完全一致。
+- 最终自动验证：资源提交 6ac355eed6e0a9556ca9c8209d5f68f36419f693 通过 macOS CI 34835764890（job 103949099125），316/316 XCTest、Debug/Release、build-app.sh、严格签名、DMG/ZIP 检查与上传成功。下载该 run 的 arm64 ZIP 后严格 codesign 和 ZIP 完整性复验通过，包内 PNG/ICNS 与提交资源逐字节相同；ICNS SHA-256 为 9c9dca7e778fefe2fafcbbd20262fcb22496d547bcf84f3c5bb418a23436d921，ZIP SHA-256 为 28d106c4704901cbf558f2bcb3b0f27acd2da76c11a08c969be4cf96abc18b6f。此后仅补验证文档，实际应用外观仍待用户确认。
